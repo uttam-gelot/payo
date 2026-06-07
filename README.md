@@ -1,6 +1,6 @@
 <div align="center">
 
-# Payo
+<img src="https://raw.githubusercontent.com/uttam-gelot/payo/main/assets/logo.png" alt="Payo" width="200" />
 
 **Generate project-tailored AI assistant rules & skills in under two minutes.**
 
@@ -22,10 +22,13 @@ project's conventions instead of guessing.
 No install required — run it in any project directory:
 
 ```bash
-npx payo
+npx @uge/payo
 # or
-bunx payo
+bunx @uge/payo
 ```
+
+> The command you run after install is still `payo`. Install globally with
+> `npm i -g @uge/payo` (or `bun add -g @uge/payo`), then just run `payo`.
 
 Answer a short questionnaire about your stack, and Payo drops tailored AI
 guidance files straight into your repo.
