@@ -1,5 +1,5 @@
 {
-	"name": "payo",
+	"name": "@uge/payo",
 	"version": "0.1.0",
 	"description": "CLI tool to generate AI rules and skills for your project",
 	"module": "src/index.ts",
