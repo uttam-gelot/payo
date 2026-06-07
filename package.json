@@ -5,7 +5,7 @@
 	"module": "src/index.ts",
 	"main": "dist/index.js",
 	"bin": {
-		"payo": "./dist/index.js"
+		"payo": "dist/index.js"
 	},
 	"scripts": {
 		"dev": "bun run src/index.ts",
@@ -22,8 +22,15 @@
 	"engines": {
 		"bun": ">=1.1.0"
 	},
-	"files": ["dist"],
-	"keywords": ["cli", "ai", "rules", "skills"],
+	"files": [
+		"dist"
+	],
+	"keywords": [
+		"cli",
+		"ai",
+		"rules",
+		"skills"
+	],
 	"license": "MIT",
 	"type": "module",
 	"dependencies": {
