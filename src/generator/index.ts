@@ -1,0 +1,305 @@
+/**
+ * Generator entry point. Resolves the provider Strategy for the chosen AI tool.
+ * If that provider exposes a headless CLI agent and it is installed, the agent
+ * generates a fixed set of skill docs in the tool's native format — every
+ * applicable skill runs as its own subprocess in a bounded parallel pool.
+ * Multi-file tools keep each skill's native file; single-file tools stage each
+ * skill to a temp file and concatenate the survivors into their one master doc.
+ * Otherwise (no agent, not installed, or every run failed) it falls back to the
+ * provider's static template — so the user is never left empty-handed.
+ */
+import fs from 'fs';
+import path from 'path';
+import type { AiTool } from '../types/index';
+import type { Answers } from '../questions/types';
+import type {
+  AgentRunner,
+  AiProvider,
+  GeneratedArtifact,
+  GenerateHooks,
+  GenerationResult,
+  ResumeStore,
+  RuleSection,
+} from './types';
+import type { SkillSpec } from './skills';
+import { buildBaseRules } from './rules';
+import { selectSkills } from './skills';
+import { isAvailable, runAgent } from './agent';
+import { getProvider } from '../providers/index';
+import { config } from '../config';
+
+/** Atomic write-then-rename, mirroring src/state/index.ts. */
+function writeArtifact(artifact: GeneratedArtifact): void {
+  const dest = path.resolve(process.cwd(), artifact.path);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  const tmp = dest + '.tmp';
+  fs.writeFileSync(tmp, artifact.content, 'utf-8');
+  fs.renameSync(tmp, dest);
+}
+
+/** Provider-agnostic rule sections rendered as the prompt's project context. */
+function projectContext(sections: RuleSection[]): string {
+  return sections.map((s) => `## ${s.title}\n${s.body}`).join('\n\n');
+}
+
+/** The project-local write instruction naming this run's target file. */
+const writeLineFor = (rel: string): string =>
+  `- Write the result to the project-local file ./${rel} (relative to the current working directory — this project). Do NOT write to any global, home-directory, or user-level config location.`;
+
+/** Shared "Requirements" block; `writeLine` names the target for this run. */
+function requirements(writeLine: string): string {
+  return [
+    'Requirements:',
+    "- Ground every rule in this project's stated purpose (Project Overview) and the exact stack and choices above. Do not include guidance for tools, languages, or frameworks that are not listed.",
+    '- Treat any custom/user-specified values verbatim — they may be non-standard names, not well-known tools.',
+    '- Be specific and concise: concrete, actionable rules for THIS project, with short examples where useful. No generic filler or boilerplate.',
+    writeLine,
+    '- Create or update that file directly using your file tools. Output only the file; do not ask questions.',
+  ].join('\n');
+}
+
+/** Per-skill prompt (multi-file tools): one skill → its native file. */
+function composePrompt(
+  provider: AiProvider,
+  skill: SkillSpec,
+  answers: Answers,
+  sections: RuleSection[],
+  outPath: string,
+): string {
+  return [
+    `You are configuring ${provider.displayName} for the software project described below.`,
+    `Project context:\n\n${projectContext(sections)}`,
+    `Task: ${skill.buildPrompt(answers)}`,
+    requirements(writeLineFor(outPath)),
+  ].join('\n\n');
+}
+
+/** Per-skill prompt (single-file tools): one skill → a section body, staged for merge. */
+function composeSectionPrompt(
+  provider: AiProvider,
+  skill: SkillSpec,
+  answers: Answers,
+  sections: RuleSection[],
+  outPath: string,
+): string {
+  return [
+    `You are configuring ${provider.displayName} for the software project described below.`,
+    `Project context:\n\n${projectContext(sections)}`,
+    `Task: ${skill.buildPrompt(answers)}\n\n` +
+      `Write ONLY the body for the "${skill.title}" section as markdown — no top-level ` +
+      `heading and no restatement of the project context. It will be embedded under a ` +
+      `"## ${skill.title}" heading in a combined guide.`,
+    requirements(writeLineFor(outPath)),
+  ].join('\n\n');
+}
+
+function runStatic(
+  provider: AiProvider,
+  answers: Answers,
+  sections: RuleSection[],
+  hooks: GenerateHooks,
+): GenerationResult {
+  const artifacts = provider.generate({ answers, sections });
+  hooks.onStart?.('static', provider.displayName, artifacts.length);
+  for (const artifact of artifacts) writeArtifact(artifact);
+  return {
+    mode: 'static',
+    providerName: provider.displayName,
+    files: artifacts.map((a) => a.path),
+  };
+}
+
+/** True once the file actually landed — exit 0 alone is not proof of a write. */
+function wroteFile(rel: string): boolean {
+  return fs.existsSync(path.resolve(process.cwd(), rel));
+}
+
+/** Configured concurrency, clamped to [1, n] for this batch. */
+function poolSize(n: number): number {
+  return Math.max(1, Math.min(config.generation.concurrency(), n));
+}
+
+/**
+ * Map `fn` over `items` with at most `limit` in flight. Results are written by
+ * original index, so the returned array preserves input order regardless of
+ * completion order — keeping downstream skill/failure lists deterministic.
+ */
+async function mapPool<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i], i);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return results;
+}
+
+/** Outcome of one skill's agent run: where it was told to write, and whether it did. */
+interface SkillRun {
+  skill: SkillSpec;
+  /** Project-relative path the skill was directed to write. */
+  path: string;
+  wrote: boolean;
+}
+
+/** Run every skill's agent concurrently (bounded), reporting progress per skill. */
+function runParallel(
+  runner: AgentRunner,
+  specs: SkillSpec[],
+  hooks: GenerateHooks,
+  pathFor: (skill: SkillSpec) => string,
+  promptFor: (skill: SkillSpec, outPath: string) => string,
+  resume?: ResumeStore,
+): Promise<SkillRun[]> {
+  const attempts = config.generation.retries() + 1;
+  return mapPool(specs, poolSize(specs.length), async (skill, i) => {
+    const rel = pathFor(skill);
+    // Resume: a skill confirmed done in a prior run whose output is still on
+    // disk is reused as-is — no model call. A missing file self-heals (re-runs).
+    if (resume?.done.has(skill.id) && wroteFile(rel)) {
+      hooks.onSkillSkip?.(skill.title);
+      return { skill, path: rel, wrote: true };
+    }
+    hooks.onSkill?.(skill.title, i + 1, specs.length);
+    const prompt = promptFor(skill, rel);
+    // Retry transient agent failures; success = exit 0 AND the file landed.
+    let wrote = false;
+    for (let attempt = 1; attempt <= attempts && !wrote; attempt++) {
+      const result = await runAgent(runner, prompt);
+      wrote = result.ok && wroteFile(rel);
+      if (!wrote && attempt < attempts) hooks.onSkillRetry?.(skill.title, attempt);
+    }
+    if (wrote) resume?.mark(skill.id);
+    hooks.onSkillResult?.(skill.title, wrote);
+    return { skill, path: rel, wrote };
+  });
+}
+
+/** AI mode for multi-file tools: each skill's native file is a deliverable. */
+async function runMultiFile(
+  provider: AiProvider,
+  runner: AgentRunner,
+  specs: SkillSpec[],
+  answers: Answers,
+  sections: RuleSection[],
+  hooks: GenerateHooks,
+  resume?: ResumeStore,
+): Promise<GenerationResult | null> {
+  hooks.onStart?.('ai', provider.displayName, specs.length);
+  const runs = await runParallel(
+    runner,
+    specs,
+    hooks,
+    (skill) => runner.outputPath(skill.id),
+    (skill, outPath) => composePrompt(provider, skill, answers, sections, outPath),
+    resume,
+  );
+
+  const skills: string[] = [];
+  const failures: string[] = [];
+  const files: string[] = [];
+  for (const r of runs) {
+    if (r.wrote) {
+      skills.push(r.skill.title);
+      if (!files.includes(r.path)) files.push(r.path);
+    } else {
+      failures.push(r.skill.title);
+    }
+  }
+  if (skills.length === 0) return null;
+  return {
+    mode: 'ai',
+    providerName: provider.displayName,
+    files,
+    skills,
+    failures: failures.length ? failures : undefined,
+  };
+}
+
+/**
+ * AI mode for single-file tools: stage each skill to a per-skill file in
+ * parallel, then concatenate the survivors into the one master doc the tool
+ * expects. The staging dir is stable (not random) so an interrupted run leaves
+ * its finished sections behind to resume from; it is removed on the terminal
+ * paths here (success or none-written), which an interruption skips.
+ */
+async function runSingleFile(
+  provider: AiProvider,
+  runner: AgentRunner,
+  specs: SkillSpec[],
+  answers: Answers,
+  sections: RuleSection[],
+  hooks: GenerateHooks,
+  resume?: ResumeStore,
+): Promise<GenerationResult | null> {
+  hooks.onStart?.('ai', provider.displayName, specs.length);
+  const stagingDir = path.join(config.payo.dir(), 'staging');
+  fs.mkdirSync(stagingDir, { recursive: true });
+  const stagingRel = path.relative(process.cwd(), stagingDir);
+  try {
+    const runs = await runParallel(
+      runner,
+      specs,
+      hooks,
+      (skill) => path.join(stagingRel, `${skill.id}.md`),
+      (skill, outPath) => composeSectionPrompt(provider, skill, answers, sections, outPath),
+      resume,
+    );
+
+    const survivors = runs.filter((r) => r.wrote);
+    if (survivors.length === 0) return null;
+
+    const body = survivors
+      .map((r) => {
+        const content = fs.readFileSync(path.resolve(process.cwd(), r.path), 'utf-8').trim();
+        return `## ${r.skill.title}\n\n${content}`;
+      })
+      .join('\n\n');
+    const master = runner.outputPath('');
+    writeArtifact({ path: master, content: `# ${provider.displayName} Guide\n\n${body}\n` });
+
+    const failures = runs.filter((r) => !r.wrote).map((r) => r.skill.title);
+    return {
+      mode: 'ai',
+      providerName: provider.displayName,
+      files: [master],
+      skills: survivors.map((r) => r.skill.title),
+      failures: failures.length ? failures : undefined,
+    };
+  } finally {
+    fs.rmSync(stagingDir, { recursive: true, force: true });
+  }
+}
+
+export async function generate(
+  answers: Answers,
+  hooks: GenerateHooks = {},
+  resume?: ResumeStore,
+): Promise<GenerationResult> {
+  // Custom AI-tool strings fall through to the generic provider.
+  const aiTool: AiTool | undefined =
+    typeof answers.aiTool === 'string' ? answers.aiTool : undefined;
+  const provider = getProvider(aiTool) ?? getProvider('other')!;
+  const sections = buildBaseRules(answers);
+
+  const runner = provider.agent;
+  if (runner && isAvailable(runner)) {
+    const specs = selectSkills(answers);
+    if (specs.length > 0) {
+      const result = runner.singleFile
+        ? await runSingleFile(provider, runner, specs, answers, sections, hooks, resume)
+        : await runMultiFile(provider, runner, specs, answers, sections, hooks, resume);
+      // null ⇒ the agent wrote nothing usable; fall through to the static floor.
+      if (result) return result;
+    }
+  }
+
+  return runStatic(provider, answers, sections, hooks);
+}

@@ -1,0 +1,43 @@
+{
+	"name": "payo",
+	"version": "0.1.0",
+	"description": "CLI tool to generate AI rules and skills for your project",
+	"module": "src/index.ts",
+	"main": "dist/index.js",
+	"bin": {
+		"payo": "./dist/index.js"
+	},
+	"scripts": {
+		"dev": "bun run src/index.ts",
+		"build": "bun build src/index.ts --outdir dist --target node --minify",
+		"postbuild": "chmod +x dist/index.js",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test",
+		"test:watch": "bun test --watch",
+		"test:coverage": "bun test --coverage",
+		"lint": "eslint src tests --ext .ts",
+		"format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+		"format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\""
+	},
+	"engines": {
+		"bun": ">=1.1.0"
+	},
+	"files": ["dist"],
+	"keywords": ["cli", "ai", "rules", "skills"],
+	"license": "MIT",
+	"type": "module",
+	"dependencies": {
+		"@clack/prompts": "^1.2.0",
+		"zod": "^4.3.6"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.3.13",
+		"@typescript-eslint/eslint-plugin": "^8",
+		"@typescript-eslint/parser": "^8",
+		"eslint": "^8",
+		"eslint-config-prettier": "^9",
+		"eslint-plugin-prettier": "^5",
+		"prettier": "^3.8.3",
+		"typescript": "^6.0.3"
+	}
+}

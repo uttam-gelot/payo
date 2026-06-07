@@ -1,0 +1,483 @@
+/**
+ * Option data and dynamic option builders for the core questions.
+ * Extracted from the former imperative prompts so the flow stays declarative.
+ */
+import type { Answers, Option } from './types';
+import { listProviders } from '../providers/index';
+import { modulesFor } from '../stack/registry';
+import { isMongo } from '../stack/predicates';
+
+// Only the tools we natively support are offered — the generic 'other'
+// provider is an internal fallback, not a user-selectable choice.
+export const aiToolOptions = (): Option<string>[] =>
+  listProviders()
+    .filter((p) => p.id !== 'other')
+    .map((p) => ({
+      value: p.id,
+      label: p.displayName,
+      ...(p.hint ? { hint: p.hint } : {}),
+    }));
+
+export const projectTypeOptions: Option<string>[] = [
+  { value: 'full-stack', label: 'Full-stack' },
+  { value: 'frontend', label: 'Frontend' },
+  { value: 'backend', label: 'Backend' },
+];
+
+export const languageOptions = (a: Answers): Option<string>[] =>
+  a.projectType === 'frontend'
+    ? [
+        { value: 'typescript', label: 'TypeScript' },
+        { value: 'javascript', label: 'JavaScript' },
+      ]
+    : [
+        { value: 'typescript', label: 'TypeScript' },
+        { value: 'python', label: 'Python' },
+        { value: 'go', label: 'Go' },
+        { value: 'rust', label: 'Rust' },
+        { value: 'javascript', label: 'JavaScript' },
+      ];
+
+/** Framework options come from tech modules whose appliesTo() passes, plus None. */
+export const frameworkOptions = (a: Answers): Option<string>[] => {
+  const fromModules = modulesFor('framework', a).flatMap((m) => m.options?.(a) ?? []);
+  return [...fromModules, { value: 'none', label: 'None' }];
+};
+
+export const apiArchitectureOptions: Option<string>[] = [
+  { value: 'rest', label: 'REST', hint: 'recommended' },
+  { value: 'graphql', label: 'GraphQL' },
+  { value: 'grpc', label: 'gRPC' },
+  { value: 'trpc', label: 'tRPC' },
+  { value: 'none', label: 'None / Not Applicable' },
+];
+
+export const stylingOptions: Option<string>[] = [
+  { value: 'tailwind', label: 'Tailwind CSS', hint: 'recommended' },
+  { value: 'shadcn', label: 'shadcn/ui' },
+  { value: 'css-modules', label: 'CSS Modules' },
+  { value: 'styled-components', label: 'Styled Components' },
+  { value: 'emotion', label: 'Emotion' },
+  { value: 'mui', label: 'Material UI (MUI)' },
+  { value: 'mantine', label: 'Mantine' },
+  { value: 'chakra', label: 'Chakra UI' },
+  { value: 'antd', label: 'Ant Design' },
+  { value: 'unocss', label: 'UnoCSS' },
+  { value: 'panda', label: 'Panda CSS' },
+  { value: 'bootstrap', label: 'Bootstrap' },
+  { value: 'daisyui', label: 'daisyUI' },
+  { value: 'vanilla-css', label: 'Vanilla CSS' },
+  { value: 'none', label: 'None' },
+];
+
+export const databaseOptions: Option<string>[] = [
+  { value: 'postgresql', label: 'PostgreSQL', hint: 'recommended' },
+  { value: 'mysql', label: 'MySQL' },
+  { value: 'mariadb', label: 'MariaDB' },
+  { value: 'sqlite', label: 'SQLite' },
+  { value: 'turso', label: 'Turso / libSQL' },
+  { value: 'cockroachdb', label: 'CockroachDB' },
+  { value: 'neon', label: 'Neon (serverless Postgres)' },
+  { value: 'mongodb', label: 'MongoDB' },
+  { value: 'redis', label: 'Redis' },
+  { value: 'dynamodb', label: 'DynamoDB' },
+  { value: 'supabase', label: 'Supabase' },
+  { value: 'firebase', label: 'Firebase' },
+  { value: 'clickhouse', label: 'ClickHouse' },
+  { value: 'cassandra', label: 'Cassandra / ScyllaDB' },
+  { value: 'neo4j', label: 'Neo4j' },
+  { value: 'elasticsearch', label: 'Elasticsearch / OpenSearch' },
+  { value: 'none', label: 'None' },
+];
+
+/** ORM options come from tech modules whose appliesTo() passes, plus raw/native and None. */
+export const ormOptions = (a: Answers): Option<string>[] => {
+  const fromModules = modulesFor('orm', a).flatMap((m) => m.options?.(a) ?? []);
+  const native: Option<string> = isMongo(a)
+    ? { value: 'native-driver', label: 'Native driver (no ODM)' }
+    : { value: 'raw-sql', label: 'Raw SQL / query builder' };
+  return [...fromModules, native, { value: 'none', label: 'None' }];
+};
+
+export const structureOptions: Option<string>[] = [
+  { value: 'standard', label: 'Standard (Framework default)', hint: 'recommended' },
+  { value: 'feature-based', label: 'Feature-based (Vertical slices)' },
+  { value: 'ddd', label: 'Domain-Driven Design (DDD)' },
+  { value: 'monorepo', label: 'Monorepo (Turborepo/Nx)' },
+  { value: 'custom', label: 'Custom' },
+];
+
+export const codingStandardOptions: Option<string>[] = [
+  { value: 'DRY', label: "DRY — Don't Repeat Yourself", hint: 'recommended' },
+  { value: 'modular', label: 'Modular architecture', hint: 'recommended' },
+  { value: 'soc', label: 'Separation of concerns', hint: 'recommended' },
+  { value: 'solid', label: 'SOLID principles' },
+  { value: 'functional', label: 'Functional / Pure functions' },
+  { value: 'strict-types', label: 'Strict type safety' },
+];
+
+export const documentationOptions: Option<string>[] = [
+  { value: 'readme', label: 'README — overview, setup, common commands', hint: 'recommended' },
+  {
+    value: 'comments',
+    label: 'Code comments / doc-comments (JSDoc, docstrings)',
+    hint: 'recommended',
+  },
+  { value: 'api-docs', label: 'API reference docs' },
+  { value: 'adr', label: 'Architecture Decision Records (ADRs)' },
+  { value: 'changelog', label: 'CHANGELOG (Keep a Changelog)' },
+];
+
+export const formatterOptions = (a: Answers): Option<string>[] => {
+  switch (a.language) {
+    case 'typescript':
+    case 'javascript':
+      return [
+        { value: 'prettier', label: 'Prettier', hint: 'recommended' },
+        { value: 'biome', label: 'Biome' },
+        { value: 'dprint', label: 'dprint' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'python':
+      return [
+        { value: 'black', label: 'Black', hint: 'recommended' },
+        { value: 'ruff', label: 'Ruff (Formatter)' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'go':
+      return [
+        { value: 'gofmt', label: 'gofmt / goimports', hint: 'recommended' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'rust':
+      return [
+        { value: 'rustfmt', label: 'rustfmt', hint: 'recommended' },
+        { value: 'none', label: 'None' },
+      ];
+    default:
+      return [
+        { value: 'prettier', label: 'Prettier' },
+        { value: 'none', label: 'None' },
+      ];
+  }
+};
+
+export const linterOptions = (a: Answers): Option<string>[] => {
+  switch (a.language) {
+    case 'typescript':
+    case 'javascript':
+      return [
+        { value: 'eslint', label: 'ESLint', hint: 'recommended' },
+        { value: 'biome', label: 'Biome (Linter)' },
+        { value: 'oxlint', label: 'oxlint' },
+        { value: 'standardjs', label: 'StandardJS' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'python':
+      return [
+        { value: 'ruff', label: 'Ruff (Linter)', hint: 'recommended' },
+        { value: 'flake8', label: 'Flake8' },
+        { value: 'pylint', label: 'PyLint' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'go':
+      return [
+        { value: 'golangci-lint', label: 'golangci-lint', hint: 'recommended' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'rust':
+      return [
+        { value: 'clippy', label: 'Clippy', hint: 'recommended' },
+        { value: 'none', label: 'None' },
+      ];
+    default:
+      return [
+        { value: 'eslint', label: 'ESLint' },
+        { value: 'none', label: 'None' },
+      ];
+  }
+};
+
+export const loggerOptions = (a: Answers): Option<string>[] => {
+  switch (a.language) {
+    case 'typescript':
+    case 'javascript':
+      return [
+        { value: 'pino', label: 'Pino', hint: 'recommended' },
+        { value: 'winston', label: 'Winston' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'python':
+      return [
+        { value: 'structlog', label: 'structlog', hint: 'recommended' },
+        { value: 'loguru', label: 'Loguru' },
+        { value: 'logging', label: 'logging (stdlib)' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'go':
+      return [
+        { value: 'slog', label: 'slog (stdlib)', hint: 'recommended' },
+        { value: 'zap', label: 'Zap' },
+        { value: 'zerolog', label: 'Zerolog' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'rust':
+      return [
+        { value: 'tracing', label: 'tracing', hint: 'recommended' },
+        { value: 'log', label: 'log' },
+        { value: 'none', label: 'None' },
+      ];
+    default:
+      return [
+        { value: 'pino', label: 'Pino', hint: 'recommended' },
+        { value: 'none', label: 'None' },
+      ];
+  }
+};
+
+export const testTypeOptions = (a: Answers): Option<string>[] => {
+  const opts: Option<string>[] = [
+    { value: 'unit', label: 'Unit', hint: 'recommended' },
+    { value: 'integration', label: 'Integration', hint: 'recommended' },
+  ];
+  // Component tests only apply to UI projects.
+  if (a.projectType !== 'backend') opts.push({ value: 'component', label: 'Component' });
+  opts.push({ value: 'e2e', label: 'End-to-end (E2E)' });
+  return opts;
+};
+
+export const testRunnerOptions = (a: Answers): Option<string>[] => {
+  switch (a.language) {
+    case 'typescript':
+    case 'javascript':
+      return [
+        { value: 'vitest', label: 'Vitest', hint: 'recommended' },
+        { value: 'jest', label: 'Jest' },
+        { value: 'node-test', label: 'node:test' },
+        { value: 'bun-test', label: 'bun test' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'python':
+      return [
+        { value: 'pytest', label: 'pytest', hint: 'recommended' },
+        { value: 'unittest', label: 'unittest (stdlib)' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'go':
+      return [
+        { value: 'go-test', label: 'go test', hint: 'recommended' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'rust':
+      return [
+        { value: 'cargo-test', label: 'cargo test', hint: 'recommended' },
+        { value: 'none', label: 'None' },
+      ];
+    default:
+      return [
+        { value: 'jest', label: 'Jest', hint: 'recommended' },
+        { value: 'none', label: 'None' },
+      ];
+  }
+};
+
+export const e2eToolOptions: Option<string>[] = [
+  { value: 'playwright', label: 'Playwright', hint: 'recommended' },
+  { value: 'cypress', label: 'Cypress' },
+  { value: 'webdriverio', label: 'WebdriverIO' },
+  { value: 'none', label: 'None' },
+];
+
+export const gitWorkflowOptions: Option<string>[] = [
+  {
+    value: 'standard',
+    label: 'Standard — conventional commits, feature branches, PR required',
+    hint: 'recommended',
+  },
+  { value: 'minimal', label: 'Minimal — free-form commits, direct commits allowed' },
+];
+
+// --- Authentication ---------------------------------------------------------
+
+/** Hosted identity providers offered regardless of language. */
+const HOSTED_AUTH: Option<string>[] = [
+  { value: 'auth0', label: 'Auth0' },
+  { value: 'cognito', label: 'AWS Cognito' },
+];
+
+export const authApproachOptions = (a: Answers): Option<string>[] => {
+  const none: Option<string> = { value: 'none', label: 'None' };
+  switch (a.language) {
+    case 'python':
+      return a.framework === 'django'
+        ? [
+            { value: 'django-allauth', label: 'django-allauth', hint: 'recommended' },
+            { value: 'django-auth', label: 'Built-in Django auth' },
+            { value: 'authlib', label: 'Authlib (OAuth/OIDC)' },
+            { value: 'custom-jwt', label: 'Custom JWT' },
+            ...HOSTED_AUTH,
+            none,
+          ]
+        : [
+            { value: 'fastapi-users', label: 'fastapi-users', hint: 'recommended' },
+            { value: 'authlib', label: 'Authlib (OAuth/OIDC)' },
+            { value: 'custom-jwt', label: 'Custom JWT' },
+            ...HOSTED_AUTH,
+            none,
+          ];
+    case 'go':
+      return [
+        { value: 'golang-jwt', label: 'golang-jwt', hint: 'recommended' },
+        { value: 'goth', label: 'Goth (OAuth)' },
+        { value: 'sessions', label: 'Custom sessions' },
+        ...HOSTED_AUTH,
+        none,
+      ];
+    case 'rust':
+      return [
+        { value: 'jsonwebtoken', label: 'jsonwebtoken (JWT)', hint: 'recommended' },
+        { value: 'tower-sessions', label: 'tower-sessions' },
+        { value: 'oauth2', label: 'oauth2 crate' },
+        ...HOSTED_AUTH,
+        none,
+      ];
+    default:
+      // TS / JS
+      return a.framework === 'nextjs'
+        ? [
+            { value: 'authjs', label: 'Auth.js / NextAuth', hint: 'recommended' },
+            { value: 'better-auth', label: 'Better Auth' },
+            { value: 'clerk', label: 'Clerk' },
+            { value: 'supabase-auth', label: 'Supabase Auth' },
+            { value: 'custom', label: 'Custom' },
+            ...HOSTED_AUTH,
+            none,
+          ]
+        : [
+            { value: 'better-auth', label: 'Better Auth', hint: 'recommended' },
+            { value: 'authjs', label: 'Auth.js' },
+            { value: 'passport', label: 'Passport' },
+            { value: 'clerk', label: 'Clerk' },
+            { value: 'custom-jwt', label: 'Custom JWT / sessions' },
+            ...HOSTED_AUTH,
+            none,
+          ];
+  }
+};
+
+export const authStrategyOptions: Option<string>[] = [
+  { value: 'session', label: 'Server-side session cookies', hint: 'recommended' },
+  { value: 'jwt', label: 'Stateless JWT (access + refresh)' },
+  { value: 'provider', label: 'Provider-managed (hosted)' },
+];
+
+// --- Runtime & package manager ----------------------------------------------
+
+export const packageManagerOptions = (a: Answers): Option<string>[] => {
+  switch (a.language) {
+    case 'typescript':
+    case 'javascript':
+      return [
+        { value: 'pnpm', label: 'pnpm', hint: 'recommended' },
+        { value: 'npm', label: 'npm' },
+        { value: 'yarn', label: 'Yarn' },
+        { value: 'bun', label: 'Bun' },
+      ];
+    case 'python':
+      return [
+        { value: 'uv', label: 'uv', hint: 'recommended' },
+        { value: 'poetry', label: 'Poetry' },
+        { value: 'pip-venv', label: 'pip + venv' },
+        { value: 'pipenv', label: 'Pipenv' },
+      ];
+    default:
+      return [];
+  }
+};
+
+export const runtimeOptions: Option<string>[] = [
+  { value: 'node', label: 'Node.js', hint: 'recommended' },
+  { value: 'bun', label: 'Bun' },
+  { value: 'deno', label: 'Deno' },
+];
+
+// --- Validation -------------------------------------------------------------
+
+export const validationOptions = (a: Answers): Option<string>[] => {
+  switch (a.language) {
+    case 'typescript':
+    case 'javascript': {
+      const nest = a.framework === 'nestjs';
+      return [
+        { value: 'zod', label: 'Zod', ...(nest ? {} : { hint: 'recommended' }) },
+        { value: 'valibot', label: 'Valibot' },
+        { value: 'arktype', label: 'ArkType' },
+        { value: 'yup', label: 'Yup' },
+        {
+          value: 'class-validator',
+          label: 'class-validator',
+          ...(nest ? { hint: 'recommended' } : {}),
+        },
+        { value: 'none', label: 'None' },
+      ];
+    }
+    case 'python':
+      return [
+        { value: 'pydantic', label: 'Pydantic v2', hint: 'recommended' },
+        { value: 'marshmallow', label: 'marshmallow' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'go':
+      return [
+        { value: 'validator', label: 'go-playground/validator', hint: 'recommended' },
+        { value: 'ozzo', label: 'ozzo-validation' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'rust':
+      return [
+        { value: 'validator', label: 'validator', hint: 'recommended' },
+        { value: 'garde', label: 'garde' },
+        { value: 'none', label: 'None' },
+      ];
+    default:
+      return [
+        { value: 'zod', label: 'Zod', hint: 'recommended' },
+        { value: 'none', label: 'None' },
+      ];
+  }
+};
+
+// --- State management (frontend / full-stack) -------------------------------
+
+export const stateManagementOptions = (a: Answers): Option<string>[] => {
+  switch (a.framework) {
+    case 'vue':
+    case 'nuxtjs':
+      return [
+        { value: 'pinia', label: 'Pinia', hint: 'recommended' },
+        { value: 'none', label: 'None / local state' },
+      ];
+    case 'svelte':
+    case 'sveltekit':
+      return [
+        { value: 'svelte-stores', label: 'Svelte stores / runes', hint: 'recommended' },
+        { value: 'none', label: 'None / local state' },
+      ];
+    case 'angular':
+      return [
+        { value: 'signals', label: 'Signals', hint: 'recommended' },
+        { value: 'ngrx', label: 'NgRx' },
+        { value: 'none', label: 'None / services' },
+      ];
+    default:
+      // React / Next / Remix / Solid / generic frontend
+      return [
+        { value: 'zustand', label: 'Zustand (client state)', hint: 'recommended' },
+        { value: 'tanstack-query', label: 'TanStack Query (server state)' },
+        { value: 'redux-toolkit', label: 'Redux Toolkit' },
+        { value: 'jotai', label: 'Jotai' },
+        { value: 'context', label: 'React Context' },
+        { value: 'none', label: 'None / local state' },
+      ];
+  }
+};

@@ -1,0 +1,246 @@
+/**
+ * Skill taxonomy: the fixed set of rule/skill documents payo asks the
+ * selected AI agent to generate. Provider-agnostic — each spec gates itself
+ * on the collected answers and supplies the task instruction for one doc.
+ */
+import type { Answers } from '../questions/types';
+
+export interface SkillSpec {
+  /** Stable id; also used as the native filename stem. */
+  id: string;
+  /** Human-friendly name, shown in the CLI report. */
+  title: string;
+  /** Whether this skill applies to the current answers. */
+  appliesTo(a: Answers): boolean;
+  /** Task instruction for the agent (project context is added by the caller). */
+  buildPrompt(a: Answers): string;
+}
+
+/** A string answer is "set" when it is a non-empty value other than 'none'. */
+function has(a: Answers, key: string): boolean {
+  const v = a[key];
+  return typeof v === 'string' && v.length > 0 && v !== 'none';
+}
+
+/** Read a "set" string answer, or undefined. */
+function val(a: Answers, key: string): string | undefined {
+  return has(a, key) ? (a[key] as string) : undefined;
+}
+
+// Declared in order of importance — this drives the section order when a
+// single-file tool (e.g. Codex AGENTS.md) merges the skills into one doc.
+const skills: SkillSpec[] = [
+  {
+    id: 'project-overview',
+    title: 'Project Overview',
+    appliesTo: () => true,
+    buildPrompt: () =>
+      'Summarize this specific project for an AI coding assistant: its purpose and scope (from the ' +
+      'project description), the high-level architecture, and how the selected stack fits together. ' +
+      'Keep it concise and factual — describe THIS project, not software in general.',
+  },
+  {
+    id: 'coding-standards',
+    title: 'Coding Standards',
+    appliesTo: () => true,
+    buildPrompt: (a): string => {
+      const lang = val(a, 'language');
+      const standards = Array.isArray(a.codingStandards) ? a.codingStandards.join(', ') : undefined;
+      const validation = val(a, 'validation');
+      const base =
+        `Write the coding standards and conventions the assistant must follow for ${lang ?? 'the chosen language'}` +
+        (standards ? `, applying the selected standards (${standards})` : '') +
+        ': naming, file organization, error handling, and language-idiomatic best practices. ' +
+        'Include environment and configuration handling: keep configuration and secrets in environment ' +
+        'variables, commit a .env.example documenting every required variable (never commit a real .env), ' +
+        'and validate required variables at startup.';
+      return validation
+        ? base +
+            ` Validate inputs and external data at trust boundaries using the selected validation ` +
+            `library (${validation}), and derive types from the schemas where possible.`
+        : base;
+    },
+  },
+  {
+    id: 'framework-conventions',
+    title: 'Framework Conventions',
+    appliesTo: (a) => has(a, 'framework'),
+    buildPrompt: (a): string => {
+      const fw = val(a, 'framework');
+      return (
+        `Write framework-specific conventions and best practices for ${fw ?? 'the chosen framework'}, ` +
+        'incorporating the framework follow-up choices in the Tech Details context (e.g. router, ' +
+        'component model, data-fetching). Cover project structure, idiomatic patterns, and common pitfalls.'
+      );
+    },
+  },
+  {
+    id: 'data-layer',
+    title: 'Data Layer',
+    appliesTo: (a) => has(a, 'database'),
+    buildPrompt: (a): string => {
+      const orm = val(a, 'orm');
+      const via = orm
+        ? `the selected ORM / data-access layer (${orm})`
+        : 'the selected database and ORM';
+      return (
+        'Write data-layer guidance: how to model schemas, write queries/migrations, and ' +
+        `use ${via} safely and consistently, following its idioms and the migration/schema ` +
+        'choices in the Tech Details context. Include naming conventions for tables, columns, ' +
+        'indexes, and foreign keys, following the chosen conventions (see the Tech Details context).'
+      );
+    },
+  },
+  {
+    id: 'api-conventions',
+    title: 'API Conventions',
+    appliesTo: (a) => has(a, 'apiArchitecture'),
+    buildPrompt: (a): string => {
+      const api = val(a, 'apiArchitecture');
+      return (
+        `Write API conventions for ${api ? `the ${api} API` : 'the chosen API architecture'}: ` +
+        'endpoint/handler structure, a URL versioning scheme (e.g. a /v1 prefix), a consistent ' +
+        'structured response envelope for both success and error payloads, pagination conventions for ' +
+        'list endpoints (limit/offset or cursor) with consistent metadata, request/response validation, ' +
+        'status codes, and error semantics.'
+      );
+    },
+  },
+  {
+    id: 'auth',
+    title: 'Authentication & Authorization',
+    appliesTo: (a) => has(a, 'authApproach'),
+    buildPrompt: (a): string => {
+      const approach = val(a, 'authApproach');
+      const strategy = val(a, 'authStrategy');
+      const via = approach ? `the selected approach (${approach})` : 'the chosen auth approach';
+      const parts = [
+        `Write authentication and authorization conventions using ${via}: how to model identity ` +
+          'and sessions, protect routes/handlers, and verify credentials.',
+      ];
+      if (strategy) parts.push(`Use a ${strategy} session strategy.`);
+      parts.push(
+        'Hash passwords with a strong algorithm (argon2 or bcrypt), keep secrets in environment ' +
+          'variables, set secure/httpOnly cookies where applicable, and never log credentials, ' +
+          'tokens, or session identifiers.',
+      );
+      if (a.rbac === true) {
+        parts.push(
+          'Enforce role-based access control (RBAC) with a clear roles/permissions model checked ' +
+            'on the server for every protected operation.',
+        );
+      }
+      return parts.join(' ');
+    },
+  },
+  {
+    id: 'error-handling-logging',
+    title: 'Error Handling & Logging',
+    appliesTo: () => true,
+    buildPrompt: (a): string => {
+      const logger = val(a, 'logger');
+      const via = logger ? `the selected logger (${logger})` : 'a dedicated logger';
+      return (
+        'Write error-handling and logging conventions: a consistent error strategy ' +
+        '(typed/wrapped errors, fail fast, never swallow exceptions) and how errors surface to ' +
+        `callers; structured logging through ${via} (never raw console/print) with appropriate ` +
+        'log levels, and never logging secrets or sensitive data.'
+      );
+    },
+  },
+  {
+    id: 'state-management',
+    title: 'State Management',
+    appliesTo: (a) => has(a, 'stateManagement') && a.projectType !== 'backend',
+    buildPrompt: (a): string => {
+      const lib = val(a, 'stateManagement');
+      const via = lib ? `the selected library (${lib})` : 'the chosen state solution';
+      return (
+        `Write state-management conventions using ${via}: separate server state ` +
+        '(data fetching/caching) from client/UI state, keep stores small and colocated, avoid ' +
+        'prop drilling and unnecessary global state, and define clear patterns for async state, ' +
+        'loading, and error handling.'
+      );
+    },
+  },
+  {
+    id: 'testing',
+    title: 'Testing',
+    appliesTo: () => true,
+    buildPrompt: (a): string => {
+      const types = Array.isArray(a.testTypes) ? a.testTypes.join(', ') : undefined;
+      const runner = val(a, 'testRunner');
+      const e2e = val(a, 'e2eTool');
+      const parts = [
+        'Write testing guidance appropriate to the stack: a separate testing setup (dedicated ' +
+          'test configuration and directory layout, fixtures/factories, and separation of test ' +
+          'types), what to test, and conventions for naming and organizing tests.',
+      ];
+      if (types) parts.push(`Cover these test types: ${types}.`);
+      if (runner) parts.push(`Use ${runner} for unit and integration tests.`);
+      if (e2e) parts.push(`Use ${e2e} for end-to-end tests.`);
+      return parts.join(' ');
+    },
+  },
+  {
+    id: 'tooling',
+    title: 'Tooling',
+    appliesTo: (a) =>
+      has(a, 'formatter') || has(a, 'linter') || has(a, 'packageManager') || has(a, 'runtime'),
+    buildPrompt: (a): string => {
+      const pm = val(a, 'packageManager');
+      const rt = val(a, 'runtime');
+      const fmt = val(a, 'formatter');
+      const lint = val(a, 'linter');
+      const tools: string[] = [];
+      if (fmt) tools.push(`formatter (${fmt})`);
+      if (lint) tools.push(`linter (${lint})`);
+      const named = tools.length ? tools.join(' and ') : 'formatter and linter';
+      const base =
+        `Write tooling guidance: how the assistant should respect the selected ${named} and keep ` +
+        'code passing them.';
+      const extra: string[] = [];
+      if (pm) extra.push(`Use ${pm} as the package manager and commit its lockfile.`);
+      if (rt) extra.push(`Target the ${rt} runtime.`);
+      return extra.length ? `${base} ${extra.join(' ')}` : base;
+    },
+  },
+  {
+    id: 'documentation',
+    title: 'Documentation',
+    appliesTo: (a) => Array.isArray(a.documentation) && a.documentation.length > 0,
+    buildPrompt: (a): string => {
+      const picks = (a.documentation as string[]).join(', ');
+      return (
+        `Write documentation conventions for the selected artifacts (${picks}): what each should ` +
+        'contain and how to keep it current. For a README cover purpose, setup, and common commands; ' +
+        'for code comments use the language doc-comment standard (JSDoc/TSDoc, docstrings) and explain ' +
+        'intent rather than restating code; keep docs beside the code and update them as part of each change.'
+      );
+    },
+  },
+  {
+    id: 'git-workflow',
+    title: 'Git Workflow',
+    appliesTo: (a) => has(a, 'gitWorkflow'),
+    buildPrompt: (a): string => {
+      const wf = val(a, 'gitWorkflow');
+      const base =
+        `Write git-workflow guidance for the ${wf ?? 'selected'} workflow: branching, commit message ` +
+        'conventions, and PR practices, and maintaining a comprehensive .gitignore (build output, ' +
+        'dependencies, environment/secret files, and OS/editor artifacts).';
+      if (typeof a.aiAttribution !== 'boolean') return base;
+      return (
+        base +
+        (a.aiAttribution
+          ? ' In commits and PRs, attribute AI-assisted work (e.g. a Co-Authored-By trailer).'
+          : ' Do not mention AI assistants or add AI co-authorship trailers in commit messages or PR descriptions.')
+      );
+    },
+  },
+];
+
+/** The skills that apply to the current answers, in declared order. */
+export function selectSkills(a: Answers): SkillSpec[] {
+  return skills.filter((s) => s.appliesTo(a));
+}
