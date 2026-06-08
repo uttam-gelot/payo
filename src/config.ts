@@ -36,7 +36,7 @@ export const config = {
   /** Questionnaire constraints. */
   questionnaire: {
     /** Max length of the free-text project description. */
-    maxDescriptionChars: 200,
+    maxDescriptionChars: 1_000,
   },
 
   /** Project-local working dir for all payo state (session, staging). */
