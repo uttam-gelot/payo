@@ -1,4 +1,4 @@
-import { intro, outro, note, log } from '@clack/prompts';
+import { outro, note, log } from '@clack/prompts';
 import {
   loadSession,
   createSession,
@@ -13,9 +13,10 @@ import { flow } from '../questions/flow';
 import { generate } from '../generator/index';
 import { writeBootstrapPrompt } from '../generator/bootstrap';
 import type { ResumeStore } from '../generator/types';
+import { printBanner } from './banner';
 
 export async function run(): Promise<void> {
-  intro('✨ Payo — AI rules & skills generator');
+  printBanner();
 
   // --- Resume / Restart ---
   let session: Session;
