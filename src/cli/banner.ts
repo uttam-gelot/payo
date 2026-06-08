@@ -80,8 +80,7 @@ function kittyImage(png: Buffer): string {
   let out = '';
   chunks.forEach((chunk, i) => {
     const more = i < chunks.length - 1 ? 1 : 0;
-    const control =
-      i === 0 ? `a=T,f=100,c=${LOGO_COLS},r=${rows},m=${more}` : `m=${more}`;
+    const control = i === 0 ? `a=T,f=100,c=${LOGO_COLS},r=${rows},m=${more}` : `m=${more}`;
     out += `\x1b_G${control};${chunk}\x1b\\`;
   });
   return out + '\n'.repeat(rows);

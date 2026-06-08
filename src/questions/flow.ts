@@ -43,7 +43,8 @@ const core: Record<string, Question> = {
     id: 'projectDefinition',
     type: 'text',
     message: 'Describe your project (a few sentences — the more detail, the better).',
-    placeholder: 'e.g. REST API for an e-commerce platform with auth, payments, and admin dashboard',
+    placeholder:
+      'e.g. REST API for an e-commerce platform with auth, payments, and admin dashboard',
     validate: (input) => {
       const max = config.questionnaire.maxDescriptionChars;
       if (!input?.trim()) return 'Please provide a short description.';
