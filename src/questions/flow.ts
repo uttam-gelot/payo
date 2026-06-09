@@ -64,14 +64,14 @@ const core: Record<string, Question> = {
   apiArchitecture: {
     id: 'apiArchitecture',
     type: 'select',
-    message: 'API Architecture?',
+    message: 'API architecture?',
     options: opt.apiArchitectureOptions,
     when: (a) => a.projectType !== 'frontend',
   },
   styling: {
     id: 'stylingLibrary',
     type: 'select',
-    message: 'Styling / UI Library?',
+    message: 'Styling / UI library?',
     options: opt.stylingOptions,
     when: (a) => a.projectType !== 'backend',
   },
@@ -80,6 +80,7 @@ const core: Record<string, Question> = {
     type: 'select',
     message: 'Database?',
     options: opt.databaseOptions,
+    when: (a) => a.projectType !== 'frontend',
   },
   orm: {
     id: 'orm',
@@ -100,7 +101,7 @@ const core: Record<string, Question> = {
     id: 'codingStandards',
     type: 'multiselect',
     summary: 'Coding standards',
-    message: 'Coding standards? (space to select, enter to confirm)',
+    message: 'Coding standards?',
     options: opt.codingStandardOptions,
     required: true,
   },
@@ -108,7 +109,7 @@ const core: Record<string, Question> = {
     id: 'documentation',
     type: 'multiselect',
     summary: 'Documentation',
-    message: 'Which docs should the assistant maintain? (space to select, enter to confirm)',
+    message: 'Which docs should the assistant maintain?',
     options: opt.documentationOptions,
     required: false,
   },
@@ -116,14 +117,14 @@ const core: Record<string, Question> = {
     id: 'formatter',
     type: 'select',
     summary: 'Formatter',
-    message: 'Code Formatter?',
+    message: 'Code formatter?',
     optionsFrom: opt.formatterOptions,
   },
   linter: {
     id: 'linter',
     type: 'select',
     summary: 'Linter',
-    message: 'Code Linter?',
+    message: 'Code linter?',
     optionsFrom: opt.linterOptions,
   },
   gitWorkflow: {
@@ -146,12 +147,13 @@ const core: Record<string, Question> = {
     summary: 'Logger',
     message: 'Logging library?',
     optionsFrom: opt.loggerOptions,
+    when: (a) => a.projectType !== 'frontend',
   },
   testTypes: {
     id: 'testTypes',
     type: 'multiselect',
     summary: 'Test types',
-    message: 'Which kinds of tests? (space to select, enter to confirm)',
+    message: 'Which kinds of tests?',
     optionsFrom: opt.testTypeOptions,
     required: true,
   },
@@ -161,6 +163,9 @@ const core: Record<string, Question> = {
     summary: 'Test runner',
     message: 'Test runner for unit / integration tests?',
     optionsFrom: opt.testRunnerOptions,
+    when: (a) =>
+      Array.isArray(a.testTypes) &&
+      (a.testTypes.includes('unit') || a.testTypes.includes('integration')),
   },
   e2eTool: {
     id: 'e2eTool',
@@ -244,6 +249,9 @@ export const flow: FlowSection[] = [
   single(core.orm),
   expandSelected('orm'),
   // Authentication topic group — approach, session strategy, and RBAC.
+  // Intentionally ungated by projectType: approach + RBAC apply to client-side
+  // auth too (Clerk/Supabase SDKs in a frontend app). Only authStrategy (server
+  // sessions) is frontend-gated, on the question itself.
   {
     recommendable: true,
     gate: () => ({ id: 'auth.__recommended', title: 'Authentication' }),

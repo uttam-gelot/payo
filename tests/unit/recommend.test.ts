@@ -2,6 +2,7 @@ import { describe, it, expect } from 'bun:test';
 import {
   recommendedAnswer,
   recommendedLabel,
+  answerLabel,
   questionSummary,
 } from '../../src/questions/recommend';
 import type { Question } from '../../src/questions/types';
@@ -91,6 +92,32 @@ describe('recommendedLabel', () => {
         {},
       ),
     ).toBe('—');
+  });
+});
+
+describe('answerLabel', () => {
+  const sel: Question = {
+    id: 'x',
+    type: 'select',
+    message: '',
+    options: [
+      { value: 'a', label: 'Alpha — first' },
+      { value: 'b', label: 'Beta' },
+    ],
+  };
+
+  it('maps a stored select value to its option label, dropping the tail', () => {
+    expect(answerLabel(sel, 'a', {})).toBe('Alpha');
+  });
+
+  it('joins array values', () => {
+    expect(answerLabel({ ...sel, type: 'multiselect' }, ['a', 'b'], {})).toBe('Alpha, Beta');
+  });
+
+  it('renders booleans as Yes/No and unset as an em dash', () => {
+    expect(answerLabel({ id: 'c', type: 'confirm', message: '' }, true, {})).toBe('Yes');
+    expect(answerLabel({ id: 'c', type: 'confirm', message: '' }, false, {})).toBe('No');
+    expect(answerLabel(sel, undefined, {})).toBe('—');
   });
 });
 

@@ -7,8 +7,8 @@ import {
   cleanupWorkspace,
   type Session,
 } from '../state/index';
-import { confirmResume, confirmBootstrapPrompt } from '../questions/runner';
-import { runFlow } from '../questions/engine';
+import { confirmResume, confirmBootstrapPrompt, confirmGenerate } from '../questions/runner';
+import { runFlow, reviewLines } from '../questions/engine';
 import { flow } from '../questions/flow';
 import { generate } from '../generator/index';
 import { writeBootstrapPrompt } from '../generator/bootstrap';
@@ -36,6 +36,14 @@ export async function run(): Promise<void> {
 
   // --- Dynamic questionnaire ---
   session = await runFlow(flow, session);
+
+  // --- Review answers before generating ---
+  note(reviewLines(flow, session.answers).join('\n'), 'Review your stack');
+  if (!(await confirmGenerate())) {
+    // Keep the .payo/ session so a re-run resumes and lets the user edit answers.
+    outro('Cancelled — run again to review or change your answers.');
+    return;
+  }
 
   // --- Generate provider artifact(s) ---
   // Resume: skip skills a prior interrupted run already finished. The working

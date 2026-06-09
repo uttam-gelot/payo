@@ -282,11 +282,12 @@ export const testRunnerOptions = (a: Answers): Option<string>[] => {
   }
 };
 
+// No 'None' option: e2eTool only surfaces once the user has already picked the
+// 'e2e' test type, so offering None would contradict that choice.
 export const e2eToolOptions: Option<string>[] = [
   { value: 'playwright', label: 'Playwright', hint: 'recommended' },
   { value: 'cypress', label: 'Cypress' },
   { value: 'webdriverio', label: 'WebdriverIO' },
-  { value: 'none', label: 'None' },
 ];
 
 export const gitWorkflowOptions: Option<string>[] = [
