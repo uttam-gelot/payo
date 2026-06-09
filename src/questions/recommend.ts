@@ -43,12 +43,32 @@ export function questionSummary(q: Question): string {
 
 /** Human-readable label for a question's recommended answer, for the defaults note. */
 export function recommendedLabel(q: Question, a: Answers): string {
-  const value = recommendedAnswer(q, a);
+  return labelForValue(q, recommendedAnswer(q, a), a);
+}
+
+/** Human-readable label for a stored answer value, for the pre-generation review. */
+export function answerLabel(q: Question, value: unknown, a: Answers): string {
+  return labelForValue(q, normalizeValue(value), a);
+}
+
+/** Coerce a loosely-typed stored answer into the value shape labelForValue expects. */
+function normalizeValue(value: unknown): string | string[] | boolean | undefined {
+  if (value === undefined || typeof value === 'boolean' || typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string');
+  return undefined;
+}
+
+/** Render a select/multiselect/confirm/text value as a compact display label. */
+function labelForValue(
+  q: Question,
+  value: string | string[] | boolean | undefined,
+  a: Answers,
+): string {
   if (value === undefined) return '—';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
 
   const options = resolveOptions(q, a);
-  // Keep the note compact: drop the explanatory tail after an em dash.
+  // Keep the line compact: drop the explanatory tail after an em dash.
   const labelOf = (v: string): string =>
     (options.find((o) => o.value === v)?.label ?? v).split(' — ')[0].trim();
   if (Array.isArray(value)) return value.map(labelOf).join(', ');

@@ -127,6 +127,16 @@ export async function confirmResume(answeredCount: number): Promise<boolean> {
   return value;
 }
 
+/** Final confirm before generation — last chance to catch a wrong answer. */
+export async function confirmGenerate(): Promise<boolean> {
+  const value = await confirm({
+    message: 'Generate config with these settings?',
+    initialValue: true,
+  });
+  guardCancel(value);
+  return value;
+}
+
 /** Offer the post-generation bootstrap prompt once generation is done. */
 export async function confirmBootstrapPrompt(): Promise<boolean> {
   const value = await confirm({

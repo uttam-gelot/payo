@@ -9,7 +9,7 @@
 import { note } from '@clack/prompts';
 import type { Answers, FlowSection, Question } from './types';
 import { runQuestion } from './runner';
-import { questionSummary, recommendedAnswer, recommendedLabel } from './recommend';
+import { answerLabel, questionSummary, recommendedAnswer, recommendedLabel } from './recommend';
 import { recordAnswer, type Session } from '../state/index';
 
 interface PlannedDefault {
@@ -84,6 +84,32 @@ function gateDecision(stored: unknown): 'recommended' | 'customize' | 'skip' | u
   if (stored === true) return 'recommended'; // legacy boolean sessions
   if (stored === false) return 'customize';
   return undefined;
+}
+
+/** True when a stored answer carries no real content (skipped / not-applicable). */
+function isUnset(value: unknown): boolean {
+  if (value === undefined || value === null || value === '' || value === 'none') return true;
+  return Array.isArray(value) && value.length === 0;
+}
+
+/**
+ * One `summary: label` line per answered question, walking the flow in order so the
+ * review reads like the questionnaire. Gate decisions and unset (skipped) answers are
+ * omitted; booleans render as Yes/No so explicit confirms still show.
+ */
+export function reviewLines(flow: FlowSection[], answers: Answers): string[] {
+  const lines: string[] = [];
+  const seen = new Set<string>();
+  for (const section of flow) {
+    for (const q of section.questions(answers)) {
+      if (seen.has(q.id) || q.id.endsWith('__recommended')) continue;
+      seen.add(q.id);
+      const value = answers[q.id];
+      if (isUnset(value)) continue;
+      lines.push(`${questionSummary(q)}: ${answerLabel(q, value, answers)}`);
+    }
+  }
+  return lines;
 }
 
 export async function runFlow(flow: FlowSection[], session: Session): Promise<Session> {
