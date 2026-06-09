@@ -136,7 +136,7 @@ const skills: SkillSpec[] = [
   {
     id: 'error-handling-logging',
     title: 'Error Handling & Logging',
-    appliesTo: () => true,
+    appliesTo: (a) => has(a, 'logger'),
     buildPrompt: (a): string => {
       const logger = val(a, 'logger');
       const via = logger ? `the selected logger (${logger})` : 'a dedicated logger';
@@ -166,7 +166,7 @@ const skills: SkillSpec[] = [
   {
     id: 'testing',
     title: 'Testing',
-    appliesTo: () => true,
+    appliesTo: (a) => Array.isArray(a.testTypes) && a.testTypes.length > 0,
     buildPrompt: (a): string => {
       const types = Array.isArray(a.testTypes) ? a.testTypes.join(', ') : undefined;
       const runner = val(a, 'testRunner');

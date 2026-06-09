@@ -18,11 +18,12 @@ const hintOf = (opts: Option<string>[], value: string): string | undefined =>
   opts.find((o) => o.value === value)?.hint;
 
 describe('ormOptions', () => {
-  it('TS + SQL: Prisma recommended, raw-sql tail', () => {
+  it('TS + SQL: TypeORM recommended (not Prisma), raw-sql tail', () => {
     const o = ormOptions({ language: 'typescript', database: 'postgresql' });
     expect(vals(o)).toContain('prisma');
     expect(vals(o)).toContain('raw-sql');
-    expect(hintOf(o, 'prisma')).toBe('recommended');
+    expect(hintOf(o, 'typeorm')).toBe('recommended');
+    expect(hintOf(o, 'prisma')).toBeUndefined();
   });
 
   it('TS + Mongo: native-driver tail, Mongoose recommended (not Prisma)', () => {
