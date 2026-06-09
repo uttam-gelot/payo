@@ -107,6 +107,44 @@ describe('runFlow — manual (decline-all gates)', () => {
   });
 });
 
+/** A frontend persona with DB / logger left unanswered, so their gates decide. */
+const FRONTEND: Answers = {
+  aiTool: 'claude',
+  projectType: 'frontend',
+  projectDefinition: 'x',
+  language: 'typescript',
+  framework: 'react',
+};
+
+describe('runFlow — persona gates', () => {
+  it('does not ask database, orm, or logger for a frontend project', async () => {
+    gateDecision = false; // customize every group
+    const session = await runFlow(flow, freshSession(FRONTEND));
+    const a = session.answers;
+
+    expect(asked).not.toContain('database');
+    expect(asked).not.toContain('orm');
+    expect(asked).not.toContain('logger');
+    expect(a.database).toBeUndefined();
+    expect(a.orm).toBeUndefined();
+    expect(a.logger).toBeUndefined();
+  });
+
+  it('skips testRunner when only e2e is selected, asks it for unit/integration', async () => {
+    gateDecision = false;
+    scripted = { testTypes: ['e2e'], e2eTool: 'cypress' };
+    let a = (await runFlow(flow, freshSession(FRONTEND))).answers;
+    expect(asked).not.toContain('testRunner');
+    expect(a.testRunner).toBeUndefined();
+    expect(asked).toContain('e2eTool');
+
+    asked = [];
+    scripted = { testTypes: ['unit'] };
+    a = (await runFlow(flow, freshSession(FRONTEND))).answers;
+    expect(asked).toContain('testRunner');
+  });
+});
+
 describe('runFlow — skip (skip every group)', () => {
   it('records skip sentinels and asks no group question', async () => {
     gateDecision = 'skip';
@@ -116,15 +154,16 @@ describe('runFlow — skip (skip every group)', () => {
     // select / text questions stored as 'none' (treated as unset by the generator)
     expect(a['nextjs.router']).toBe('none');
     expect(a.authApproach).toBe('none');
-    expect(a.testRunner).toBe('none');
     expect(a.structure).toBe('none');
     // multiselect skipped to an empty list, confirm to false
     expect(a.testTypes).toEqual([]);
     expect(a.codingStandards).toEqual([]);
     expect(a.aiAttribution).toBe(false);
 
-    // when-gated-by-skip questions never surface (authStrategy needs auth !== none)
+    // when-gated-by-skip questions never surface: authStrategy needs auth !== none,
+    // and testRunner needs unit/integration in testTypes (skipped to []).
     expect(a.authStrategy).toBeUndefined();
+    expect(a.testRunner).toBeUndefined();
     expect(a.e2eTool).toBeUndefined();
 
     // nothing was actually asked — every group was skipped at the gate

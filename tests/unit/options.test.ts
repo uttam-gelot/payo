@@ -7,6 +7,7 @@ import {
   stateManagementOptions,
   packageManagerOptions,
   testTypeOptions,
+  e2eToolOptions,
 } from '../../src/questions/options';
 import type { Option } from '../../src/questions/types';
 
@@ -93,5 +94,11 @@ describe('testTypeOptions', () => {
   it('offers component tests only outside backend', () => {
     expect(vals(testTypeOptions({ projectType: 'frontend' }))).toContain('component');
     expect(vals(testTypeOptions({ projectType: 'backend' }))).not.toContain('component');
+  });
+});
+
+describe('e2eToolOptions', () => {
+  it('has no "None" — only surfaces after e2e is already chosen', () => {
+    expect(vals(e2eToolOptions)).not.toContain('none');
   });
 });
