@@ -105,6 +105,7 @@ export const structureOptions: Option<string>[] = [
   { value: 'ddd', label: 'Domain-Driven Design (DDD)' },
   { value: 'monorepo', label: 'Monorepo (Turborepo/Nx)' },
   { value: 'custom', label: 'Custom' },
+  { value: 'none', label: 'None' },
 ];
 
 export const codingStandardOptions: Option<string>[] = [
@@ -295,6 +296,7 @@ export const gitWorkflowOptions: Option<string>[] = [
     hint: 'recommended',
   },
   { value: 'minimal', label: 'Minimal — free-form commits, direct commits allowed' },
+  { value: 'none', label: 'None' },
 ];
 
 // --- Authentication ---------------------------------------------------------
@@ -369,6 +371,7 @@ export const authStrategyOptions: Option<string>[] = [
   { value: 'session', label: 'Server-side session cookies', hint: 'recommended' },
   { value: 'jwt', label: 'Stateless JWT (access + refresh)' },
   { value: 'provider', label: 'Provider-managed (hosted)' },
+  { value: 'none', label: 'None' },
 ];
 
 // --- Runtime & package manager ----------------------------------------------
@@ -382,6 +385,7 @@ export const packageManagerOptions = (a: Answers): Option<string>[] => {
         { value: 'npm', label: 'npm' },
         { value: 'yarn', label: 'Yarn' },
         { value: 'bun', label: 'Bun' },
+        { value: 'none', label: 'None' },
       ];
     case 'python':
       return [
@@ -389,6 +393,7 @@ export const packageManagerOptions = (a: Answers): Option<string>[] => {
         { value: 'poetry', label: 'Poetry' },
         { value: 'pip-venv', label: 'pip + venv' },
         { value: 'pipenv', label: 'Pipenv' },
+        { value: 'none', label: 'None' },
       ];
     default:
       return [];
@@ -399,6 +404,7 @@ export const runtimeOptions: Option<string>[] = [
   { value: 'node', label: 'Node.js', hint: 'recommended' },
   { value: 'bun', label: 'Bun' },
   { value: 'deno', label: 'Deno' },
+  { value: 'none', label: 'None' },
 ];
 
 // --- Validation -------------------------------------------------------------

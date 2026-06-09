@@ -33,12 +33,6 @@ export const config = {
     stderrDetailChars: 500,
   },
 
-  /** Questionnaire constraints. */
-  questionnaire: {
-    /** Max length of the free-text project description. */
-    maxDescriptionChars: 1_000,
-  },
-
   /** Project-local working dir for all payo state (session, staging). */
   payo: {
     /** Root holding the session file and single-file staging. Env: PAYO_DIR. */

@@ -15,7 +15,7 @@ void mock.module('@clack/prompts', () => ({ ...realClack, note: () => undefined 
  *  - gate confirms ('*.__recommended') return `gateDecision`;
  *  - otherwise return a scripted answer, falling back to the recommended value.
  */
-let gateDecision = false;
+let gateDecision: unknown = false;
 let scripted: Record<string, unknown> = {};
 let asked: string[] = [];
 
@@ -104,5 +104,30 @@ describe('runFlow — manual (decline-all gates)', () => {
     // e2e selected ⇒ e2eTool was asked and recorded
     expect(asked).toContain('e2eTool');
     expect(a.e2eTool).toBe('cypress');
+  });
+});
+
+describe('runFlow — skip (skip every group)', () => {
+  it('records skip sentinels and asks no group question', async () => {
+    gateDecision = 'skip';
+    const session = await runFlow(flow, freshSession(BASE));
+    const a = session.answers;
+
+    // select / text questions stored as 'none' (treated as unset by the generator)
+    expect(a['nextjs.router']).toBe('none');
+    expect(a.authApproach).toBe('none');
+    expect(a.testRunner).toBe('none');
+    expect(a.structure).toBe('none');
+    // multiselect skipped to an empty list, confirm to false
+    expect(a.testTypes).toEqual([]);
+    expect(a.codingStandards).toEqual([]);
+    expect(a.aiAttribution).toBe(false);
+
+    // when-gated-by-skip questions never surface (authStrategy needs auth !== none)
+    expect(a.authStrategy).toBeUndefined();
+    expect(a.e2eTool).toBeUndefined();
+
+    // nothing was actually asked — every group was skipped at the gate
+    expect(asked.filter((id) => !id.endsWith('__recommended'))).toEqual([]);
   });
 });
