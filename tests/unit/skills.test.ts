@@ -32,10 +32,19 @@ describe('selectSkills', () => {
     );
   });
 
-  it('always includes project-overview, coding-standards and testing', () => {
+  it('always includes project-overview and coding-standards', () => {
     const got = ids(contexts.tsBackend);
     expect(got).toContain('project-overview');
     expect(got).toContain('coding-standards');
-    expect(got).toContain('testing');
+  });
+
+  it('includes testing only when test types are selected', () => {
+    expect(ids(contexts.tsBackend)).not.toContain('testing');
+    expect(ids({ ...contexts.tsBackend, testTypes: ['unit'] })).toContain('testing');
+  });
+
+  it('includes error-handling-logging only when a logger is set', () => {
+    expect(ids(contexts.tsBackend)).not.toContain('error-handling-logging');
+    expect(ids({ ...contexts.tsBackend, logger: 'pino' })).toContain('error-handling-logging');
   });
 });

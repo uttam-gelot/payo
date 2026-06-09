@@ -7,7 +7,7 @@ export const typeorm: TechModule = {
   title: 'TypeORM',
   category: 'orm',
   appliesTo: (a) => isTsJs(a) && isSqlDb(a),
-  options: () => [{ value: 'typeorm', label: 'TypeORM' }],
+  options: () => [{ value: 'typeorm', label: 'TypeORM', hint: 'recommended' }],
   questions: () => [
     {
       id: 'typeorm.entities',

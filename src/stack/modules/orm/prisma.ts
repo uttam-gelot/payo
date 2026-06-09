@@ -1,16 +1,15 @@
 import type { TechModule } from '../../types';
 import { isMongo, isSqlDb, isTsJs } from '../../predicates';
 
-/** TS/JS ORM for SQL and MongoDB. Recommended default for SQL databases. */
+/** TS/JS ORM for SQL and MongoDB. */
 export const prisma: TechModule = {
   id: 'prisma',
   title: 'Prisma',
   category: 'orm',
   appliesTo: (a) => isTsJs(a) && (isSqlDb(a) || isMongo(a)),
-  // Recommended for SQL; on MongoDB the recommended default is Mongoose instead.
-  options: (a) => [
-    { value: 'prisma', label: 'Prisma', ...(isSqlDb(a) ? { hint: 'recommended' } : {}) },
-  ],
+  // Offered for SQL and MongoDB; the recommended defaults are TypeORM (SQL) and
+  // Mongoose (MongoDB), so Prisma carries no recommended hint.
+  options: () => [{ value: 'prisma', label: 'Prisma' }],
   questions: () => [
     {
       id: 'prisma.migrations',
