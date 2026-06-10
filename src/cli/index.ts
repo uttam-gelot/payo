@@ -1,4 +1,4 @@
-import { outro, note, log } from '@clack/prompts';
+import { outro, note, log, spinner } from '@clack/prompts';
 import {
   loadSession,
   createSession,
@@ -10,8 +10,7 @@ import {
 import { confirmResume, confirmBootstrapPrompt, confirmGenerate } from '../questions/runner';
 import { runFlow, reviewLines } from '../questions/engine';
 import { flow } from '../questions/flow';
-import { generate } from '../generator/index';
-import { writeBootstrapPrompt } from '../generator/bootstrap';
+import { generate, generateBootstrap } from '../generator/index';
 import type { ResumeStore } from '../generator/types';
 import { printBanner } from './banner';
 
@@ -95,10 +94,22 @@ export async function run(): Promise<void> {
   cleanupWorkspace();
 
   // Offer a paste-ready prompt to scaffold a working project from the new skills.
+  // The provider's CLI agent writes it when installed; otherwise a deterministic
+  // template is used as the floor.
   if (await confirmBootstrapPrompt()) {
-    const rel = writeBootstrapPrompt(session.answers, result.files, result.providerName);
+    // The agent run blocks; show a spinner while it generates (AI path only).
+    let spin: ReturnType<typeof spinner> | undefined;
+    const bootstrap = await generateBootstrap(session.answers, result.files, (name) => {
+      spin = spinner();
+      spin.start(`Generating bootstrap prompt with ${name}… this may take a minute.`);
+    });
+    spin?.stop(
+      bootstrap.mode === 'ai'
+        ? `Generated bootstrap prompt with ${result.providerName}.`
+        : 'AI generation unavailable — wrote a deterministic prompt instead.',
+    );
     note(
-      `Saved to ${rel}\nPaste its contents into any LLM to scaffold the project.`,
+      `Saved to ${bootstrap.path}\nPaste its contents into any LLM to scaffold the project.`,
       'Bootstrap prompt',
     );
   }

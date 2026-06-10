@@ -25,6 +25,8 @@ import type { SkillSpec } from './skills';
 import { buildBaseRules } from './rules';
 import { selectSkills } from './skills';
 import { isAvailable, runAgent } from './agent';
+import { resolveCommands } from './commands';
+import { buildBootstrapMetaPrompt, writeBootstrapPrompt } from './bootstrap';
 import { getProvider } from '../providers/index';
 import { config } from '../config';
 
@@ -302,4 +304,38 @@ export async function generate(
   }
 
   return runStatic(provider, answers, sections, hooks);
+}
+
+/**
+ * Produce the paste-ready `bootstrap-prompt.md`. If the chosen provider's CLI
+ * agent is installed, drive it with a meta-prompt to write a polished prompt
+ * itself (injecting the resolved commands as fixed facts). On any miss — no
+ * agent, not installed, or nothing written — fall back silently to the static
+ * deterministic floor so the user always gets a file.
+ */
+export async function generateBootstrap(
+  answers: Answers,
+  files: string[],
+  /** Fired once the agent run is about to start (AI path only) so the CLI can show progress. */
+  onAiStart?: (providerName: string) => void,
+): Promise<{ mode: 'ai' | 'static'; path: string }> {
+  const aiTool: AiTool | undefined =
+    typeof answers.aiTool === 'string' ? answers.aiTool : undefined;
+  const provider = getProvider(aiTool) ?? getProvider('other')!;
+  const rel = 'bootstrap-prompt.md';
+
+  const runner = provider.agent;
+  if (runner && isAvailable(runner)) {
+    onAiStart?.(provider.displayName);
+    const commands = resolveCommands(answers);
+    const prompt = buildBootstrapMetaPrompt(answers, files, provider.displayName, commands);
+    const attempts = config.generation.retries() + 1;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      const result = await runAgent(runner, prompt);
+      if (result.ok && wroteFile(rel)) return { mode: 'ai', path: rel };
+    }
+  }
+
+  const written = writeBootstrapPrompt(answers, files, provider.displayName);
+  return { mode: 'static', path: written };
 }
