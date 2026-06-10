@@ -1,5 +1,6 @@
 import type { TechModule } from '../../types';
 import { isTsJs } from '../../predicates';
+import { pmCreate, pmRun } from '../../commands';
 
 /** Astro — content-focused meta-framework (frontend or full-stack). */
 export const astro: TechModule = {
@@ -39,4 +40,8 @@ export const astro: TechModule = {
       recommended: true,
     },
   ],
+  scaffold: (a) => pmCreate(a, 'astro'),
+  devCommand: (a) => pmRun(a, 'dev'),
+  testCommand: (a) => pmRun(a, 'test'),
+  buildCommand: (a) => pmRun(a, 'build'),
 };

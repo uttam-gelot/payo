@@ -1,5 +1,6 @@
 import type { TechModule } from '../../types';
 import { isTsJs } from '../../predicates';
+import { pmCreate, pmRun } from '../../commands';
 
 /** Nuxt — Vue meta-framework (frontend or full-stack). */
 export const nuxtjs: TechModule = {
@@ -31,4 +32,8 @@ export const nuxtjs: TechModule = {
       ],
     },
   ],
+  scaffold: (a) => pmCreate(a, 'nuxt'),
+  devCommand: (a) => pmRun(a, 'dev'),
+  testCommand: (a) => pmRun(a, 'test'),
+  buildCommand: (a) => pmRun(a, 'build'),
 };

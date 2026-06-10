@@ -1,4 +1,5 @@
 import type { TechModule } from '../../types';
+import { pmRun } from '../../commands';
 
 export const nestjs: TechModule = {
   id: 'nestjs',
@@ -43,4 +44,8 @@ export const nestjs: TechModule = {
       ],
     },
   ],
+  scaffold: () => 'npx @nestjs/cli new <app>',
+  devCommand: (a) => pmRun(a, 'start:dev'),
+  testCommand: (a) => pmRun(a, 'test'),
+  buildCommand: (a) => pmRun(a, 'build'),
 };

@@ -1,5 +1,6 @@
 import type { TechModule } from '../../types';
 import { isTsJs } from '../../predicates';
+import { pmCreate, pmRun } from '../../commands';
 
 /** Hono — lightweight backend framework, multi-runtime. */
 export const hono: TechModule = {
@@ -39,4 +40,8 @@ export const hono: TechModule = {
       recommended: false,
     },
   ],
+  scaffold: (a) => pmCreate(a, 'hono'),
+  devCommand: (a) => pmRun(a, 'dev'),
+  testCommand: (a) => pmRun(a, 'test'),
+  buildCommand: (a) => pmRun(a, 'build'),
 };

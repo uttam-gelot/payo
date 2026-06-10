@@ -41,4 +41,7 @@ export const django: TechModule = {
       ],
     },
   ],
+  scaffold: () => 'django-admin startproject <app>',
+  devCommand: () => 'python manage.py runserver',
+  testCommand: () => 'python manage.py test',
 };

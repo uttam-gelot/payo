@@ -27,4 +27,8 @@ export const actix: TechModule = {
       recommended: true,
     },
   ],
+  scaffold: () => 'cargo new <app>',
+  devCommand: () => 'cargo run',
+  testCommand: () => 'cargo test',
+  buildCommand: () => 'cargo build --release',
 };

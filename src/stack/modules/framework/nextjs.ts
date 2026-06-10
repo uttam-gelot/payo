@@ -1,5 +1,6 @@
 import type { TechModule } from '../../types';
 import { isTsJs } from '../../predicates';
+import { pmCreate, pmRun } from '../../commands';
 
 export const nextjs: TechModule = {
   id: 'nextjs',
@@ -48,4 +49,8 @@ export const nextjs: TechModule = {
       ],
     },
   ],
+  scaffold: (a) => pmCreate(a, 'next-app'),
+  devCommand: (a) => pmRun(a, 'dev'),
+  testCommand: (a) => pmRun(a, 'test'),
+  buildCommand: (a) => pmRun(a, 'build'),
 };

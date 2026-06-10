@@ -1,5 +1,6 @@
 import type { TechModule } from '../../types';
 import { isTsJs } from '../../predicates';
+import { pmCreate, pmRun } from '../../commands';
 
 /** Svelte SPA framework (use SvelteKit for full-stack). */
 export const svelte: TechModule = {
@@ -30,4 +31,8 @@ export const svelte: TechModule = {
       ],
     },
   ],
+  scaffold: (a) => pmCreate(a, 'svelte'),
+  devCommand: (a) => pmRun(a, 'dev'),
+  testCommand: (a) => pmRun(a, 'test'),
+  buildCommand: (a) => pmRun(a, 'build'),
 };

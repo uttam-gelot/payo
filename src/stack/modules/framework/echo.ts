@@ -27,4 +27,8 @@ export const echo: TechModule = {
       recommended: true,
     },
   ],
+  scaffold: () => 'go mod init <module>',
+  devCommand: () => 'go run ./...',
+  testCommand: () => 'go test ./...',
+  buildCommand: () => 'go build ./...',
 };

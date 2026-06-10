@@ -1,5 +1,6 @@
 import type { TechModule } from '../../types';
 import { isTsJs } from '../../predicates';
+import { pmCreate, pmRun } from '../../commands';
 
 /** Remix / React Router 7 framework mode (frontend or full-stack). */
 export const remix: TechModule = {
@@ -30,4 +31,8 @@ export const remix: TechModule = {
       ],
     },
   ],
+  scaffold: (a) => pmCreate(a, 'remix'),
+  devCommand: (a) => pmRun(a, 'dev'),
+  testCommand: (a) => pmRun(a, 'test'),
+  buildCommand: (a) => pmRun(a, 'build'),
 };

@@ -1,5 +1,6 @@
 import type { TechModule } from '../../types';
 import { isTsJs } from '../../predicates';
+import { pmCreate, pmRun } from '../../commands';
 
 /** React SPA library. Recommended frontend default. */
 export const react: TechModule = {
@@ -32,4 +33,9 @@ export const react: TechModule = {
       ],
     },
   ],
+  // Vite is the recommended bundler; scaffold its TS-React template.
+  scaffold: (a) => pmCreate(a, 'vite', '--template react-ts'),
+  devCommand: (a) => pmRun(a, 'dev'),
+  testCommand: (a) => pmRun(a, 'test'),
+  buildCommand: (a) => pmRun(a, 'build'),
 };

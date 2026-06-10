@@ -37,4 +37,8 @@ export const gin: TechModule = {
       ],
     },
   ],
+  scaffold: () => 'go mod init <module>',
+  devCommand: () => 'go run ./...',
+  testCommand: () => 'go test ./...',
+  buildCommand: () => 'go build ./...',
 };

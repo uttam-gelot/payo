@@ -1,5 +1,6 @@
 import type { TechModule } from '../../types';
 import { isTsJs } from '../../predicates';
+import { pmCreate, pmRun } from '../../commands';
 
 /** SolidJS SPA framework. */
 export const solid: TechModule = {
@@ -30,4 +31,8 @@ export const solid: TechModule = {
       ],
     },
   ],
+  scaffold: (a) => pmCreate(a, 'solid'),
+  devCommand: (a) => pmRun(a, 'dev'),
+  testCommand: (a) => pmRun(a, 'test'),
+  buildCommand: (a) => pmRun(a, 'build'),
 };

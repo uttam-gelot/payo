@@ -1,4 +1,5 @@
 import type { TechModule } from '../../types';
+import { pmRun } from '../../commands';
 
 /** Angular SPA framework (TypeScript only). */
 export const angular: TechModule = {
@@ -37,4 +38,8 @@ export const angular: TechModule = {
       recommended: false,
     },
   ],
+  scaffold: () => 'npx -p @angular/cli ng new <app>',
+  devCommand: (a) => pmRun(a, 'start'),
+  testCommand: (a) => pmRun(a, 'test'),
+  buildCommand: (a) => pmRun(a, 'build'),
 };
