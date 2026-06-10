@@ -41,4 +41,7 @@ export const fastapi: TechModule = {
       ],
     },
   ],
+  // No official generator; uvicorn runs the ASGI app, pytest runs the suite.
+  devCommand: () => 'uvicorn app.main:app --reload',
+  testCommand: () => 'pytest',
 };

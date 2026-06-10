@@ -1,5 +1,6 @@
 import type { TechModule } from '../../types';
 import { isTsJs } from '../../predicates';
+import { pmRun } from '../../commands';
 
 /** Express backend framework. Recommended default for a JavaScript backend. */
 export const express: TechModule = {
@@ -40,4 +41,8 @@ export const express: TechModule = {
       recommended: true,
     },
   ],
+  // No official generator; commands map to the skeleton's package.json scripts.
+  devCommand: (a) => pmRun(a, 'dev'),
+  testCommand: (a) => pmRun(a, 'test'),
+  buildCommand: (a) => pmRun(a, 'build'),
 };

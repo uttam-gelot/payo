@@ -1,5 +1,6 @@
 import type { TechModule } from '../../types';
 import { isTsJs } from '../../predicates';
+import { pmCreate, pmRun } from '../../commands';
 
 /** Vue SPA framework. */
 export const vue: TechModule = {
@@ -30,4 +31,8 @@ export const vue: TechModule = {
       ],
     },
   ],
+  scaffold: (a) => pmCreate(a, 'vue'),
+  devCommand: (a) => pmRun(a, 'dev'),
+  testCommand: (a) => pmRun(a, 'test'),
+  buildCommand: (a) => pmRun(a, 'build'),
 };

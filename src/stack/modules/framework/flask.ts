@@ -31,4 +31,6 @@ export const flask: TechModule = {
       ],
     },
   ],
+  devCommand: () => 'flask run --debug',
+  testCommand: () => 'pytest',
 };

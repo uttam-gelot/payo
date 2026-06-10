@@ -30,4 +30,6 @@ export const litestar: TechModule = {
       ],
     },
   ],
+  devCommand: () => 'litestar run --reload',
+  testCommand: () => 'pytest',
 };

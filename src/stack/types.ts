@@ -26,4 +26,12 @@ export interface TechModule {
   options?(a: Answers): Option<string>[];
   /** Follow-up questions asked after this module is selected. */
   questions(a: Answers): Question[];
+  /** Official generator/init command for this stack (e.g. `pnpm create next-app`). */
+  scaffold?(a: Answers): string | undefined;
+  /** Command that runs the dev server (e.g. `pnpm dev`, `go run ./...`). */
+  devCommand?(a: Answers): string | undefined;
+  /** Command that runs the test suite (e.g. `pnpm test`, `go test ./...`). */
+  testCommand?(a: Answers): string | undefined;
+  /** Command that produces a production build (e.g. `pnpm build`, `cargo build --release`). */
+  buildCommand?(a: Answers): string | undefined;
 }
