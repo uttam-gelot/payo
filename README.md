@@ -13,6 +13,10 @@ project's conventions instead of guessing.
 [![Bun](https://img.shields.io/badge/Bun-%3E%3D1.1.0-black?logo=bun)](https://bun.sh)
 [![Made with TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
+<br />
+
+![Payo demo](https://raw.githubusercontent.com/uttam-gelot/payo/main/assets/demo.gif)
+
 </div>
 
 ---
@@ -29,6 +33,7 @@ project's conventions instead of guessing.
 - [Bootstrap prompt](#bootstrap-prompt)
 - [Resume anytime](#resume-anytime)
 - [Requirements](#requirements)
+- [Run locally](#run-locally)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -161,7 +166,32 @@ generating what's missing. Finished runs clean the directory up automatically.
 
 ## Requirements
 
-- [Bun](https://bun.sh) **>= 1.1.0**
+**To run Payo:** [Node.js](https://nodejs.org) **>= 18**. That's it — `npx @uge/payo`
+runs the published, Node-targeted binary, so **you do not need Bun to use Payo.**
+If you prefer Bun, `bunx @uge/payo` works too.
+
+**To develop Payo:** [Bun](https://bun.sh) **>= 1.1.0** (the project builds, tests,
+and runs from source with Bun — see [Run locally](#run-locally)).
+
+## Run locally
+
+Hacking on Payo or running it from source:
+
+```bash
+git clone https://github.com/uttam-gelot/payo.git
+cd payo
+bun install        # Bun >= 1.1.0
+bun run dev        # runs src/index.ts directly
+```
+
+Other useful scripts:
+
+```bash
+bun test           # run the test suite
+bun run typecheck  # tsc --noEmit
+bun run lint       # eslint
+bun run build      # bundle to dist/ (Node target)
+```
 
 ## Contributing
 
