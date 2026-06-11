@@ -24,25 +24,29 @@ star velocity, which triggers GitHub's Trending algorithm. Sources at the bottom
 
 ## Phase 0 — Pre-launch readiness (do BEFORE announcing)
 
-The single biggest lever: **a 10-second demo GIF/video at the top of the
-README.** A CLI you can't *see* working converts poorly. Every source ranks a
+The single biggest lever: **a demo GIF at the top of the README** — ✅ shipped in
+PR #8. A CLI you can't *see* working converts poorly. Every source ranks a
 "GIF/screenshot showing it working" + "install in under 2 minutes" as table
-stakes.
+stakes. Remaining Phase 0 items below are not yet done.
 
-- [ ] **Demo asset** — record an [asciinema](https://asciinema.org) or terminal
-      GIF of a full `npx @uge/payo` run (questionnaire → generated files). Embed
-      at the top of the README, above the fold. This is the hero asset reused
-      everywhere (HN, PH, Reddit, Twitter).
-- [ ] **One-sentence hook** — already strong: *"Generate project-tailored AI
-      assistant rules & skills in under two minutes."* Keep it identical across
-      every channel.
-- [ ] **README polish** — add: the demo GIF, a "Why" paragraph (the pain:
-      re-pasting "here's how this project works" into every chat), and a short
-      comparison vs. hand-writing `CLAUDE.md`.
-- [ ] **`npx @uge/payo` works clean on a fresh machine** — test in a clean
-      container/VM. First-run friction kills launches. README says Bun >= 1.1.0
-      is required — confirm the `npx` path works for Node-only users, or document
-      it clearly. This is a common drop-off point.
+- [x] **Demo asset** — ✅ Done (PR #8). 74s screen recording of a full
+      `npx @uge/payo` run, ffmpeg → GIF (3× speed, 900px, ~7.5 MB), committed at
+      `assets/demo.gif`. Hero asset reused everywhere (HN, PH, Reddit, Twitter).
+      To regenerate: `ffmpeg -i rec.mov -vf "setpts=PTS/3,fps=12,scale=900:-1:flags=lanczos,palettegen=stats_mode=diff" palette.png`
+      then `ffmpeg -i rec.mov -i palette.png -filter_complex "setpts=PTS/3,fps=12,scale=900:-1[x];[x][1:v]paletteuse" demo.gif`.
+- [x] **One-sentence hook** — ✅ Locked: *"Generate project-tailored AI assistant
+      rules & skills in under two minutes."* Keep it identical across every channel.
+- [x] **README polish** — ✅ Done (PR #8). Demo GIF added at top via absolute
+      `raw.githubusercontent.com` URL (renders on npm too, not just GitHub).
+      Still TODO: a "Why" paragraph (the pain: re-pasting "here's how this project
+      works" into every chat) + a short comparison vs. hand-writing `CLAUDE.md`.
+- [x] **Node-vs-Bun friction fixed** — ✅ Done (PR #8). README Requirements now
+      split: *running* needs only **Node >= 18** (published binary is Node-targeted,
+      no Bun), *developing* needs **Bun >= 1.1.0**. New "Run locally" section added.
+- [ ] **`npx @uge/payo` works clean on a fresh machine** — still TODO: smoke-test
+      in a clean container/VM with Node only (no Bun). The Node >= 18 claim is
+      reasoned from the build (`--target node`, node shebang) but not yet runtime-
+      verified. First-run friction kills launches.
 - [ ] **Repo hygiene** — set GitHub topics (`ai`, `cli`, `claude`, `cursor`,
       `copilot`, `developer-tools`, `codegen`), a clear repo description, a
       social-preview image (Settings → Social preview), and pin a couple of
