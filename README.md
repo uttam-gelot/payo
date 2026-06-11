@@ -24,6 +24,7 @@ project's conventions instead of guessing.
 ## Contents
 
 - [What is Payo?](#what-is-payo)
+- [Why Payo?](#why-payo)
 - [Who is this for?](#who-is-this-for)
 - [Quick Start](#quick-start)
 - [How to use — a walkthrough](#how-to-use--a-walkthrough)
@@ -48,6 +49,22 @@ It supports **Claude, Cursor, GitHub Copilot, Codex, Windsurf, and Antigravity**
 Where the assistant ships a headless CLI, Payo drives that tool's own AI to
 write rich, project-specific docs; where it doesn't, Payo falls back to solid
 templates — so you always end up with usable output.
+
+## Why Payo?
+
+Every AI coding session starts cold. Your assistant doesn't know you use Drizzle
+over Prisma, that handlers live in `src/routes`, that you write Vitest specs
+beside the file, or that commits follow Conventional Commits. So you re-explain
+it — in chat after chat — and still get code that ignores half of it.
+
+The fix is the guidance files each tool already reads (`CLAUDE.md`,
+`.cursorrules`, `.github/copilot-instructions.md`, `AGENTS.md`). But writing them
+by hand is tedious, easy to get wrong, and different for every tool. Most people
+never do it, or do it once and let it rot.
+
+Payo writes them for you in about two minutes — tailored to your actual stack,
+in each tool's native format — so your assistant follows _your_ conventions from
+the first prompt instead of guessing.
 
 ## Who is this for?
 
