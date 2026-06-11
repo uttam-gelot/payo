@@ -66,6 +66,21 @@ Payo writes them for you in about two minutes — tailored to your actual stack,
 in each tool's native format — so your assistant follows _your_ conventions from
 the first prompt instead of guessing.
 
+### Vibe coding vs. coding with Payo
+
+**Vibe coding** is fast and fun: you prompt, the AI improvises, and code appears.
+But with no shared rules the assistant guesses your stack — picks a different ORM
+than the rest of the repo, scatters files wherever, invents its own naming, skips
+your test and commit conventions. It works for a throwaway demo; on a real
+codebase it quietly piles up inconsistency you pay for later in review and
+refactors.
+
+**Coding with Payo** keeps the speed but adds a guardrail. The same prompts now
+run against guidance the assistant actually reads, so it reaches for _your_
+framework, _your_ folder layout, _your_ testing and git rules every time —
+without you re-explaining them. Same vibe, output that fits the project instead
+of fighting it.
+
 ## Who is this for?
 
 - **Devs starting a new repo** who want their AI assistant productive from
