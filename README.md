@@ -24,6 +24,7 @@ project's conventions instead of guessing.
 ## Contents
 
 - [What is Payo?](#what-is-payo)
+- [Why Payo?](#why-payo)
 - [Who is this for?](#who-is-this-for)
 - [Quick Start](#quick-start)
 - [How to use — a walkthrough](#how-to-use--a-walkthrough)
@@ -48,6 +49,38 @@ It supports **Claude, Cursor, GitHub Copilot, Codex, Windsurf, and Antigravity**
 Where the assistant ships a headless CLI, Payo drives that tool's own AI to
 write rich, project-specific docs; where it doesn't, Payo falls back to solid
 templates — so you always end up with usable output.
+
+## Why Payo?
+
+Every AI coding session starts cold. Your assistant doesn't know you use Drizzle
+over Prisma, that handlers live in `src/routes`, that you write Vitest specs
+beside the file, or that commits follow Conventional Commits. So you re-explain
+it — in chat after chat — and still get code that ignores half of it.
+
+The fix is the guidance files each tool already reads (`CLAUDE.md`,
+`.cursorrules`, `.github/copilot-instructions.md`, `AGENTS.md`). But writing them
+by hand is tedious, easy to get wrong, and different for every tool. Most people
+never do it, or do it once and let it rot.
+
+Payo writes them for you in about two minutes — tailored to your actual stack,
+in each tool's native format — so your assistant follows _your_ conventions from
+the first prompt instead of guessing.
+
+### Vibe coding, without the mess
+
+Vibe coding is fast and fun — you prompt, the AI improvises, code appears. The
+problem isn't the speed, it's that the assistant has no rules to improvise
+_within_. So it guesses: a different ORM than the rest of the repo, files
+scattered wherever, its own naming, your tests and commit conventions skipped.
+Fine for a throwaway demo; on a real codebase it quietly piles up inconsistency
+you pay for later in reviews, bugs, and refactors — and each new chat starts the
+guessing over.
+
+Payo gives that improvisation a guardrail. It generates the guidance files your
+assistant already reads, so the AI reaches for _your_ framework, _your_ folder
+layout, _your_ testing and git rules every time — without you stopping to explain
+them. You keep vibe coding at full speed; the output just fits the project
+instead of fighting it.
 
 ## Who is this for?
 
