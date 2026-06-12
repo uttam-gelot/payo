@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Payo — CLAUDE.md, .cursorrules &amp; AGENTS.md generator CLI</title>
+  <meta name="description" content="Payo is a free CLI that generates project-tailored AI assistant rules — CLAUDE.md, .cursorrules, Copilot instructions, and AGENTS.md — in under two minutes. Works with Claude, Cursor, Copilot, Codex, Windsurf, and Antigravity." />
+  <meta name="keywords" content="CLAUDE.md generator, cursor rules generator, .cursorrules generator, copilot instructions generator, AGENTS.md generator, AI coding assistant rules, project context generator" />
+  <meta name="author" content="Payo" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta name="theme-color" content="#046f73" />
+  <link rel="canonical" href="https://uttam-gelot.github.io/payo/" />
+
+  <!-- Favicons -->
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="apple-touch-icon" href="favicon.png" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Payo" />
+  <meta property="og:url" content="https://uttam-gelot.github.io/payo/" />
+  <meta property="og:title" content="Payo — CLAUDE.md, .cursorrules &amp; AGENTS.md generator CLI" />
+  <meta property="og:description" content="Generate project-tailored AI assistant rules — CLAUDE.md, .cursorrules, Copilot instructions, AGENTS.md — in under two minutes. Works with Claude, Cursor, Copilot, Codex, Windsurf, and Antigravity." />
+  <meta property="og:image" content="https://uttam-gelot.github.io/payo/og.png" />
+  <meta property="og:image:secure_url" content="https://uttam-gelot.github.io/payo/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="2400" />
+  <meta property="og:image:height" content="1260" />
+  <meta property="og:image:alt" content="Payo — generate CLAUDE.md, .cursorrules, Copilot instructions, and AGENTS.md in two minutes." />
+  <meta property="og:locale" content="en_US" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Payo — CLAUDE.md, .cursorrules &amp; AGENTS.md generator CLI" />
+  <meta name="twitter:description" content="Generate project-tailored AI assistant rules in under two minutes. Works with Claude, Cursor, Copilot, Codex, Windsurf, Antigravity." />
+  <meta name="twitter:image" content="https://uttam-gelot.github.io/payo/og.png" />
+  <meta name="twitter:image:alt" content="Payo — generate AI assistant rules in two minutes." />
+
+  <!-- Structured data: SoftwareApplication -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Payo",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Windows, macOS, Linux",
+    "description": "CLI that generates project-tailored AI assistant rules — CLAUDE.md, .cursorrules, Copilot instructions, AGENTS.md — in under two minutes.",
+    "url": "https://uttam-gelot.github.io/payo/",
+    "image": "https://uttam-gelot.github.io/payo/og.png",
+    "downloadUrl": "https://www.npmjs.com/package/@uge/payo",
+    "softwareVersion": "0.1.7",
+    "license": "https://opensource.org/licenses/MIT",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+  }
+  </script>
+
+  <!-- Structured data: FAQ -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is a CLAUDE.md file?",
+        "acceptedAnswer": { "@type": "Answer", "text": "CLAUDE.md is a guidance file that Claude and Claude Code read to learn your project's stack, conventions, and rules, so the assistant follows them instead of guessing. Payo generates one tailored to your project automatically." }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I generate a .cursorrules file?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Run npx @uge/payo in your project, answer a short questionnaire about your stack, and Payo writes a .cursorrules file (plus Cursor's .cursor/rules/) tailored to your framework, database, testing, and git conventions." }
+      },
+      {
+        "@type": "Question",
+        "name": "Do I need Bun to run Payo?",
+        "acceptedAnswer": { "@type": "Answer", "text": "No. Running Payo only needs Node.js 18 or newer — npx @uge/payo runs the published Node-targeted binary. Bun is only required if you build Payo from source." }
+      },
+      {
+        "@type": "Question",
+        "name": "Which AI coding tools does Payo support?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Claude, Cursor, GitHub Copilot, Codex CLI, Windsurf, and Antigravity. Payo writes each tool's guidance files in its own native format and location." }
+      }
+    ]
+  }
+  </script>
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --ink: #14201d;
+      --muted: #5e6b67;
+      --line: #e7ece9;
+
+      --teal: #046f73;        /* primary — from logo layers */
+      --teal-deep: #034b4e;
+      --teal-soft: #e2f0f0;
+      --sand: #e8b983;        /* secondary — from logo P / wordmark */
+      --sand-deep: #b8823a;
+      --sand-soft: #fcf3e6;
+
+      --shadow-sm: 0 1px 2px rgba(20,32,29,.06), 0 2px 6px rgba(20,32,29,.05);
+      --shadow-md: 0 4px 12px rgba(20,32,29,.07), 0 12px 32px rgba(20,32,29,.07);
+      --shadow-teal: 0 8px 22px rgba(4,111,115,.26);
+
+      --max: 1180px;
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+    body {
+      margin: 0; background: var(--bg); color: var(--ink);
+      font: 17px/1.7 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+    }
+    a { color: inherit; text-decoration: none; }
+    .wrap { max-width: var(--max); margin: 0 auto; padding: 0 32px; }
+
+    /* nav */
+    nav { position: sticky; top: 0; z-index: 10; background: rgba(255,255,255,.82);
+      backdrop-filter: saturate(180%) blur(12px); border-bottom: 1px solid var(--line); }
+    .nav-in { display: flex; justify-content: space-between; align-items: center;
+      max-width: var(--max); margin: 0 auto; padding: 16px 32px; }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 24px; letter-spacing: -.02em; color: var(--teal); }
+    .brand img { width: 56px; height: 56px; }
+    .nav-links { display: flex; gap: 26px; align-items: center; font-size: 15px; color: var(--muted); }
+    .nav-links a:hover { color: var(--ink); }
+    .nav-cta { padding: 8px 16px; border-radius: 10px; background: var(--teal); color: #fff !important;
+      font-weight: 600; box-shadow: var(--shadow-teal); }
+    .nav-cta:hover { background: var(--teal-deep); }
+
+    /* hero */
+    .hero { position: relative; overflow: hidden; padding: 88px 0 56px; text-align: center; }
+    .hero::before { content: ""; position: absolute; inset: 0; z-index: -1;
+      background:
+        radial-gradient(60% 50% at 18% 0%, rgba(224,169,109,.20), transparent 60%),
+        radial-gradient(55% 55% at 85% 10%, rgba(12,133,119,.16), transparent 60%); }
+    .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; margin-bottom: 26px;
+      border: 1px solid var(--line); border-radius: 999px; background: #fff; box-shadow: var(--shadow-sm);
+      font-size: 13.5px; color: var(--muted); font-weight: 500; }
+    .pill b { color: var(--teal); font-weight: 700; }
+    h1 { font-size: 3.4rem; line-height: 1.05; letter-spacing: -.04em; margin: 0 auto 22px; max-width: 16ch; font-weight: 760; }
+    h1 .accent { color: var(--teal); }
+    .lede { font-size: 1.22rem; color: var(--muted); margin: 0 auto 34px; max-width: 60ch; line-height: 1.6; }
+    .lede strong { color: var(--ink); font-weight: 650; }
+
+    .hero-cta { display: flex; gap: 14px; justify-content: center; align-items: center; flex-wrap: wrap; }
+    .cmd { display: inline-flex; align-items: center; gap: 14px;
+      background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-sm);
+      padding: 12px 14px 12px 18px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px; }
+    .cmd code { background: none; }
+    .cmd .sigil { color: var(--sand-deep); user-select: none; }
+    .cmd button { border: 0; background: var(--teal-soft); color: var(--teal-deep); cursor: pointer;
+      font: 600 13px/1 ui-sans-serif, sans-serif; padding: 8px 12px; border-radius: 8px; }
+    .cmd button:hover { background: var(--teal); color: #fff; }
+    .btn-ghost { display: inline-flex; align-items: center; gap: 8px; padding: 13px 18px; border-radius: 12px;
+      border: 1px solid var(--line); background: #fff; box-shadow: var(--shadow-sm); font-weight: 600; font-size: 15px; }
+    .btn-ghost:hover { border-color: var(--sand); background: var(--sand-soft); }
+    .btn-ghost svg { width: 17px; height: 17px; }
+    .cmd-note { margin-top: 16px; font-size: 14px; color: var(--muted); }
+    .cmd-note code { background: var(--teal-soft); color: var(--teal-deep); }
+
+    /* demo */
+    .demo-wrap { max-width: 960px; margin: 60px auto 0; padding: 10px;
+      border-radius: calc(var(--radius) + 6px); background: linear-gradient(135deg, var(--sand-soft), var(--teal-soft));
+      box-shadow: var(--shadow-md); }
+    .demo { width: 100%; display: block; border-radius: var(--radius); border: 1px solid rgba(255,255,255,.7); }
+
+    /* sections */
+    section { padding: 80px 0; }
+    .sec-head { max-width: 74ch; margin: 0 0 40px; }
+    h2 { font-size: 2rem; letter-spacing: -.03em; margin: 0 0 14px; font-weight: 720; }
+    .sec-head p { margin: 0; color: var(--muted); font-size: 1.1rem; }
+    p { margin: 0 0 16px; }
+    .muted { color: var(--muted); }
+    code { background: var(--sand-soft); color: var(--sand-deep); padding: 2px 7px; border-radius: 6px;
+      font-size: .86em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    /* tool cards */
+    .tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .tool { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 20px;
+      box-shadow: var(--shadow-sm); transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+    .tool:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--teal-soft); }
+    .tool .name { font-weight: 680; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .tool .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--teal); }
+    .tool .files { color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: 13px; line-height: 1.7; word-break: break-word; }
+
+    /* stacks */
+    .stacks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .stack { border: 1px solid var(--line); border-radius: 14px; padding: 22px 20px; box-shadow: var(--shadow-sm); background: #fff; }
+    .stack .lang { font-weight: 700; font-size: 1.05rem; margin-bottom: 4px; }
+    .stack .lang em { font-style: normal; color: var(--teal); }
+    .stack .kicker { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--sand-deep); font-weight: 700; margin: 16px 0 6px; }
+    .stack .kicker:first-of-type { margin-top: 14px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; background: var(--teal-soft); color: var(--teal-deep); font-weight: 550; white-space: nowrap; }
+    .db-row { margin-top: 22px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+      padding: 18px 22px; border-radius: 14px; background: var(--sand-soft); border: 1px solid var(--line); }
+    .db-row .kicker { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--sand-deep); font-weight: 700; margin: 0; }
+    .db-row .chip { background: #fff; border: 1px solid var(--line); }
+
+    /* split: why + steps */
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: start; }
+    ol.steps { list-style: none; counter-reset: s; margin: 0; padding: 0; }
+    ol.steps li { counter-increment: s; padding: 0 0 22px 52px; position: relative; }
+    ol.steps li:last-child { padding-bottom: 0; }
+    ol.steps li::before { content: counter(s); position: absolute; left: 0; top: -2px;
+      width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center;
+      font-size: 15px; font-weight: 700; color: #fff;
+      background: linear-gradient(135deg, var(--teal), var(--teal-deep)); box-shadow: var(--shadow-teal); }
+    ol.steps b { font-weight: 650; }
+    ol.steps span { color: var(--muted); display: block; font-size: .98rem; }
+
+    .why-card { background: linear-gradient(160deg, var(--teal-soft), var(--sand-soft));
+      border-radius: var(--radius); padding: 32px; box-shadow: var(--shadow-sm); }
+    .why-card h2 { font-size: 1.7rem; }
+    .why-card p { color: #2f3d39; }
+    .why-card p:last-child { margin-bottom: 0; }
+
+    .stat { margin-top: 28px; font-size: .95rem; color: var(--muted); }
+    .stat b { color: var(--teal-deep); }
+
+    /* faq */
+    .faq { max-width: none; }
+    details { border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; margin-bottom: 12px;
+      box-shadow: var(--shadow-sm); transition: border-color .15s ease; }
+    details[open] { border-color: var(--teal-soft); }
+    summary { cursor: pointer; font-weight: 620; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; color: var(--teal); font-size: 1.3rem; line-height: 1; }
+    details[open] summary::after { content: "–"; }
+    details p { margin: 14px 0 0; color: var(--muted); }
+
+    /* footer */
+    footer { border-top: 1px solid var(--line); margin-top: 0; }
+    .foot-in { max-width: var(--max); margin: 0 auto; padding: 44px 32px 56px;
+      display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .foot-brand { display: flex; align-items: center; gap: 11px; font-weight: 700; font-size: 20px; color: var(--teal); }
+    .foot-brand img { width: 46px; height: 46px; }
+    .foot-links { display: flex; gap: 24px; color: var(--muted); font-size: 15px; }
+    .foot-links a:hover { color: var(--teal); }
+
+    @media (max-width: 880px) {
+      .tools { grid-template-columns: 1fr 1fr; }
+      .stacks { grid-template-columns: 1fr 1fr; }
+      .split { grid-template-columns: 1fr; gap: 40px; }
+    }
+    @media (max-width: 600px) {
+      .wrap, .nav-in, .foot-in { padding-left: 20px; padding-right: 20px; }
+      h1 { font-size: 2.4rem; }
+      .hero { padding: 56px 0 40px; }
+      section { padding: 56px 0; }
+      .tools { grid-template-columns: 1fr; }
+      .stacks { grid-template-columns: 1fr; }
+      .nav-links a:not(.nav-cta) { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="nav-in">
+      <a class="brand" href="/"><img src="https://raw.githubusercontent.com/uttam-gelot/payo/main/assets/icon.png" alt="" />Payo</a>
+      <div class="nav-links">
+        <a href="#how">How it works</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://github.com/uttam-gelot/payo">GitHub</a>
+        <a class="nav-cta" href="https://www.npmjs.com/package/@uge/payo">Install</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="wrap">
+      <span class="pill"><b>npx @uge/payo</b> · zero config</span>
+      <h1>AI assistant rules for your project, in <span class="accent">two minutes</span>.</h1>
+      <p class="lede">
+        Payo is a free CLI that writes the guidance files your AI coding assistant reads —
+        <strong>CLAUDE.md</strong>, <strong>.cursorrules</strong>,
+        <strong>Copilot instructions</strong>, and <strong>AGENTS.md</strong> — tailored to your
+        actual stack.
+      </p>
+
+      <div class="hero-cta">
+        <div class="cmd">
+          <code><span class="sigil">$ </span>npx @uge/payo</code>
+          <button id="copy" aria-label="Copy command">Copy</button>
+        </div>
+        <a class="btn-ghost" href="https://github.com/uttam-gelot/payo">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+          Star on GitHub
+        </a>
+      </div>
+      <p class="cmd-note">Prefer Bun? <code>bunx @uge/payo</code> works too. No install required — needs only Node.js 18+.</p>
+
+      <div class="demo-wrap">
+        <img class="demo" src="https://raw.githubusercontent.com/uttam-gelot/payo/main/assets/demo.gif" alt="Payo CLI generating CLAUDE.md, .cursorrules, and AGENTS.md from a short questionnaire" loading="lazy" />
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <section id="what">
+      <div class="sec-head">
+        <h2>One questionnaire, every tool's config</h2>
+        <p>
+          AI assistants are only as good as the context they're given. Payo interviews you about your
+          stack, then writes the files each assistant actually reads — a CLAUDE.md generator, cursor
+          rules generator, Copilot instructions generator, and AGENTS.md generator in one command.
+        </p>
+      </div>
+      <div class="tools">
+        <div class="tool"><div class="name"><span class="dot"></span>Claude</div><div class="files">CLAUDE.md<br />.claude/skills/</div></div>
+        <div class="tool"><div class="name"><span class="dot"></span>Cursor</div><div class="files">.cursorrules<br />.cursor/rules/</div></div>
+        <div class="tool"><div class="name"><span class="dot"></span>GitHub Copilot</div><div class="files">.github/copilot-instructions.md</div></div>
+        <div class="tool"><div class="name"><span class="dot"></span>Codex</div><div class="files">AGENTS.md</div></div>
+        <div class="tool"><div class="name"><span class="dot"></span>Antigravity</div><div class="files">AGENTS.md<br />.agents/skills/</div></div>
+        <div class="tool"><div class="name"><span class="dot"></span>Windsurf</div><div class="files">.windsurfrules</div></div>
+      </div>
+    </section>
+
+    <section id="stacks">
+      <div class="sec-head">
+        <h2>Knows your stack, not just generic advice</h2>
+        <p>
+          Payo understands <strong>25 frameworks</strong>, <strong>24 ORMs</strong>, and
+          <strong>4 databases</strong> across four languages — and tailors its questions and the
+          generated rules to whatever you pick. Choose Next.js and you get Next.js follow-ups;
+          choose Postgres and you're asked about migrations and naming.
+        </p>
+      </div>
+      <div class="stacks">
+        <div class="stack">
+          <div class="lang"><em>TypeScript / JavaScript</em></div>
+          <div class="kicker">Frameworks</div>
+          <div class="chips">
+            <span class="chip">Next.js</span><span class="chip">Nuxt</span><span class="chip">SvelteKit</span>
+            <span class="chip">Remix</span><span class="chip">Astro</span><span class="chip">React</span>
+            <span class="chip">Vue</span><span class="chip">Svelte</span><span class="chip">Solid</span>
+            <span class="chip">Angular</span><span class="chip">Express</span><span class="chip">Fastify</span>
+            <span class="chip">NestJS</span><span class="chip">Hono</span>
+          </div>
+          <div class="kicker">ORMs</div>
+          <div class="chips">
+            <span class="chip">Prisma</span><span class="chip">Drizzle</span><span class="chip">TypeORM</span>
+            <span class="chip">Sequelize</span><span class="chip">Kysely</span><span class="chip">MikroORM</span>
+            <span class="chip">Mongoose</span>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="lang"><em>Python</em></div>
+          <div class="kicker">Frameworks</div>
+          <div class="chips">
+            <span class="chip">Django</span><span class="chip">FastAPI</span><span class="chip">Flask</span>
+            <span class="chip">Litestar</span>
+          </div>
+          <div class="kicker">ORMs</div>
+          <div class="chips">
+            <span class="chip">SQLAlchemy</span><span class="chip">SQLModel</span><span class="chip">Django ORM</span>
+            <span class="chip">Tortoise</span><span class="chip">Peewee</span><span class="chip">Beanie</span>
+            <span class="chip">MongoEngine</span><span class="chip">Motor</span>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="lang"><em>Go</em></div>
+          <div class="kicker">Frameworks</div>
+          <div class="chips">
+            <span class="chip">Gin</span><span class="chip">Echo</span><span class="chip">Fiber</span>
+            <span class="chip">Chi</span>
+          </div>
+          <div class="kicker">ORMs / data</div>
+          <div class="chips">
+            <span class="chip">GORM</span><span class="chip">Ent</span><span class="chip">sqlc</span>
+            <span class="chip">sqlx</span><span class="chip">mongo-go-driver</span>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="lang"><em>Rust</em></div>
+          <div class="kicker">Frameworks</div>
+          <div class="chips">
+            <span class="chip">Actix</span><span class="chip">Axum</span><span class="chip">Rocket</span>
+          </div>
+          <div class="kicker">ORMs / data</div>
+          <div class="chips">
+            <span class="chip">SeaORM</span><span class="chip">Diesel</span><span class="chip">SQLx</span>
+            <span class="chip">mongodb</span>
+          </div>
+        </div>
+      </div>
+      <div class="db-row">
+        <span class="kicker">Databases</span>
+        <span class="chip">PostgreSQL</span><span class="chip">MySQL</span><span class="chip">SQLite</span><span class="chip">MongoDB</span>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="split">
+        <div class="why-card">
+          <h2>Stop re-explaining your project</h2>
+          <p>
+            Every session starts cold. Your assistant doesn't know you use Drizzle over Prisma, that
+            handlers live in <code>src/routes</code>, or that commits follow Conventional Commits — so
+            you re-explain it chat after chat, and still get code that ignores half of it.
+          </p>
+          <p>
+            Writing the guidance by hand is tedious and different for every tool, so most people never
+            do it. Payo writes it in about two minutes, in each tool's native format — so your assistant
+            follows <em>your</em> conventions from the first prompt.
+          </p>
+        </div>
+        <div>
+          <h2 style="margin-bottom:28px">How it works</h2>
+          <ol class="steps">
+            <li><b>Run it in your repo.</b> <span>npx @uge/payo — no install, no signup, no config.</span></li>
+            <li><b>Answer a short questionnaire.</b> <span>Questions adapt to your stack; most have sensible defaults.</span></li>
+            <li><b>Get tailored guidance files.</b> <span>Rich AI-written docs when the tool's CLI is present, solid templates otherwise.</span></li>
+            <li><b>Optional bootstrap prompt.</b> <span>A paste-ready prompt to scaffold a runnable project honoring the rules.</span></li>
+          </ol>
+          <p class="stat">Understands <b>25 frameworks</b>, <b>24 ORMs</b>, and <b>4 databases</b> across TypeScript/JavaScript, Python, Go, and Rust.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="faq">
+      <div class="sec-head"><h2>Frequently asked questions</h2></div>
+      <div class="faq">
+        <details>
+          <summary>What is a CLAUDE.md file?</summary>
+          <p>A guidance file Claude and Claude Code read to learn your project's stack, conventions, and rules — so the assistant follows them instead of guessing. Payo generates one tailored to your project automatically.</p>
+        </details>
+        <details>
+          <summary>How do I generate a .cursorrules file?</summary>
+          <p>Run <code>npx @uge/payo</code>, answer a short questionnaire, and Payo writes <code>.cursorrules</code> (plus <code>.cursor/rules/</code>) tailored to your framework, database, testing, and git conventions.</p>
+        </details>
+        <details>
+          <summary>Do I need Bun to run Payo?</summary>
+          <p>No. Running Payo only needs <strong>Node.js 18+</strong> — <code>npx @uge/payo</code> runs the published Node-targeted binary. Bun is only needed to build from source.</p>
+        </details>
+        <details>
+          <summary>Which AI coding tools does Payo support?</summary>
+          <p>Claude, Cursor, GitHub Copilot, Codex, Windsurf, and Antigravity — each in its own native format and location.</p>
+        </details>
+        <details>
+          <summary>Is Payo free and open source?</summary>
+          <p>Yes. MIT-licensed and free. Source on <a href="https://github.com/uttam-gelot/payo">GitHub</a>.</p>
+        </details>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="foot-in">
+      <span class="foot-brand"><img src="https://raw.githubusercontent.com/uttam-gelot/payo/main/assets/icon.png" alt="" />Payo</span>
+      <div class="foot-links">
+        <a href="https://github.com/uttam-gelot/payo">GitHub</a>
+        <a href="https://www.npmjs.com/package/@uge/payo">npm</a>
+        <a href="https://github.com/uttam-gelot/payo/blob/main/LICENSE">MIT License</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    function bindCopy(id) {
+      var btn = document.getElementById(id);
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        navigator.clipboard.writeText('npx @uge/payo').then(function () {
+          var t = btn.textContent; btn.textContent = 'Copied';
+          setTimeout(function () { btn.textContent = t; }, 1400);
+        });
+      });
+    }
+    bindCopy('copy');
+  </script>
+
+</body>
+</html>
