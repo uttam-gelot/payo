@@ -80,6 +80,11 @@ export function fullStackAnswers(aiTool?: string): Answers {
     testRunner: 'vitest',
     gitWorkflow: 'standard',
     aiAttribution: false,
+    commitScope: true,
+    commitScratchGuard: true,
+    confirmPush: true,
+    verifyBeforeCommit: true,
+    atomicCommits: true,
   };
 }
 

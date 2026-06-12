@@ -51,6 +51,11 @@ describe('recommended path applies correct values', () => {
     expect(a.documentation).toEqual(['readme', 'comments']);
     expect(a.gitWorkflow).toBe('standard');
     expect(a.aiAttribution).toBe(false);
+    expect(a.commitScope).toBe(true);
+    expect(a.commitScratchGuard).toBe(true);
+    expect(a.confirmPush).toBe(true);
+    expect(a.verifyBeforeCommit).toBe(true);
+    expect(a.atomicCommits).toBe(true);
 
     // validation & state
     expect(a.validation).toBe('zod');

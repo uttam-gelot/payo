@@ -167,6 +167,20 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
           : '- Do not mention AI assistants or add AI co-authorship trailers in commits or PRs.',
       );
     }
+    if (answers.commitScope === true)
+      lines.push('- Scope each commit to the current task; do not include unrelated changes.');
+    if (answers.commitScratchGuard === true)
+      lines.push(
+        '- Ask before committing scratch/planning files (e.g. .md or .html notes for planning, R&D, or local-only use); keep them out of commits unless confirmed.',
+      );
+    if (answers.confirmPush === true)
+      lines.push('- Never push to a remote without explicit confirmation.');
+    if (answers.verifyBeforeCommit === true)
+      lines.push(
+        '- Run the formatter, linter, and tests before committing; only commit when they pass.',
+      );
+    if (answers.atomicCommits === true)
+      lines.push('- Keep commits small and atomic — one logical change per commit.');
     sections.push({ title: 'Git Workflow', body: lines.join('\n') });
   }
 
