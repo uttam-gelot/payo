@@ -30,9 +30,23 @@ import { buildBootstrapMetaPrompt, writeBootstrapPrompt } from './bootstrap';
 import { getProvider } from '../providers/index';
 import { config } from '../config';
 
+/**
+ * Resolve an artifact path against cwd, rejecting anything that escapes the
+ * project directory. Every built-in provider uses fixed relative paths; this
+ * enforces that invariant for contributed providers too.
+ */
+export function resolveContained(rel: string): string {
+  const dest = path.resolve(process.cwd(), rel);
+  const relative = path.relative(process.cwd(), dest);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`Refusing to write outside the project directory: ${rel}`);
+  }
+  return dest;
+}
+
 /** Atomic write-then-rename, mirroring src/state/index.ts. */
 function writeArtifact(artifact: GeneratedArtifact): void {
-  const dest = path.resolve(process.cwd(), artifact.path);
+  const dest = resolveContained(artifact.path);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   const tmp = dest + '.tmp';
   fs.writeFileSync(tmp, artifact.content, 'utf-8');

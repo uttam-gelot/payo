@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { setAgentOverride, resetAgentOverride } from '../helpers/agentMock';
-import { predictTargets, backupFiles } from '../../src/generator/index';
+import { predictTargets, backupFiles, resolveContained } from '../../src/generator/index';
 import { listProviders } from '../../src/providers/index';
 import { selectSkills } from '../../src/generator/skills';
 import { buildBaseRules } from '../../src/generator/rules';
@@ -36,6 +36,29 @@ describe('predictTargets — AI mode', () => {
 
   it('predicts the single master file for a single-file tool (codex)', () => {
     expect(predictTargets(fullStackAnswers('codex'))).toEqual(['AGENTS.md']);
+  });
+});
+
+describe('resolveContained', () => {
+  it('resolves project-relative paths', async () => {
+    // Compare against cwd, not the mkdtemp string — macOS reports the
+    // /private-resolved real path from process.cwd() after chdir.
+    await inTempProject(() => {
+      expect(resolveContained('CLAUDE.md')).toBe(join(process.cwd(), 'CLAUDE.md'));
+      expect(resolveContained('.claude/skills/testing/SKILL.md')).toBe(
+        join(process.cwd(), '.claude/skills/testing/SKILL.md'),
+      );
+    });
+  });
+
+  it('rejects paths that escape the project directory', async () => {
+    await inTempProject(() => {
+      expect(() => resolveContained('../outside.md')).toThrow('outside the project directory');
+      expect(() => resolveContained('/tmp/abs.md')).toThrow('outside the project directory');
+      expect(() => resolveContained('nested/../../outside.md')).toThrow(
+        'outside the project directory',
+      );
+    });
   });
 });
 
