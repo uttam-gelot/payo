@@ -159,6 +159,11 @@ describe('runFlow — skip (skip every group)', () => {
     expect(a.testTypes).toEqual([]);
     expect(a.codingStandards).toEqual([]);
     expect(a.aiAttribution).toBe(false);
+    expect(a.commitScope).toBe(false);
+    expect(a.commitScratchGuard).toBe(false);
+    expect(a.confirmPush).toBe(false);
+    expect(a.verifyBeforeCommit).toBe(false);
+    expect(a.atomicCommits).toBe(false);
 
     // when-gated-by-skip questions never surface: authStrategy needs auth !== none,
     // and testRunner needs unit/integration in testTypes (skipped to []).

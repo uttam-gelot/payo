@@ -225,17 +225,26 @@ const skills: SkillSpec[] = [
     appliesTo: (a) => has(a, 'gitWorkflow'),
     buildPrompt: (a): string => {
       const wf = val(a, 'gitWorkflow');
-      const base =
+      let base =
         `Write git-workflow guidance for the ${wf ?? 'selected'} workflow: branching, commit message ` +
         'conventions, and PR practices, and maintaining a comprehensive .gitignore (build output, ' +
         'dependencies, environment/secret files, and OS/editor artifacts).';
-      if (typeof a.aiAttribution !== 'boolean') return base;
-      return (
-        base +
-        (a.aiAttribution
+      if (typeof a.aiAttribution === 'boolean')
+        base += a.aiAttribution
           ? ' In commits and PRs, attribute AI-assisted work (e.g. a Co-Authored-By trailer).'
-          : ' Do not mention AI assistants or add AI co-authorship trailers in commit messages or PR descriptions.')
-      );
+          : ' Do not mention AI assistants or add AI co-authorship trailers in commit messages or PR descriptions.';
+      if (a.commitScope === true)
+        base += ' Scope each commit to the task at hand, excluding unrelated changes.';
+      if (a.commitScratchGuard === true)
+        base +=
+          ' Ask before committing scratch/planning files (e.g. .md or .html notes created only for planning, R&D, or local use).';
+      if (a.confirmPush === true) base += ' Never push to a remote without explicit confirmation.';
+      if (a.verifyBeforeCommit === true)
+        base +=
+          ' Run the formatter, linter, and tests before committing, and only commit when they pass.';
+      if (a.atomicCommits === true)
+        base += ' Keep commits small and atomic — one logical change per commit.';
+      return base;
     },
   },
 ];

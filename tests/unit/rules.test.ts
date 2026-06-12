@@ -59,6 +59,31 @@ describe('buildBaseRules', () => {
     expect(on).toContain('Co-Authored-By');
   });
 
+  it('emits commit-hygiene lines in the Git Workflow section when enabled', () => {
+    const md = renderMarkdown(
+      'G',
+      buildBaseRules({
+        ...contexts.tsBackend,
+        gitWorkflow: 'standard',
+        commitScope: true,
+        commitScratchGuard: true,
+        confirmPush: true,
+        verifyBeforeCommit: true,
+        atomicCommits: true,
+      }),
+    );
+    expect(md).toContain('Scope each commit');
+    expect(md).toContain('scratch/planning files');
+    expect(md).toContain('Never push to a remote without explicit confirmation');
+    expect(md).toContain('atomic');
+
+    const off = renderMarkdown(
+      'G',
+      buildBaseRules({ ...contexts.tsBackend, gitWorkflow: 'standard' }),
+    );
+    expect(off).not.toContain('Scope each commit');
+  });
+
   it('backend omits State Management', () => {
     const a: Answers = {
       ...contexts.tsBackend,
