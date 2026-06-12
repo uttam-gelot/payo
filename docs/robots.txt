@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://uttam-gelot.github.io/payo/sitemap.xml
+Sitemap: https://payo.uttamgelot.com/sitemap.xml
