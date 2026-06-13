@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'bun:test';
-import { OTHER, offersOther, parseCustom, mergeMultiselect } from '../../src/questions/runner';
+import {
+  OTHER,
+  offersOther,
+  parseCustom,
+  mergeMultiselect,
+  hoistRecommended,
+  resolveOptions,
+} from '../../src/questions/runner';
+import { validationOptions } from '../../src/questions/options';
 import type { Option, Question } from '../../src/questions/types';
 
 const select = (over: Partial<Question> = {}): Question => ({
@@ -11,6 +19,8 @@ const select = (over: Partial<Question> = {}): Question => ({
 
 const opts = (...values: string[]): Option<string>[] =>
   values.map((value) => ({ value, label: value }));
+
+const rec = (value: string): Option<string> => ({ value, label: value, hint: 'recommended' });
 
 describe('offersOther', () => {
   it('offers Other by default (no allowOther flag)', () => {
@@ -28,6 +38,46 @@ describe('offersOther', () => {
 
   it("treats 'none' as a real choice, still offering Other", () => {
     expect(offersOther(select(), opts('a', 'none'))).toBe(true);
+  });
+});
+
+describe('hoistRecommended', () => {
+  const vals = (o: Option<string>[]): string[] => o.map((x) => x.value);
+
+  it('moves a single recommended option to the front, keeping the rest in order', () => {
+    expect(vals(hoistRecommended([opts('a', 'b')[0], rec('c'), opts('a', 'b')[1]]))).toEqual([
+      'c',
+      'a',
+      'b',
+    ]);
+  });
+
+  it('groups multiple recommended hints at the front in their original order', () => {
+    const o = [opts('a')[0], rec('b'), opts('c')[0], rec('d')];
+    expect(vals(hoistRecommended(o))).toEqual(['b', 'd', 'a', 'c']);
+  });
+
+  it('returns the list unchanged when none are recommended', () => {
+    const o = opts('a', 'b', 'c');
+    expect(hoistRecommended(o)).toBe(o);
+  });
+
+  it('returns the list unchanged when all are recommended', () => {
+    const o = [rec('a'), rec('b')];
+    expect(hoistRecommended(o)).toBe(o);
+  });
+
+  it('keeps a trailing none last when the recommended one is hoisted', () => {
+    const o = [opts('a')[0], rec('b'), opts('none')[0]];
+    expect(vals(hoistRecommended(o))).toEqual(['b', 'a', 'none']);
+  });
+});
+
+describe('resolveOptions', () => {
+  it('hoists the recommended option from a dynamic builder (NestJS validation)', () => {
+    const q = select({ optionsFrom: validationOptions });
+    const resolved = resolveOptions(q, { language: 'typescript', framework: 'nestjs' });
+    expect(resolved[0]?.value).toBe('class-validator');
   });
 });
 

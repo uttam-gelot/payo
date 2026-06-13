@@ -14,8 +14,15 @@ export function guardCancel<T>(value: T | symbol): asserts value is NonNullable<
 
 export const OTHER = '__other__';
 
+/** Stable-sort options so recommended-hinted ones lead, preserving order otherwise. */
+export function hoistRecommended(options: Option<string>[]): Option<string>[] {
+  const recommended = options.filter((o) => o.hint === 'recommended');
+  if (recommended.length === 0 || recommended.length === options.length) return options;
+  return [...recommended, ...options.filter((o) => o.hint !== 'recommended')];
+}
+
 export function resolveOptions(q: Question, a: Answers): Option<string>[] {
-  return q.optionsFrom ? q.optionsFrom(a) : (q.options ?? []);
+  return hoistRecommended(q.optionsFrom ? q.optionsFrom(a) : (q.options ?? []));
 }
 
 /** Whether to append an "Other (specify)" choice — on by default, opt out with `allowOther: false`. */
