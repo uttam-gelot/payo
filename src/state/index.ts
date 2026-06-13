@@ -3,6 +3,7 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { config } from '../config';
+import { writeFileAtomic } from '../fsutil';
 import type { Answers } from '../questions/types';
 
 // ---------------------------------------------------------------------------
@@ -62,11 +63,7 @@ export function loadSession(): Session | null {
 
 /** Save session to disk using an atomic write-then-rename pattern. */
 export function saveSession(session: Session): void {
-  const file = sessionFile();
-  fs.mkdirSync(sessionDir(), { recursive: true });
-  const json = JSON.stringify(session, null, 2);
-  fs.writeFileSync(file + '.tmp', json, 'utf-8');
-  fs.renameSync(file + '.tmp', file);
+  writeFileAtomic(sessionFile(), JSON.stringify(session, null, 2));
 }
 
 /** Delete the session file (used on Restart or after successful completion). */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import '../../src/stack/modules/index'; // populate the module registry (resolveCommands reads it)
 import {
   buildBootstrapPrompt,
@@ -96,6 +96,13 @@ describe('writeBootstrapPrompt', () => {
       expect(rel).toBe('bootstrap-prompt.md');
       expect(existsSync(rel)).toBe(true);
       expect(readFileSync(rel, 'utf8')).toBe(buildBootstrapPrompt(answers, files, 'Codex CLI'));
+    });
+  });
+
+  it('writes atomically, leaving no .tmp sibling', async () => {
+    await inTempProject((dir) => {
+      writeBootstrapPrompt(fullStackAnswers(), files, 'Codex CLI');
+      expect(readdirSync(dir).some((f) => f.endsWith('.tmp'))).toBe(false);
     });
   });
 });

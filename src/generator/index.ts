@@ -29,6 +29,7 @@ import { resolveCommands } from './commands';
 import { buildBootstrapMetaPrompt, writeBootstrapPrompt } from './bootstrap';
 import { getProvider } from '../providers/index';
 import { config } from '../config';
+import { writeFileAtomic } from '../fsutil';
 
 /**
  * Resolve an artifact path against cwd, rejecting anything that escapes the
@@ -44,13 +45,8 @@ export function resolveContained(rel: string): string {
   return dest;
 }
 
-/** Atomic write-then-rename, mirroring src/state/index.ts. */
 function writeArtifact(artifact: GeneratedArtifact): void {
-  const dest = resolveContained(artifact.path);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  const tmp = dest + '.tmp';
-  fs.writeFileSync(tmp, artifact.content, 'utf-8');
-  fs.renameSync(tmp, dest);
+  writeFileAtomic(resolveContained(artifact.path), artifact.content);
 }
 
 /** Provider-agnostic rule sections rendered as the prompt's project context. */

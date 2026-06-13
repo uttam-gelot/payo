@@ -7,6 +7,7 @@
 
 import { run } from './cli/index';
 import { parseArgs, versionText, helpText } from './cli/argv';
+import { FileWriteError } from './fsutil';
 
 const action = parseArgs(process.argv.slice(2));
 if (action === 'version') {
@@ -21,6 +22,12 @@ if (action === 'version') {
 }
 
 run().catch((err: unknown) => {
-  console.error('Unexpected error:', err);
+  // Expected filesystem failures get a clean one-line message; the .payo/
+  // session survives (cleanup only runs after success), so a re-run resumes.
+  if (err instanceof FileWriteError) {
+    console.error(err.message);
+  } else {
+    console.error('Unexpected error:', err);
+  }
   process.exit(1);
 });
