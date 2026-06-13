@@ -33,6 +33,7 @@ project's conventions instead of guessing.
 - [AI vs. template generation](#ai-vs-template-generation)
 - [Bootstrap prompt](#bootstrap-prompt)
 - [Resume anytime](#resume-anytime)
+- [Roadmap](#roadmap)
 - [Requirements](#requirements)
 - [Run locally](#run-locally)
 - [Contributing](#contributing)
@@ -183,6 +184,14 @@ A few environment variables tune AI generation:
 | `PAYO_RETRIES`          | `1`      | Extra attempts after a failed run    |
 | `PAYO_AGENT_TIMEOUT_MS` | `120000` | Wall-clock cap per file (ms)         |
 
+### Your data stays yours
+
+Payo has no backend and no telemetry. Rich generation runs entirely through the
+AI CLI **you** already have installed (`claude`, `cursor-agent`, etc.), so your
+answers go only to that tool under your own account and credentials — exactly as
+if you'd prompted it yourself. Payo itself sends nothing to any server; without a
+CLI present it never leaves your machine at all, falling back to local templates.
+
 ## Bootstrap prompt
 
 An empty repo with great guidance is still an empty repo. After generating, Payo
@@ -196,6 +205,27 @@ iterate with you until it runs.
 Interrupt a run and pick up where you left off. Payo saves your questionnaire
 answers and generation progress under `.payo/`; rerun and it resumes, only
 generating what's missing. Finished runs clean the directory up automatically.
+
+## Roadmap
+
+Payo works today, but it's still early. Here's where it's headed:
+
+- **First-class existing-project support.** Right now Payo shines on a fresh
+  repo. The next big step is making it just as good on an established codebase:
+  **detect** the stack from what's already there (manifests, lockfiles, config,
+  folder layout), **auto-answer** the questionnaire from that evidence, and let
+  you confirm or tweak instead of typing it all out — then the normal generation
+  flow continues.
+- **Broader stack coverage.** More languages, frameworks, ORMs, databases, and
+  AI tools, plus deeper, more opinionated defaults for the ones already
+  supported — so the guidance fits more of the ecosystem out of the box.
+- **A smoother flow.** Faster, clearer prompts; better defaults and grouping;
+  tighter summaries and confirmations; and a generation step that's quicker and
+  more transparent about what it's doing.
+
+Have a stack you want supported or an idea to make the flow better?
+[Open an issue](https://github.com/uttam-gelot/payo/issues) or see
+[Contributing](#contributing).
 
 ## Requirements
 
