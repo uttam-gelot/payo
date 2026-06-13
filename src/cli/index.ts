@@ -7,10 +7,16 @@ import {
   cleanupWorkspace,
   type Session,
 } from '../state/index';
-import { confirmResume, confirmBootstrapPrompt, confirmGenerate } from '../questions/runner';
+import fs from 'fs';
+import {
+  confirmResume,
+  confirmBootstrapPrompt,
+  confirmGenerate,
+  confirmOverwrite,
+} from '../questions/runner';
 import { runFlow, reviewLines } from '../questions/engine';
 import { flow } from '../questions/flow';
-import { generate, generateBootstrap } from '../generator/index';
+import { generate, generateBootstrap, predictTargets, backupFiles } from '../generator/index';
 import type { ResumeStore } from '../generator/types';
 import { printBanner } from './banner';
 
@@ -49,6 +55,27 @@ export async function run(): Promise<void> {
   // dir is removed once we reach the end of run(), so only a killed run (which
   // exits before cleanup) carries progress over.
   const resumeCount = session.generated.length;
+
+  // --- Overwrite guard ---
+  // Checked before any generation work starts, so no agent call is wasted on a
+  // run the user then abandons. Skipped on resume: those files exist because
+  // payo's own interrupted run wrote them.
+  if (resumeCount === 0) {
+    const existing = predictTargets(session.answers).filter((rel) => fs.existsSync(rel));
+    if (existing.length > 0) {
+      const choice = await confirmOverwrite(existing);
+      if (choice === 'skip') {
+        // Keep the .payo/ session so a re-run resumes with these answers.
+        outro('Skipped — existing files left untouched. Run again to revisit.');
+        return;
+      }
+      if (choice === 'backup') {
+        const backups = backupFiles(existing);
+        note(backups.map((b) => `• ${b}`).join('\n'), 'Existing files renamed');
+      }
+    }
+  }
+
   const resume: ResumeStore = {
     done: new Set(session.generated),
     mark: (id) => {

@@ -137,6 +137,28 @@ export async function confirmGenerate(): Promise<boolean> {
   return value;
 }
 
+/** What to do when generation would overwrite files that already exist. */
+export type OverwriteChoice = 'overwrite' | 'backup' | 'skip';
+
+/**
+ * Asked before any generation work starts (so no agent call is wasted) when
+ * one or more target files already exist in the project.
+ */
+export async function confirmOverwrite(existing: string[]): Promise<OverwriteChoice> {
+  const shown = existing.slice(0, 3).join(', ');
+  const more = existing.length > 3 ? ` and ${existing.length - 3} more` : '';
+  const value = await select({
+    message: `${shown}${more} already exist${existing.length === 1 ? 's' : ''}. What should payo do?`,
+    options: [
+      { value: 'backup', label: 'Back up — rename existing to *.bak, then write fresh files' },
+      { value: 'overwrite', label: 'Overwrite — replace the existing files' },
+      { value: 'skip', label: 'Skip — keep existing files and generate nothing' },
+    ],
+  });
+  guardCancel(value);
+  return value;
+}
+
 /** Offer the post-generation bootstrap prompt once generation is done. */
 export async function confirmBootstrapPrompt(): Promise<boolean> {
   const value = await confirm({

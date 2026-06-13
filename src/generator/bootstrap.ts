@@ -11,9 +11,9 @@
  *    fixed facts so the model never has to guess them.
  * Orchestration (which path runs) lives in src/generator/index.ts.
  */
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Answers } from '../questions/types';
+import { writeFileAtomic } from '../fsutil';
 import { buildBaseRules, renderMarkdown } from './rules';
 import { resolveCommands, type StackCommands } from './commands';
 
@@ -173,7 +173,7 @@ export function writeBootstrapPrompt(
   providerName: string,
 ): string {
   const rel = 'bootstrap-prompt.md';
-  fs.writeFileSync(
+  writeFileAtomic(
     path.join(process.cwd(), rel),
     buildBootstrapPrompt(answers, files, providerName),
   );

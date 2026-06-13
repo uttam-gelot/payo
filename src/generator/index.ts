@@ -29,14 +29,24 @@ import { resolveCommands } from './commands';
 import { buildBootstrapMetaPrompt, writeBootstrapPrompt } from './bootstrap';
 import { getProvider } from '../providers/index';
 import { config } from '../config';
+import { writeFileAtomic } from '../fsutil';
 
-/** Atomic write-then-rename, mirroring src/state/index.ts. */
+/**
+ * Resolve an artifact path against cwd, rejecting anything that escapes the
+ * project directory. Every built-in provider uses fixed relative paths; this
+ * enforces that invariant for contributed providers too.
+ */
+export function resolveContained(rel: string): string {
+  const dest = path.resolve(process.cwd(), rel);
+  const relative = path.relative(process.cwd(), dest);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`Refusing to write outside the project directory: ${rel}`);
+  }
+  return dest;
+}
+
 function writeArtifact(artifact: GeneratedArtifact): void {
-  const dest = path.resolve(process.cwd(), artifact.path);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  const tmp = dest + '.tmp';
-  fs.writeFileSync(tmp, artifact.content, 'utf-8');
-  fs.renameSync(tmp, dest);
+  writeFileAtomic(resolveContained(artifact.path), artifact.content);
 }
 
 /** Provider-agnostic rule sections rendered as the prompt's project context. */
@@ -280,15 +290,52 @@ async function runSingleFile(
   }
 }
 
+/** The provider Strategy for the collected answers (custom tools ⇒ generic). */
+function providerFor(answers: Answers): AiProvider {
+  const aiTool: AiTool | undefined =
+    typeof answers.aiTool === 'string' ? answers.aiTool : undefined;
+  return getProvider(aiTool) ?? getProvider('other')!;
+}
+
+/**
+ * The project-relative paths a `generate()` run with these answers will write,
+ * mirroring its mode decision (AI agent vs static templates). Lets the CLI
+ * warn about existing files before any generation starts.
+ */
+export function predictTargets(answers: Answers): string[] {
+  const provider = providerFor(answers);
+  const runner = provider.agent;
+  if (runner && isAvailable(runner)) {
+    const specs = selectSkills(answers);
+    if (specs.length > 0) {
+      const paths = runner.singleFile
+        ? [runner.outputPath('')]
+        : specs.map((s) => runner.outputPath(s.id));
+      return [...new Set(paths)];
+    }
+  }
+  const sections = buildBaseRules(answers);
+  return provider.generate({ answers, sections }).map((a) => a.path);
+}
+
+/** Rename each existing file to `<path>.bak` (replacing a stale backup) and return the backups. */
+export function backupFiles(relPaths: string[]): string[] {
+  const backups: string[] = [];
+  for (const rel of relPaths) {
+    const src = path.resolve(process.cwd(), rel);
+    if (!fs.existsSync(src)) continue;
+    fs.renameSync(src, src + '.bak');
+    backups.push(rel + '.bak');
+  }
+  return backups;
+}
+
 export async function generate(
   answers: Answers,
   hooks: GenerateHooks = {},
   resume?: ResumeStore,
 ): Promise<GenerationResult> {
-  // Custom AI-tool strings fall through to the generic provider.
-  const aiTool: AiTool | undefined =
-    typeof answers.aiTool === 'string' ? answers.aiTool : undefined;
-  const provider = getProvider(aiTool) ?? getProvider('other')!;
+  const provider = providerFor(answers);
   const sections = buildBaseRules(answers);
 
   const runner = provider.agent;
@@ -319,9 +366,7 @@ export async function generateBootstrap(
   /** Fired once the agent run is about to start (AI path only) so the CLI can show progress. */
   onAiStart?: (providerName: string) => void,
 ): Promise<{ mode: 'ai' | 'static'; path: string }> {
-  const aiTool: AiTool | undefined =
-    typeof answers.aiTool === 'string' ? answers.aiTool : undefined;
-  const provider = getProvider(aiTool) ?? getProvider('other')!;
+  const provider = providerFor(answers);
   const rel = 'bootstrap-prompt.md';
 
   const runner = provider.agent;

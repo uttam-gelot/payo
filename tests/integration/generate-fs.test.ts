@@ -46,7 +46,10 @@ describe('generate() — static output on disk', () => {
     });
   });
 
-  it('overwrites a pre-existing artifact (documents current behavior)', async () => {
+  // generate() itself overwrites by design; the CLI's overwrite guard
+  // (predictTargets + confirmOverwrite in src/cli/index.ts) prompts before
+  // generate() is ever called, so this layer stays unconditional.
+  it('overwrites a pre-existing artifact when invoked directly', async () => {
     await inTempProject(async (dir) => {
       writeFileSync(join(dir, 'CLAUDE.md'), 'OLD CONTENT', 'utf-8');
       await generate(fullStackAnswers('claude'));
