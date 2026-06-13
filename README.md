@@ -2,7 +2,7 @@
 
 <img src="https://raw.githubusercontent.com/uttam-gelot/payo/main/assets/logo.png" alt="Payo" width="200" />
 
-**Generate project-tailored AI assistant rules & skills in under two minutes.**
+**Generate project-tailored AI assistant rules & skills in minutes.**
 
 Payo interviews you about your stack, then writes the guidance files your AI
 coding assistant reads — so Claude, Cursor, Copilot, and friends follow _your_
@@ -63,7 +63,7 @@ The fix is the guidance files each tool already reads (`CLAUDE.md`,
 by hand is tedious, easy to get wrong, and different for every tool. Most people
 never do it, or do it once and let it rot.
 
-Payo writes them for you in about two minutes — tailored to your actual stack,
+Payo writes them for you in minutes — tailored to your actual stack,
 in each tool's native format — so your assistant follows _your_ conventions from
 the first prompt instead of guessing.
 
