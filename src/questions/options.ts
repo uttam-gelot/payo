@@ -206,6 +206,7 @@ export const loggerOptions = (a: Answers): Option<string>[] => {
       return [
         { value: 'pino', label: 'Pino', hint: 'recommended' },
         { value: 'winston', label: 'Winston' },
+        { value: 'custom', label: 'Custom centralized logger (no third-party)' },
         { value: 'none', label: 'None' },
       ];
     case 'python':
@@ -213,6 +214,7 @@ export const loggerOptions = (a: Answers): Option<string>[] => {
         { value: 'structlog', label: 'structlog', hint: 'recommended' },
         { value: 'loguru', label: 'Loguru' },
         { value: 'logging', label: 'logging (stdlib)' },
+        { value: 'custom', label: 'Custom centralized logger (no third-party)' },
         { value: 'none', label: 'None' },
       ];
     case 'go':
@@ -220,17 +222,20 @@ export const loggerOptions = (a: Answers): Option<string>[] => {
         { value: 'slog', label: 'slog (stdlib)', hint: 'recommended' },
         { value: 'zap', label: 'Zap' },
         { value: 'zerolog', label: 'Zerolog' },
+        { value: 'custom', label: 'Custom centralized logger (no third-party)' },
         { value: 'none', label: 'None' },
       ];
     case 'rust':
       return [
         { value: 'tracing', label: 'tracing', hint: 'recommended' },
         { value: 'log', label: 'log' },
+        { value: 'custom', label: 'Custom centralized logger (no third-party)' },
         { value: 'none', label: 'None' },
       ];
     default:
       return [
         { value: 'pino', label: 'Pino', hint: 'recommended' },
+        { value: 'custom', label: 'Custom centralized logger (no third-party)' },
         { value: 'none', label: 'None' },
       ];
   }

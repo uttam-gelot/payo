@@ -102,6 +102,30 @@ describe('buildBaseRules', () => {
     expect(t).toContain('Error Handling & Logging');
     expect(t).toContain('Testing');
   });
+
+  it('adds the .env-read guard line only when envExampleOnly is set', () => {
+    const guard = 'Never read or open the real .env file';
+    const on = renderMarkdown(
+      'G',
+      buildBaseRules({ ...contexts.tsBackend, codingStandards: ['DRY'], envExampleOnly: true }),
+    );
+    expect(on).toContain(guard);
+
+    const off = renderMarkdown(
+      'G',
+      buildBaseRules({ ...contexts.tsBackend, codingStandards: ['DRY'] }),
+    );
+    expect(off).not.toContain(guard);
+  });
+
+  it('emits centralized-logger guidance when logger=custom', () => {
+    const md = renderMarkdown('G', buildBaseRules({ ...contexts.tsBackend, logger: 'custom' }));
+    expect(md).toContain('Build one simple centralized logger module');
+    expect(md).not.toContain('Log through custom');
+
+    const pino = renderMarkdown('G', buildBaseRules({ ...contexts.tsBackend, logger: 'pino' }));
+    expect(pino).toContain('Log through pino');
+  });
 });
 
 describe('renderMarkdown', () => {

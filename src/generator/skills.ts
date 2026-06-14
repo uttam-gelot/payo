@@ -54,11 +54,17 @@ const skills: SkillSpec[] = [
         'Include environment and configuration handling: keep configuration and secrets in environment ' +
         'variables, commit a .env.example documenting every required variable (never commit a real .env), ' +
         'and validate required variables at startup.';
+      const envGuarded =
+        a.envExampleOnly === true
+          ? base +
+            ' The assistant must never read or open the real .env file; rely on .env.example for the ' +
+            'list of required variable names.'
+          : base;
       return validation
-        ? base +
+        ? envGuarded +
             ` Validate inputs and external data at trust boundaries using the selected validation ` +
             `library (${validation}), and derive types from the schemas where possible.`
-        : base;
+        : envGuarded;
     },
   },
   {
@@ -139,7 +145,13 @@ const skills: SkillSpec[] = [
     appliesTo: (a) => has(a, 'logger'),
     buildPrompt: (a): string => {
       const logger = val(a, 'logger');
-      const via = logger ? `the selected logger (${logger})` : 'a dedicated logger';
+      const via =
+        logger === 'custom'
+          ? 'a simple in-house centralized logger module — a thin wrapper over the language stdlib ' +
+            'output, defined once and reused across the codebase, with no third-party logging library'
+          : logger
+            ? `the selected logger (${logger})`
+            : 'a dedicated logger';
       return (
         'Write error-handling and logging conventions: a consistent error strategy ' +
         '(typed/wrapped errors, fail fast, never swallow exceptions) and how errors surface to ' +

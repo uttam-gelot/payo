@@ -177,6 +177,14 @@ const core: Record<string, Question> = {
     message: 'Keep commits small and atomic (one logical change each)?',
     recommended: true,
   },
+  envExampleOnly: {
+    id: 'envExampleOnly',
+    type: 'confirm',
+    summary: 'Use .env.example only',
+    message:
+      'Forbid the assistant from reading the real .env, requiring it to work from .env.example instead?',
+    recommended: true,
+  },
   logger: {
     id: 'logger',
     type: 'select',
@@ -309,6 +317,7 @@ export const flow: FlowSection[] = [
       core.confirmPush,
       core.verifyBeforeCommit,
       core.atomicCommits,
+      core.envExampleOnly,
     ],
   },
   // Validation & state-management topic group (state asked only outside backend).
