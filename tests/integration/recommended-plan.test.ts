@@ -56,6 +56,7 @@ describe('recommended path applies correct values', () => {
     expect(a.confirmPush).toBe(true);
     expect(a.verifyBeforeCommit).toBe(true);
     expect(a.atomicCommits).toBe(true);
+    expect(a.envExampleOnly).toBe(true);
 
     // validation & state
     expect(a.validation).toBe('zod');

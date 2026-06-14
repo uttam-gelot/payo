@@ -115,6 +115,11 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
       '- Commit a .env.example documenting every required variable; never commit a real .env.',
       '- Validate required environment variables at startup.',
     ];
+    if (answers.envExampleOnly === true) {
+      body.push(
+        '- Never read or open the real .env file; work from .env.example (it lists every variable name without secret values).',
+      );
+    }
     sections.push({ title: 'Coding Standards', body: body.join('\n') });
   }
 
@@ -125,11 +130,15 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
   }
 
   const logger = str(answers, 'logger');
+  const loggingLine =
+    logger === 'custom'
+      ? '- Build one simple centralized logger module (a thin wrapper over the stdlib output) and import it everywhere; no third-party logging library, no raw console/print, with appropriate log levels.'
+      : `- Log through ${logger ?? 'a dedicated logger'} (not raw console/print) with appropriate log levels.`;
   sections.push({
     title: 'Error Handling & Logging',
     body: [
       '- Use a consistent error strategy: typed/wrapped errors, fail fast, never swallow exceptions.',
-      `- Log through ${logger ?? 'a dedicated logger'} (not raw console/print) with appropriate log levels.`,
+      loggingLine,
       '- Never log secrets or sensitive data.',
     ].join('\n'),
   });

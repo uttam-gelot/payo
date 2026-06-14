@@ -47,4 +47,25 @@ describe('selectSkills', () => {
     expect(ids(contexts.tsBackend)).not.toContain('error-handling-logging');
     expect(ids({ ...contexts.tsBackend, logger: 'pino' })).toContain('error-handling-logging');
   });
+
+  it('describes a centralized in-house logger when logger=custom', () => {
+    const skill = selectSkills({ ...contexts.tsBackend, logger: 'custom' }).find(
+      (s) => s.id === 'error-handling-logging',
+    );
+    const prompt = skill?.buildPrompt({ ...contexts.tsBackend, logger: 'custom' }) ?? '';
+    expect(prompt).toContain('centralized logger');
+    expect(prompt).toContain('no third-party logging library');
+    expect(prompt).not.toContain('selected logger (custom)');
+  });
+
+  it('adds .env-read guidance to coding-standards when envExampleOnly is set', () => {
+    const a: Answers = { ...contexts.tsBackend, envExampleOnly: true };
+    const skill = selectSkills(a).find((s) => s.id === 'coding-standards');
+    expect(skill?.buildPrompt(a)).toContain('never read or open the real .env file');
+
+    const without = selectSkills(contexts.tsBackend).find((s) => s.id === 'coding-standards');
+    expect(without?.buildPrompt(contexts.tsBackend)).not.toContain(
+      'never read or open the real .env file',
+    );
+  });
 });
