@@ -1,5 +1,4 @@
-import { describe, it, expect, mock, beforeEach } from 'bun:test';
-import * as realClack from '@clack/prompts';
+import { describe, it, expect } from 'bun:test';
 import {
   OTHER,
   offersOther,
@@ -12,18 +11,6 @@ import {
 } from '../../src/questions/runner';
 import { validationOptions } from '../../src/questions/options';
 import type { Option, Question } from '../../src/questions/types';
-
-// reviewAction / selectAnswerToEdit wrap @clack's `select`; drive it via `clackSelect`.
-// bun's mock.module is process-wide and other test files also mock @clack/prompts, so
-// re-register in beforeEach — the most recent registration wins at call time, making
-// these tests independent of file load order.
-let clackSelect: unknown;
-beforeEach(() => {
-  void mock.module('@clack/prompts', () => ({
-    ...realClack,
-    select: () => Promise.resolve(clackSelect),
-  }));
-});
 
 const select = (over: Partial<Question> = {}): Question => ({
   id: 'q',
@@ -109,10 +96,8 @@ describe('parseCustom', () => {
 
 describe('reviewAction', () => {
   it('returns the chosen action verbatim', async () => {
-    clackSelect = 'generate';
-    expect(await reviewAction()).toBe('generate');
-    clackSelect = 'edit';
-    expect(await reviewAction()).toBe('edit');
+    expect(await reviewAction(() => Promise.resolve('generate'))).toBe('generate');
+    expect(await reviewAction(() => Promise.resolve('edit'))).toBe('edit');
   });
 });
 
@@ -123,13 +108,11 @@ describe('selectAnswerToEdit', () => {
   ];
 
   it('returns the picked answer id', async () => {
-    clackSelect = 'logger';
-    expect(await selectAnswerToEdit(items)).toBe('logger');
+    expect(await selectAnswerToEdit(items, () => Promise.resolve('logger'))).toBe('logger');
   });
 
   it('maps the Back sentinel to undefined', async () => {
-    clackSelect = '__back__';
-    expect(await selectAnswerToEdit(items)).toBeUndefined();
+    expect(await selectAnswerToEdit(items, () => Promise.resolve('__back__'))).toBeUndefined();
   });
 });
 
