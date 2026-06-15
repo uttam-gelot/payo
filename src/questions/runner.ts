@@ -134,14 +134,44 @@ export async function confirmResume(answeredCount: number): Promise<boolean> {
   return value;
 }
 
-/** Final confirm before generation — last chance to catch a wrong answer. */
-export async function confirmGenerate(): Promise<boolean> {
-  const value = await confirm({
+/**
+ * The slice of @clack's `select` these helpers use. Injectable so unit tests can
+ * drive the choice deterministically without mocking the @clack module (bun's
+ * process-wide `mock.module` collides across test files).
+ */
+type SelectPrompt = (opts: {
+  message: string;
+  options: { value: string; label: string }[];
+}) => Promise<string | symbol>;
+
+/** Review-screen choice: generate now, or edit a prior answer first. */
+export async function reviewAction(ask: SelectPrompt = select): Promise<'generate' | 'edit'> {
+  const value = await ask({
     message: 'Generate config with these settings?',
-    initialValue: true,
+    options: [
+      { value: 'generate', label: 'Generate' },
+      { value: 'edit', label: 'Edit an answer' },
+    ],
   });
   guardCancel(value);
-  return value;
+  return value as 'generate' | 'edit';
+}
+
+/** Pick which answered question to re-answer; returns undefined for "back". */
+export async function selectAnswerToEdit(
+  items: { id: string; label: string }[],
+  ask: SelectPrompt = select,
+): Promise<string | undefined> {
+  const BACK = '__back__';
+  const value = await ask({
+    message: 'Which answer would you like to change?',
+    options: [
+      ...items.map((i) => ({ value: i.id, label: i.label })),
+      { value: BACK, label: '← Back' },
+    ],
+  });
+  guardCancel(value);
+  return value === BACK ? undefined : value;
 }
 
 /** What to do when generation would overwrite files that already exist. */

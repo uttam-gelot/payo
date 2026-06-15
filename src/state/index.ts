@@ -88,6 +88,33 @@ export function recordAnswer(session: Session, id: string, value: unknown): Sess
   return updated;
 }
 
+/**
+ * Drop one or more answers (value + answered entry) in a single persisted update.
+ * Returns the session unchanged (no write) when none of the ids were present.
+ * Used by edit-from-review, where one user action can clear several answers.
+ */
+export function forgetAnswers(session: Session, ids: string[]): Session {
+  const drop = new Set(ids);
+  const answers: Answers = { ...session.answers };
+  let changed = false;
+  for (const id of drop) {
+    if (id in answers) {
+      delete answers[id];
+      changed = true;
+    }
+  }
+  const answered = session.answered.filter((x) => !drop.has(x));
+  if (!changed && answered.length === session.answered.length) return session;
+  const updated: Session = { ...session, answers, answered };
+  saveSession(updated);
+  return updated;
+}
+
+/** Drop a single answer (value + answered entry) and persist. */
+export function forgetAnswer(session: Session, id: string): Session {
+  return forgetAnswers(session, [id]);
+}
+
 /** Record one skill id as generated (idempotent) and persist. */
 export function recordGenerated(session: Session, id: string): Session {
   if (session.generated.includes(id)) return session;

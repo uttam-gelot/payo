@@ -6,6 +6,8 @@ import {
   mergeMultiselect,
   hoistRecommended,
   resolveOptions,
+  reviewAction,
+  selectAnswerToEdit,
 } from '../../src/questions/runner';
 import { validationOptions } from '../../src/questions/options';
 import type { Option, Question } from '../../src/questions/types';
@@ -89,6 +91,28 @@ describe('parseCustom', () => {
 
   it('de-duplicates against itself and the already-chosen values', () => {
     expect(parseCustom('a, a, b', ['b'])).toEqual(['a']);
+  });
+});
+
+describe('reviewAction', () => {
+  it('returns the chosen action verbatim', async () => {
+    expect(await reviewAction(() => Promise.resolve('generate'))).toBe('generate');
+    expect(await reviewAction(() => Promise.resolve('edit'))).toBe('edit');
+  });
+});
+
+describe('selectAnswerToEdit', () => {
+  const items = [
+    { id: 'framework', label: 'Framework: Next.js' },
+    { id: 'logger', label: 'Logger: pino' },
+  ];
+
+  it('returns the picked answer id', async () => {
+    expect(await selectAnswerToEdit(items, () => Promise.resolve('logger'))).toBe('logger');
+  });
+
+  it('maps the Back sentinel to undefined', async () => {
+    expect(await selectAnswerToEdit(items, () => Promise.resolve('__back__'))).toBeUndefined();
   });
 });
 
