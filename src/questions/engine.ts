@@ -243,13 +243,22 @@ export function reconcile(flow: FlowSection[], session: Session): Session {
  * (dropping ones that became unreachable) then re-run the flow to ask anything
  * newly unlocked.
  */
-export async function reviewAndEdit(flow: FlowSection[], session: Session): Promise<Session> {
+export async function reviewAndEdit(
+  flow: FlowSection[],
+  session: Session,
+  prompts: {
+    review?: () => Promise<'generate' | 'edit'>;
+    pickEdit?: (items: EditItem[]) => Promise<string | undefined>;
+  } = {},
+): Promise<Session> {
+  const review = prompts.review ?? reviewAction;
+  const pickEdit = prompts.pickEdit ?? selectAnswerToEdit;
   for (;;) {
     note(reviewLines(flow, session.answers).join('\n'), 'Review your stack');
-    if ((await reviewAction()) === 'generate') return session;
+    if ((await review()) === 'generate') return session;
 
     const items = editableItems(flow, session);
-    const id = await selectAnswerToEdit(items);
+    const id = await pickEdit(items);
     if (!id) continue; // ← Back
     const item = items.find((i) => i.id === id);
     if (!item) continue;

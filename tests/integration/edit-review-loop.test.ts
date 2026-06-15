@@ -9,13 +9,14 @@ import type { Answers, Question } from '../../src/questions/types';
 void mock.module('@clack/prompts', () => ({ ...realClack, note: () => undefined }));
 
 /**
- * Drive the real `reviewAndEdit` with a scripted prompt layer. We mock the three
- * runner prompts it depends on (keeping the real `resolveOptions` that
- * `recommend.ts` needs):
- *  - `reviewAction`     → next entry of `actions` (defaults to 'generate');
- *  - `selectAnswerToEdit` → next entry of `editPicks';
- *  - `runQuestion`      → gate confirms answer `gateDecision`; otherwise a
- *                         scripted value, falling back to the recommended one.
+ * Drive the real `reviewAndEdit` with a scripted prompt layer:
+ *  - `review` / `pickEdit` are injected directly into reviewAndEdit (no module
+ *    mock), so the runner module's exports are never globally overridden — that
+ *    used to leak into other files' tests depending on load order.
+ *  - `runQuestion` is the one prompt runFlow reaches internally, so it is still
+ *    mocked at the module level (same harmless override run-flow.test.ts uses):
+ *    gate confirms answer `gateDecision`; otherwise a scripted value, falling
+ *    back to the recommended one.
  */
 let actions: ('generate' | 'edit')[] = [];
 let editPicks: (string | undefined)[] = [];
@@ -25,8 +26,6 @@ let gateDecision: unknown = 'customize';
 
 void mock.module('../../src/questions/runner', () => ({
   ...realRunner,
-  reviewAction: (): Promise<unknown> => Promise.resolve(actions.shift() ?? 'generate'),
-  selectAnswerToEdit: (): Promise<unknown> => Promise.resolve(editPicks.shift()),
   runQuestion: (q: Question, a: Answers): Promise<unknown> => {
     if (q.id.endsWith('__recommended')) return Promise.resolve(gateDecision);
     asked.push(q.id);
@@ -38,6 +37,12 @@ void mock.module('../../src/questions/runner', () => ({
 
 // Import after the mocks are registered.
 const { reviewAndEdit } = await import('../../src/questions/engine');
+
+/** Scripted prompts injected into reviewAndEdit. */
+const prompts = {
+  review: (): Promise<'generate' | 'edit'> => Promise.resolve(actions.shift() ?? 'generate'),
+  pickEdit: (): Promise<string | undefined> => Promise.resolve(editPicks.shift()),
+};
 const { flow } = await import('../../src/questions/flow');
 const { clearSession } = await import('../../src/state/index');
 
@@ -63,7 +68,7 @@ describe('reviewAndEdit', () => {
   it('generates immediately without asking anything', async () => {
     actions = ['generate'];
     const before = seed();
-    const out = await reviewAndEdit(flow, freshSession(before));
+    const out = await reviewAndEdit(flow, freshSession(before), prompts);
     expect(asked).toEqual([]);
     expect(out.answers.logger).toBe(before.logger);
   });
@@ -72,7 +77,7 @@ describe('reviewAndEdit', () => {
     actions = ['edit', 'generate'];
     editPicks = ['logger'];
     scripted = { logger: 'winston' };
-    const out = await reviewAndEdit(flow, freshSession(seed()));
+    const out = await reviewAndEdit(flow, freshSession(seed()), prompts);
     expect(asked).toContain('logger');
     expect(out.answers.logger).toBe('winston');
   });
@@ -81,7 +86,7 @@ describe('reviewAndEdit', () => {
     actions = ['edit', 'generate'];
     editPicks = ['framework'];
     scripted = { framework: 'none' };
-    const out = await reviewAndEdit(flow, freshSession(seed()));
+    const out = await reviewAndEdit(flow, freshSession(seed()), prompts);
 
     expect(out.answers.framework).toBe('none');
     for (const id of ['nextjs.router', 'nextjs.components', 'nextjs.data']) {
@@ -105,7 +110,7 @@ describe('reviewAndEdit', () => {
     editPicks = ['auth.__recommended']; // pick the gate row
     gateDecision = 'recommended'; // re-decide: use recommended this time
 
-    const out = await reviewAndEdit(flow, freshSession(skipped()));
+    const out = await reviewAndEdit(flow, freshSession(skipped()), prompts);
 
     expect(out.answers['auth.__recommended']).toBe('recommended');
     expect(out.answers.authApproach).toBe('authjs'); // recommended value, no longer 'none'
@@ -115,7 +120,7 @@ describe('reviewAndEdit', () => {
     actions = ['edit', 'generate'];
     editPicks = [undefined]; // ← Back
     const before = seed();
-    const out = await reviewAndEdit(flow, freshSession(before));
+    const out = await reviewAndEdit(flow, freshSession(before), prompts);
     expect(asked).toEqual([]);
     expect(out.answers).toEqual(before);
   });
