@@ -122,9 +122,10 @@ guidance files straight into your repo.
    and you get Next.js-specific follow-ups; choose Postgres and you're asked
    about migrations and naming. Most prompts ship a **recommended default**, so
    you can blast through with <kbd>Enter</kbd>.
-3. **Review your stack.** Before writing anything, Payo shows a summary of every
-   answer and asks you to confirm. Say no and your answers are kept — rerun to
-   edit them.
+3. **Review your stack — and edit inline.** Before writing anything, Payo shows a
+   summary of every answer. Choose **Edit an answer** to change any response — or
+   re-open a section you skipped — right from the review; dependent questions are
+   re-asked automatically. Pick **Generate** when it looks right.
 4. **Payo generates the guidance.** It writes each tool's files in their native
    format and location (see the table below). With the tool's CLI installed,
    files are generated in parallel by the AI; otherwise solid templates are used.
