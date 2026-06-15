@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, mock, beforeEach } from 'bun:test';
+import * as realClack from '@clack/prompts';
 import {
   OTHER,
   offersOther,
@@ -6,14 +7,23 @@ import {
   mergeMultiselect,
   hoistRecommended,
   resolveOptions,
+  reviewAction,
+  selectAnswerToEdit,
 } from '../../src/questions/runner';
 import { validationOptions } from '../../src/questions/options';
 import type { Option, Question } from '../../src/questions/types';
 
-// NOTE: reviewAction / selectAnswerToEdit are thin @clack `select` wrappers; their
-// behavior (action verbatim, __back__ → undefined) is covered order-independently by
-// tests/integration/edit-review-loop.test.ts. Mocking @clack here would collide with
-// the global @clack mocks in the integration files (bun mock.module is process-wide).
+// reviewAction / selectAnswerToEdit wrap @clack's `select`; drive it via `clackSelect`.
+// bun's mock.module is process-wide and other test files also mock @clack/prompts, so
+// re-register in beforeEach — the most recent registration wins at call time, making
+// these tests independent of file load order.
+let clackSelect: unknown;
+beforeEach(() => {
+  void mock.module('@clack/prompts', () => ({
+    ...realClack,
+    select: () => Promise.resolve(clackSelect),
+  }));
+});
 
 const select = (over: Partial<Question> = {}): Question => ({
   id: 'q',
@@ -94,6 +104,32 @@ describe('parseCustom', () => {
 
   it('de-duplicates against itself and the already-chosen values', () => {
     expect(parseCustom('a, a, b', ['b'])).toEqual(['a']);
+  });
+});
+
+describe('reviewAction', () => {
+  it('returns the chosen action verbatim', async () => {
+    clackSelect = 'generate';
+    expect(await reviewAction()).toBe('generate');
+    clackSelect = 'edit';
+    expect(await reviewAction()).toBe('edit');
+  });
+});
+
+describe('selectAnswerToEdit', () => {
+  const items = [
+    { id: 'framework', label: 'Framework: Next.js' },
+    { id: 'logger', label: 'Logger: pino' },
+  ];
+
+  it('returns the picked answer id', async () => {
+    clackSelect = 'logger';
+    expect(await selectAnswerToEdit(items)).toBe('logger');
+  });
+
+  it('maps the Back sentinel to undefined', async () => {
+    clackSelect = '__back__';
+    expect(await selectAnswerToEdit(items)).toBeUndefined();
   });
 });
 
