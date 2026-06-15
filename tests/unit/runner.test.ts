@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, mock } from 'bun:test';
+import * as realClack from '@clack/prompts';
 import {
   OTHER,
   offersOther,
@@ -9,6 +10,15 @@ import {
 } from '../../src/questions/runner';
 import { validationOptions } from '../../src/questions/options';
 import type { Option, Question } from '../../src/questions/types';
+
+// `select` returns whatever we queue; everything else stays real.
+let selectReturn: unknown;
+void mock.module('@clack/prompts', () => ({
+  ...realClack,
+  select: () => Promise.resolve(selectReturn),
+}));
+// Import after the mock so these bind to the patched `select`.
+const { reviewAction, selectAnswerToEdit } = await import('../../src/questions/runner');
 
 const select = (over: Partial<Question> = {}): Question => ({
   id: 'q',
@@ -89,6 +99,32 @@ describe('parseCustom', () => {
 
   it('de-duplicates against itself and the already-chosen values', () => {
     expect(parseCustom('a, a, b', ['b'])).toEqual(['a']);
+  });
+});
+
+describe('reviewAction', () => {
+  it('returns the chosen action verbatim', async () => {
+    selectReturn = 'generate';
+    expect(await reviewAction()).toBe('generate');
+    selectReturn = 'edit';
+    expect(await reviewAction()).toBe('edit');
+  });
+});
+
+describe('selectAnswerToEdit', () => {
+  const items = [
+    { id: 'framework', label: 'Framework: Next.js' },
+    { id: 'logger', label: 'Logger: pino' },
+  ];
+
+  it('returns the picked answer id', async () => {
+    selectReturn = 'logger';
+    expect(await selectAnswerToEdit(items)).toBe('logger');
+  });
+
+  it('maps the Back sentinel to undefined', async () => {
+    selectReturn = '__back__';
+    expect(await selectAnswerToEdit(items)).toBeUndefined();
   });
 });
 
