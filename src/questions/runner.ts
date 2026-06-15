@@ -134,14 +134,33 @@ export async function confirmResume(answeredCount: number): Promise<boolean> {
   return value;
 }
 
-/** Final confirm before generation — last chance to catch a wrong answer. */
-export async function confirmGenerate(): Promise<boolean> {
-  const value = await confirm({
+/** Review-screen choice: generate now, or edit a prior answer first. */
+export async function reviewAction(): Promise<'generate' | 'edit'> {
+  const value = await select({
     message: 'Generate config with these settings?',
-    initialValue: true,
+    options: [
+      { value: 'generate', label: 'Generate' },
+      { value: 'edit', label: 'Edit an answer' },
+    ],
   });
   guardCancel(value);
   return value;
+}
+
+/** Pick which answered question to re-answer; returns undefined for "back". */
+export async function selectAnswerToEdit(
+  items: { id: string; label: string }[],
+): Promise<string | undefined> {
+  const BACK = '__back__';
+  const value = await select({
+    message: 'Which answer would you like to change?',
+    options: [
+      ...items.map((i) => ({ value: i.id, label: i.label })),
+      { value: BACK, label: '← Back' },
+    ],
+  });
+  guardCancel(value);
+  return value === BACK ? undefined : value;
 }
 
 /** What to do when generation would overwrite files that already exist. */

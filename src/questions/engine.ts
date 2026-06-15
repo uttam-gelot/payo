@@ -8,9 +8,9 @@
  */
 import { note } from '@clack/prompts';
 import type { Answers, FlowSection, Question } from './types';
-import { runQuestion } from './runner';
+import { runQuestion, reviewAction, selectAnswerToEdit } from './runner';
 import { answerLabel, questionSummary, recommendedAnswer, recommendedLabel } from './recommend';
-import { recordAnswer, type Session } from '../state/index';
+import { recordAnswer, forgetAnswers, type Session } from '../state/index';
 
 interface PlannedDefault {
   question: Question;
@@ -92,6 +92,23 @@ function isUnset(value: unknown): boolean {
   return Array.isArray(value) && value.length === 0;
 }
 
+/** The active gate for a recommendable section under these answers, or null. */
+function activeGate(section: FlowSection, answers: Answers): { id: string; title: string } | null {
+  return section.recommendable ? (section.gate?.(answers) ?? null) : null;
+}
+
+/**
+ * The `summary: label` review line for a content question, or null when it is a
+ * gate decision or carries no content (unset / skipped). Shared by reviewLines and
+ * editableItems so the two never drift on what counts as a reviewable answer.
+ */
+function contentLabel(q: Question, answers: Answers): string | null {
+  if (q.id.endsWith('__recommended')) return null;
+  const value = answers[q.id];
+  if (isUnset(value)) return null;
+  return `${questionSummary(q)}: ${answerLabel(q, value, answers)}`;
+}
+
 /**
  * One `summary: label` line per answered question, walking the flow in order so the
  * review reads like the questionnaire. Gate decisions and unset (skipped) answers are
@@ -102,19 +119,156 @@ export function reviewLines(flow: FlowSection[], answers: Answers): string[] {
   const seen = new Set<string>();
   for (const section of flow) {
     for (const q of section.questions(answers)) {
-      if (seen.has(q.id) || q.id.endsWith('__recommended')) continue;
+      if (seen.has(q.id)) continue;
       seen.add(q.id);
-      const value = answers[q.id];
-      if (isUnset(value)) continue;
-      lines.push(`${questionSummary(q)}: ${answerLabel(q, value, answers)}`);
+      const label = contentLabel(q, answers);
+      if (label) lines.push(label);
     }
   }
   return lines;
 }
 
+/**
+ * One row the user can pick from the review's "Edit an answer" list. A `gate` item
+ * re-opens a whole recommendable section (including skipped ones); a `question`
+ * item re-asks a single answered question.
+ */
+export interface EditItem {
+  id: string;
+  label: string;
+  kind: 'gate' | 'question';
+}
+
+/** Short state word for a section's gate decision, used in the edit list. */
+function decisionLabel(stored: unknown): string {
+  switch (gateDecision(stored)) {
+    case 'recommended':
+      return 'recommended';
+    case 'skip':
+      return 'skipped';
+    default:
+      return 'customized';
+  }
+}
+
+/**
+ * Items the user can edit from review, in flow order: each active recommendable
+ * section as a gate row (so skipped sections can be re-opened) followed by its
+ * answered, content-bearing questions. Skipped sections contribute only the gate
+ * row, since their answers are unset sentinels.
+ */
+export function editableItems(flow: FlowSection[], session: Session): EditItem[] {
+  const out: EditItem[] = [];
+  const seen = new Set<string>();
+  for (const section of flow) {
+    const questions = section.questions(session.answers);
+    const gate = activeGate(section, session.answers);
+    if (gate && questions.length > 0) {
+      out.push({
+        id: gate.id,
+        kind: 'gate',
+        label: `${gate.title} settings: ${decisionLabel(session.answers[gate.id])}`,
+      });
+    }
+    for (const q of questions) {
+      if (seen.has(q.id)) continue;
+      seen.add(q.id);
+      const label = contentLabel(q, session.answers);
+      if (label) out.push({ id: q.id, kind: 'question', label });
+    }
+  }
+  return out;
+}
+
+/**
+ * Re-open a recommendable section: forget its gate decision and every answer it
+ * owns, so the next runFlow re-offers the gate and re-drives the group. Used to
+ * un-skip (or otherwise re-decide) a section from the review screen.
+ */
+export function forgetSection(flow: FlowSection[], session: Session, gateId: string): Session {
+  const section = flow.find((s) => activeGate(s, session.answers)?.id === gateId);
+  if (!section) return session;
+  const ids = section.questions(session.answers).map((q) => q.id);
+  return forgetAnswers(session, [...ids, gateId]);
+}
+
+/** The live Question for an id, projected against current answers (questions are dynamic). */
+export function findQuestion(
+  flow: FlowSection[],
+  answers: Answers,
+  id: string,
+): Question | undefined {
+  for (const section of flow) {
+    for (const q of section.questions(answers)) {
+      if (q.id === id) return q;
+    }
+  }
+  return undefined;
+}
+
+/** Ids reachable under the given answers: askable questions + active gate decisions. */
+function reachableIds(flow: FlowSection[], answers: Answers): Set<string> {
+  const ids = new Set<string>();
+  for (const section of flow) {
+    const gate = activeGate(section, answers);
+    if (gate) ids.add(gate.id);
+    for (const q of section.questions(answers)) {
+      if (q.when && !q.when(answers)) continue;
+      ids.add(q.id);
+    }
+  }
+  return ids;
+}
+
+/**
+ * After an edit, drop any stored answer no longer reachable in the flow (question
+ * removed or its `when` now false). Loops to a fixpoint since clearing one answer
+ * can make a dependent one unreachable. runFlow then re-asks any newly-unlocked
+ * question.
+ */
+export function reconcile(flow: FlowSection[], session: Session): Session {
+  let s = session;
+  for (;;) {
+    const reachable = reachableIds(flow, s.answers);
+    const stale = s.answered.filter((id) => !reachable.has(id));
+    if (stale.length === 0) return s;
+    s = forgetAnswers(s, stale);
+  }
+}
+
+/**
+ * Show the review screen and let the user edit prior answers in a loop until they
+ * choose Generate. A gate item re-opens a whole section (incl. skipped ones); a
+ * question item re-asks one answer. Either way we reconcile dependent answers
+ * (dropping ones that became unreachable) then re-run the flow to ask anything
+ * newly unlocked.
+ */
+export async function reviewAndEdit(flow: FlowSection[], session: Session): Promise<Session> {
+  for (;;) {
+    note(reviewLines(flow, session.answers).join('\n'), 'Review your stack');
+    if ((await reviewAction()) === 'generate') return session;
+
+    const items = editableItems(flow, session);
+    const id = await selectAnswerToEdit(items);
+    if (!id) continue; // ← Back
+    const item = items.find((i) => i.id === id);
+    if (!item) continue;
+
+    if (item.kind === 'gate') {
+      session = forgetSection(flow, session, id);
+    } else {
+      const q = findQuestion(flow, session.answers, id);
+      if (!q) continue;
+      session = recordAnswer(session, id, await runQuestion(q, session.answers));
+    }
+    session = reconcile(flow, session);
+    session = await runFlow(flow, session);
+  }
+}
+
 export async function runFlow(flow: FlowSection[], session: Session): Promise<Session> {
   for (const section of flow) {
-    const gate = section.recommendable ? (section.gate?.(session.answers) ?? null) : null;
+    const gate = activeGate(section, session.answers);
 
     if (gate) {
       const skipPlan = planSkip(section, session);
