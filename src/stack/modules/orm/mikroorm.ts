@@ -27,4 +27,7 @@ export const mikroorm: TechModule = {
       ],
     },
   ],
+  // SchemaGenerator syncs the schema directly, so there is no migrate command.
+  migrateCommand: (a) =>
+    a['mikroorm.migrations'] === 'schema-generator' ? undefined : 'mikro-orm migration:up',
 };

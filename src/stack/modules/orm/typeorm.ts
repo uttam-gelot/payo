@@ -30,4 +30,7 @@ export const typeorm: TechModule = {
       ],
     },
   ],
+  // synchronize applies the schema automatically, so there is no migrate command.
+  migrateCommand: (a) =>
+    a['typeorm.migrations'] === 'synchronize' ? undefined : 'typeorm migration:run',
 };

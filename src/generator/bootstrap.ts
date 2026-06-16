@@ -31,6 +31,7 @@ function commandsBlock(cmds: StackCommands): string {
     cmds.dev && `- Dev server: \`${cmds.dev}\``,
     cmds.build && `- Build: \`${cmds.build}\``,
     cmds.test && `- Test: \`${cmds.test}\``,
+    cmds.migrate && `- Migrate: \`${cmds.migrate}\``,
   ].filter(Boolean);
   return lines.join('\n');
 }
@@ -84,6 +85,7 @@ function taskSteps(answers: Answers): string {
     cmds.dev && `run it with \`${cmds.dev}\``,
     cmds.build && `build it with \`${cmds.build}\``,
     cmds.test && `run tests with \`${cmds.test}\``,
+    cmds.migrate && `run migrations with \`${cmds.migrate}\``,
   ].filter(Boolean);
   steps.push(
     'Give me the precise install and run commands' +

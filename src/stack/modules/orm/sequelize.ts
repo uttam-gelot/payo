@@ -24,4 +24,7 @@ export const sequelize: TechModule = {
       ],
     },
   ],
+  // sequelize.sync builds the schema in-process, so there is no migrate command.
+  migrateCommand: (a) =>
+    a['sequelize.migrations'] === 'sync' ? undefined : 'sequelize-cli db:migrate',
 };

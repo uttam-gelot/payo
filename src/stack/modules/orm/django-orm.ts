@@ -17,4 +17,8 @@ export const djangoOrm: TechModule = {
       recommended: true,
     },
   ],
+  migrateCommand: (a) =>
+    a['django-orm.migrations'] === false
+      ? undefined
+      : 'python manage.py makemigrations && python manage.py migrate',
 };

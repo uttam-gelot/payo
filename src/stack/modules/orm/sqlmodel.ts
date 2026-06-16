@@ -20,4 +20,6 @@ export const sqlmodel: TechModule = {
       ],
     },
   ],
+  migrateCommand: (a) =>
+    a['sqlmodel.migrations'] === 'alembic' ? 'alembic upgrade head' : undefined,
 };

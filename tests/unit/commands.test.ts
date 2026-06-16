@@ -66,4 +66,23 @@ describe('resolveCommands', () => {
     expect(cmds({ framework: 'fastapi' }).test).toBe('pytest');
     expect(cmds({ language: 'typescript' })).toEqual({});
   });
+
+  it('resolves the migrate command from the selected ORM', () => {
+    expect(cmds({ orm: 'prisma', 'prisma.migrations': 'migrate' }).migrate).toBe(
+      'prisma migrate dev',
+    );
+    expect(cmds({ orm: 'prisma', 'prisma.migrations': 'db-push' }).migrate).toBe('prisma db push');
+    expect(cmds({ orm: 'drizzle' }).migrate).toBe('drizzle-kit generate && drizzle-kit migrate');
+    expect(cmds({ orm: 'drizzle', 'drizzle.migrations': 'push' }).migrate).toBe('drizzle-kit push');
+    expect(cmds({ orm: 'sqlalchemy', 'sqlalchemy.migrations': 'alembic' }).migrate).toBe(
+      'alembic upgrade head',
+    );
+  });
+
+  it('omits migrate when the ORM syncs the schema in-process or has no command', () => {
+    expect(cmds({ orm: 'typeorm', 'typeorm.migrations': 'synchronize' }).migrate).toBeUndefined();
+    expect(cmds({ orm: 'sqlalchemy', 'sqlalchemy.migrations': 'none' }).migrate).toBeUndefined();
+    expect(cmds({ orm: 'prisma', 'prisma.migrations': 'manual' }).migrate).toBeUndefined();
+    expect(cmds({ framework: 'nextjs' }).migrate).toBeUndefined();
+  });
 });

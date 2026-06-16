@@ -1,9 +1,12 @@
 /**
- * Resolves the scaffold / dev / test / build commands for the selected stack by
- * reading the colocated fields on the framework `TechModule`. Pure and
- * deterministic — driven entirely by the collected answers. Fields the module
- * does not define come back `undefined`, letting callers fall back to generic
- * wording. This replaces the old central scaffold lookup.
+ * Resolves the scaffold / dev / test / build / migrate commands for the selected
+ * stack by reading the colocated fields on the relevant `TechModule`s. Pure and
+ * deterministic — driven entirely by the collected answers. Fields no module
+ * defines come back `undefined`, letting callers fall back to generic wording.
+ *
+ * scaffold/dev/test/build come from the framework module; migrate comes from the
+ * ORM module (it owns the migration tooling), with the DB module as a fallback
+ * for DB-native migration.
  */
 import type { Answers } from '../questions/types';
 import { getModule } from '../stack/registry';
@@ -17,16 +20,20 @@ export interface StackCommands {
   test?: string;
   /** Production build command. */
   build?: string;
+  /** Schema-migration command (from the ORM, or the DB as a fallback). */
+  migrate?: string;
 }
 
-/** The resolved commands for the answers' framework, each omitted when unknown. */
+/** The resolved commands for the answers' stack, each omitted when unknown. */
 export function resolveCommands(a: Answers): StackCommands {
-  const mod = getModule(a.framework);
-  if (!mod) return {};
+  const framework = getModule(a.framework);
+  const orm = getModule(a.orm);
+  const db = getModule(a.database);
   return {
-    scaffold: mod.scaffold?.(a),
-    dev: mod.devCommand?.(a),
-    test: mod.testCommand?.(a),
-    build: mod.buildCommand?.(a),
+    scaffold: framework?.scaffold?.(a),
+    dev: framework?.devCommand?.(a),
+    test: framework?.testCommand?.(a),
+    build: framework?.buildCommand?.(a),
+    migrate: orm?.migrateCommand?.(a) ?? db?.migrateCommand?.(a),
   };
 }
