@@ -33,4 +33,9 @@ export const prisma: TechModule = {
       ],
     },
   ],
+  migrateCommand: (a) => {
+    if (a['prisma.migrations'] === 'db-push') return 'prisma db push';
+    if (a['prisma.migrations'] === 'manual') return undefined;
+    return 'prisma migrate dev';
+  },
 };

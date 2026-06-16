@@ -1,11 +1,13 @@
 import type { TechModule } from '../../types';
+import { dbFamily } from '../../predicates';
 
 /** DB module: keyed by the `database` answer value. Supplies follow-up questions. */
 export const postgres: TechModule = {
   id: 'postgresql',
   title: 'PostgreSQL',
   category: 'db',
-  appliesTo: (a) => a.database === 'postgresql',
+  // Family-aware: also covers Neon / Supabase / CockroachDB (Postgres under the hood).
+  appliesTo: (a) => dbFamily(a) === 'postgresql',
   questions: () => [
     {
       id: 'postgresql.migrations',

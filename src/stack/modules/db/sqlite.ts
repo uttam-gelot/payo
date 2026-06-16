@@ -1,11 +1,13 @@
 import type { TechModule } from '../../types';
+import { dbFamily } from '../../predicates';
 
 /** SQLite — supplies follow-up questions when selected as the database. */
 export const sqlite: TechModule = {
   id: 'sqlite',
   title: 'SQLite',
   category: 'db',
-  appliesTo: (a) => a.database === 'sqlite',
+  // Family-aware: also covers Turso / libSQL (SQLite-compatible).
+  appliesTo: (a) => dbFamily(a) === 'sqlite',
   questions: () => [
     {
       id: 'sqlite.migrations',

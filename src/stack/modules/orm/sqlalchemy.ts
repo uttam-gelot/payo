@@ -47,4 +47,6 @@ export const sqlalchemy: TechModule = {
       ],
     },
   ],
+  migrateCommand: (a) =>
+    a['sqlalchemy.migrations'] === 'alembic' ? 'alembic upgrade head' : undefined,
 };

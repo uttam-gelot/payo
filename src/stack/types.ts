@@ -34,4 +34,6 @@ export interface TechModule {
   testCommand?(a: Answers): string | undefined;
   /** Command that produces a production build (e.g. `pnpm build`, `cargo build --release`). */
   buildCommand?(a: Answers): string | undefined;
+  /** Command that runs schema migrations (e.g. `prisma migrate dev`). Supplied by ORM/DB modules. */
+  migrateCommand?(a: Answers): string | undefined;
 }

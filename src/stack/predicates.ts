@@ -19,6 +19,25 @@ const SQL_DBS = new Set([
 export const isSqlDb = (a: Answers): boolean =>
   typeof a.database === 'string' && SQL_DBS.has(a.database);
 
+/**
+ * Maps a database option id to the canonical engine whose DB module supplies the
+ * follow-up questions. Serverless/compatible variants reuse their wire-compatible
+ * engine's module (Neon/Supabase/CockroachDB are Postgres, MariaDB is MySQL,
+ * Turso is libSQL/SQLite), so they get the same migration/naming/pooling depth as
+ * the vanilla engine instead of being silently downgraded to a name-only bullet.
+ */
+const DB_FAMILY: Record<string, string> = {
+  neon: 'postgresql',
+  supabase: 'postgresql',
+  cockroachdb: 'postgresql',
+  mariadb: 'mysql',
+  turso: 'sqlite',
+};
+
+/** Canonical DB engine for `a.database` (e.g. neon → postgresql); identity when no alias. */
+export const dbFamily = (a: Answers): string | undefined =>
+  typeof a.database === 'string' ? (DB_FAMILY[a.database] ?? a.database) : undefined;
+
 export const isMongo = (a: Answers): boolean => a.database === 'mongodb';
 
 /** A database for which asking about an ORM / data-access layer makes sense. */

@@ -27,4 +27,8 @@ export const drizzle: TechModule = {
       recommended: true,
     },
   ],
+  migrateCommand: (a) =>
+    a['drizzle.migrations'] === 'push'
+      ? 'drizzle-kit push'
+      : 'drizzle-kit generate && drizzle-kit migrate',
 };
