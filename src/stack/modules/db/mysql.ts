@@ -1,11 +1,13 @@
 import type { TechModule } from '../../types';
+import { dbFamily } from '../../predicates';
 
 /** MySQL — supplies follow-up questions when selected as the database. */
 export const mysql: TechModule = {
   id: 'mysql',
   title: 'MySQL',
   category: 'db',
-  appliesTo: (a) => a.database === 'mysql',
+  // Family-aware: also covers MariaDB (MySQL-compatible).
+  appliesTo: (a) => dbFamily(a) === 'mysql',
   questions: () => [
     {
       id: 'mysql.migrations',

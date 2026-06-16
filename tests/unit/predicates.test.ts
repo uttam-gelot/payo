@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { isSqlDb, isMongo, isTsJs, hasModeledDb } from '../../src/stack/predicates';
+import { isSqlDb, isMongo, isTsJs, hasModeledDb, dbFamily } from '../../src/stack/predicates';
 
 describe('predicates', () => {
   it('isSqlDb is true for SQL-compatible databases', () => {
@@ -37,5 +37,19 @@ describe('predicates', () => {
     expect(hasModeledDb({ database: 'postgresql' })).toBe(true);
     expect(hasModeledDb({ database: 'mongodb' })).toBe(true);
     expect(hasModeledDb({ database: 'redis' })).toBe(false);
+  });
+
+  it('dbFamily maps compatible variants to their canonical engine', () => {
+    expect(dbFamily({ database: 'neon' })).toBe('postgresql');
+    expect(dbFamily({ database: 'supabase' })).toBe('postgresql');
+    expect(dbFamily({ database: 'cockroachdb' })).toBe('postgresql');
+    expect(dbFamily({ database: 'mariadb' })).toBe('mysql');
+    expect(dbFamily({ database: 'turso' })).toBe('sqlite');
+  });
+
+  it('dbFamily is identity for canonical engines and undefined when unset', () => {
+    expect(dbFamily({ database: 'postgresql' })).toBe('postgresql');
+    expect(dbFamily({ database: 'mongodb' })).toBe('mongodb');
+    expect(dbFamily({})).toBeUndefined();
   });
 });
