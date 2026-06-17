@@ -3,11 +3,16 @@ import '../../src/stack/modules/index'; // populate the module registry
 import {
   ormOptions,
   frameworkOptions,
+  cliFrameworkOptions,
   validationOptions,
   stateManagementOptions,
   packageManagerOptions,
   testTypeOptions,
   e2eToolOptions,
+  projectTypeOptions,
+  hasUI,
+  hasServer,
+  isStandalone,
 } from '../../src/questions/options';
 import type { Option } from '../../src/questions/types';
 
@@ -58,6 +63,52 @@ describe('frameworkOptions', () => {
       vals(frameworkOptions({ language: 'typescript', projectType: 'backend' })),
     ).not.toContain('react');
   });
+
+  it('CLI projects swap the web registry for arg-parsing libs, tailed by None', () => {
+    const ts = frameworkOptions({ language: 'typescript', projectType: 'cli' });
+    expect(vals(ts)).toContain('commander');
+    expect(vals(ts)).not.toContain('react');
+    const tsVals = vals(ts);
+    expect(tsVals[tsVals.length - 1]).toBe('none');
+
+    expect(vals(frameworkOptions({ language: 'python', projectType: 'cli' }))).toContain('typer');
+    expect(vals(frameworkOptions({ language: 'go', projectType: 'cli' }))).toContain('cobra');
+    expect(vals(frameworkOptions({ language: 'rust', projectType: 'cli' }))).toContain('clap');
+  });
+});
+
+describe('cliFrameworkOptions', () => {
+  it('recommends exactly one library per language', () => {
+    expect(recCount(cliFrameworkOptions({ language: 'typescript' }))).toBe(1);
+    expect(recCount(cliFrameworkOptions({ language: 'python' }))).toBe(1);
+    expect(recCount(cliFrameworkOptions({ language: 'go' }))).toBe(1);
+    expect(recCount(cliFrameworkOptions({ language: 'rust' }))).toBe(1);
+  });
+});
+
+describe('projectTypeOptions', () => {
+  it('includes the cli and script types', () => {
+    expect(vals(projectTypeOptions)).toContain('cli');
+    expect(vals(projectTypeOptions)).toContain('script');
+  });
+});
+
+describe('project-type predicates', () => {
+  it('classify UI / server / standalone shapes', () => {
+    expect(hasUI({ projectType: 'frontend' })).toBe(true);
+    expect(hasUI({ projectType: 'full-stack' })).toBe(true);
+    expect(hasUI({ projectType: 'backend' })).toBe(false);
+    expect(hasUI({ projectType: 'cli' })).toBe(false);
+
+    expect(hasServer({ projectType: 'backend' })).toBe(true);
+    expect(hasServer({ projectType: 'full-stack' })).toBe(true);
+    expect(hasServer({ projectType: 'frontend' })).toBe(false);
+    expect(hasServer({ projectType: 'script' })).toBe(false);
+
+    expect(isStandalone({ projectType: 'cli' })).toBe(true);
+    expect(isStandalone({ projectType: 'script' })).toBe(true);
+    expect(isStandalone({ projectType: 'backend' })).toBe(false);
+  });
 });
 
 describe('validationOptions', () => {
@@ -92,9 +143,14 @@ describe('packageManagerOptions', () => {
 });
 
 describe('testTypeOptions', () => {
-  it('offers component tests only outside backend', () => {
+  it('offers component tests only for UI projects', () => {
     expect(vals(testTypeOptions({ projectType: 'frontend' }))).toContain('component');
     expect(vals(testTypeOptions({ projectType: 'backend' }))).not.toContain('component');
+  });
+
+  it('standalone cli / script get unit + integration only (no component, no e2e)', () => {
+    expect(vals(testTypeOptions({ projectType: 'cli' }))).toEqual(['unit', 'integration']);
+    expect(vals(testTypeOptions({ projectType: 'script' }))).toEqual(['unit', 'integration']);
   });
 });
 
