@@ -22,7 +22,25 @@ export const projectTypeOptions: Option<string>[] = [
   { value: 'full-stack', label: 'Full-stack' },
   { value: 'frontend', label: 'Frontend' },
   { value: 'backend', label: 'Backend' },
+  { value: 'cli', label: 'CLI tool' },
+  { value: 'script', label: 'Standalone script' },
 ];
+
+// --- Project-type shape predicates ------------------------------------------
+// Used to gate questions by what a project actually has, rather than brittle
+// `!==` checks that silently include every newly added project type.
+
+/** Has a user interface (styling, state management apply). */
+export const hasUI = (a: Answers): boolean =>
+  a.projectType === 'frontend' || a.projectType === 'full-stack';
+
+/** Has a server / HTTP API surface (API architecture, sessions apply). */
+export const hasServer = (a: Answers): boolean =>
+  a.projectType === 'backend' || a.projectType === 'full-stack';
+
+/** A standalone executable — a CLI tool or script (no UI, no server). */
+export const isStandalone = (a: Answers): boolean =>
+  a.projectType === 'cli' || a.projectType === 'script';
 
 export const languageOptions = (a: Answers): Option<string>[] =>
   a.projectType === 'frontend'
@@ -38,8 +56,50 @@ export const languageOptions = (a: Answers): Option<string>[] =>
         { value: 'javascript', label: 'JavaScript' },
       ];
 
+/**
+ * CLI argument-parsing frameworks, keyed by language. These have no deep
+ * TechModules (no scaffold / follow-up questions) — they're a plain select,
+ * like loggerOptions, so the generated rules can name the chosen library.
+ */
+export const cliFrameworkOptions = (a: Answers): Option<string>[] => {
+  switch (a.language) {
+    case 'typescript':
+    case 'javascript':
+      return [
+        { value: 'commander', label: 'Commander.js', hint: 'recommended' },
+        { value: 'oclif', label: 'oclif' },
+        { value: 'yargs', label: 'Yargs' },
+        { value: 'cac', label: 'CAC' },
+      ];
+    case 'python':
+      return [
+        { value: 'typer', label: 'Typer', hint: 'recommended' },
+        { value: 'click', label: 'Click' },
+        { value: 'argparse', label: 'argparse (stdlib)' },
+        { value: 'fire', label: 'Python Fire' },
+      ];
+    case 'go':
+      return [
+        { value: 'cobra', label: 'Cobra', hint: 'recommended' },
+        { value: 'urfave-cli', label: 'urfave/cli' },
+        { value: 'flag', label: 'flag (stdlib)' },
+      ];
+    case 'rust':
+      return [
+        { value: 'clap', label: 'clap', hint: 'recommended' },
+        { value: 'argh', label: 'argh' },
+      ];
+    default:
+      return [{ value: 'commander', label: 'Commander.js', hint: 'recommended' }];
+  }
+};
+
 /** Framework options come from tech modules whose appliesTo() passes, plus None. */
 export const frameworkOptions = (a: Answers): Option<string>[] => {
+  // CLI tools use arg-parsing libraries rather than the web framework registry.
+  if (a.projectType === 'cli') {
+    return [...cliFrameworkOptions(a), { value: 'none', label: 'None' }];
+  }
   const fromModules = modulesFor('framework', a).flatMap((m) => m.options?.(a) ?? []);
   return [...fromModules, { value: 'none', label: 'None' }];
 };
@@ -247,8 +307,9 @@ export const testTypeOptions = (a: Answers): Option<string>[] => {
     { value: 'integration', label: 'Integration', hint: 'recommended' },
   ];
   // Component tests only apply to UI projects.
-  if (a.projectType !== 'backend') opts.push({ value: 'component', label: 'Component' });
-  opts.push({ value: 'e2e', label: 'End-to-end (E2E)' });
+  if (hasUI(a)) opts.push({ value: 'component', label: 'Component' });
+  // E2E tooling is browser-oriented; skip it for standalone CLIs / scripts.
+  if (!isStandalone(a)) opts.push({ value: 'e2e', label: 'End-to-end (E2E)' });
   return opts;
 };
 

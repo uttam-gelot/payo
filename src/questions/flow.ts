@@ -37,6 +37,8 @@ const core: Record<string, Question> = {
     type: 'select',
     message: 'What type of project is this?',
     options: opt.projectTypeOptions,
+    // Closed set: every supported shape is listed, no free-text Other.
+    allowOther: false,
   },
   projectDefinition: {
     id: 'projectDefinition',
@@ -60,20 +62,22 @@ const core: Record<string, Question> = {
     type: 'select',
     message: 'Framework?',
     optionsFrom: opt.frameworkOptions,
+    // Standalone scripts have no framework; CLI tools get arg-parsing libs.
+    when: (a) => a.projectType !== 'script',
   },
   apiArchitecture: {
     id: 'apiArchitecture',
     type: 'select',
     message: 'API architecture?',
     options: opt.apiArchitectureOptions,
-    when: (a) => a.projectType !== 'frontend',
+    when: (a) => opt.hasServer(a),
   },
   styling: {
     id: 'stylingLibrary',
     type: 'select',
     message: 'Styling / UI library?',
     options: opt.stylingOptions,
-    when: (a) => a.projectType !== 'backend',
+    when: (a) => opt.hasUI(a),
   },
   database: {
     id: 'database',
@@ -225,6 +229,8 @@ const core: Record<string, Question> = {
     summary: 'Auth approach',
     message: 'Authentication approach?',
     optionsFrom: opt.authApproachOptions,
+    // Login/identity is a UI or server concern — not a standalone CLI / script.
+    when: (a) => !opt.isStandalone(a),
   },
   authStrategy: {
     id: 'authStrategy',
@@ -232,7 +238,7 @@ const core: Record<string, Question> = {
     summary: 'Session strategy',
     message: 'Session strategy?',
     options: opt.authStrategyOptions,
-    when: (a) => a.projectType !== 'frontend' && a.authApproach !== 'none',
+    when: (a) => opt.hasServer(a) && a.authApproach !== 'none',
   },
   rbac: {
     id: 'rbac',
@@ -240,7 +246,7 @@ const core: Record<string, Question> = {
     summary: 'Role-based access control',
     message: 'Use role-based access control (RBAC)?',
     recommended: false,
-    when: (a) => a.authApproach !== 'none',
+    when: (a) => !opt.isStandalone(a) && a.authApproach !== 'none',
   },
   packageManager: {
     id: 'packageManager',
@@ -272,7 +278,7 @@ const core: Record<string, Question> = {
     summary: 'State management',
     message: 'State management?',
     optionsFrom: opt.stateManagementOptions,
-    when: (a) => a.projectType !== 'backend',
+    when: (a) => opt.hasUI(a),
   },
 };
 
