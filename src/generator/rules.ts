@@ -80,7 +80,8 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
   }
 
   const state = str(answers, 'stateManagement');
-  if (state && answers.projectType !== 'backend') {
+  const hasUI = answers.projectType === 'frontend' || answers.projectType === 'full-stack';
+  if (state && hasUI) {
     sections.push({
       title: 'State Management',
       body: [

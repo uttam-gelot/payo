@@ -154,11 +154,11 @@ Each tool gets files in its own native format and location:
 
 ## What it asks about
 
-Payo understands **25 frameworks, 24 ORMs, and 4 databases** across
+Payo understands **25 frameworks, 24 ORMs, and 16 databases** across
 **TypeScript/JavaScript, Python, Go, and Rust** — and tailors its follow-up
 questions to whatever you pick. Dimensions covered:
 
-- **Project** — type (frontend / backend / full-stack) and a short description
+- **Project** — type (frontend / backend / full-stack / CLI / script) and a short description
 - **Language & framework** — plus framework-specific conventions
 - **API** — REST, GraphQL, gRPC, tRPC
 - **Frontend** — styling and state management

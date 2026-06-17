@@ -12,7 +12,7 @@ export type AiTool =
   | 'other'
   | (string & {});
 
-export type ProjectType = 'full-stack' | 'frontend' | 'backend' | (string & {});
+export type ProjectType = 'full-stack' | 'frontend' | 'backend' | 'cli' | 'script' | (string & {});
 
 export type Language = 'javascript' | 'typescript' | 'python' | 'go' | 'rust' | (string & {});
 
@@ -39,6 +39,20 @@ export type Framework =
   | 'fiber'
   | 'axum'
   | 'actix'
+  // CLI argument-parsing frameworks (no deep TechModules; option-only).
+  | 'commander'
+  | 'oclif'
+  | 'yargs'
+  | 'cac'
+  | 'typer'
+  | 'click'
+  | 'argparse'
+  | 'fire'
+  | 'cobra'
+  | 'urfave-cli'
+  | 'flag'
+  | 'clap'
+  | 'argh'
   | 'none'
   | (string & {});
 
