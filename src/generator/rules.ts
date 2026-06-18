@@ -132,7 +132,7 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
 
   const logger = str(answers, 'logger');
   const loggingLine =
-    logger === 'custom'
+    logger === 'centralized'
       ? '- Build one simple centralized logger module (a thin wrapper over the stdlib output) and import it everywhere; no third-party logging library, no raw console/print, with appropriate log levels.'
       : `- Log through ${logger ?? 'a dedicated logger'} (not raw console/print) with appropriate log levels.`;
   sections.push({

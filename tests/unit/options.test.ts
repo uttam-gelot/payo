@@ -2,6 +2,7 @@ import { describe, it, expect } from 'bun:test';
 import '../../src/stack/modules/index'; // populate the module registry
 import {
   ormOptions,
+  loggerOptions,
   frameworkOptions,
   cliFrameworkOptions,
   validationOptions,
@@ -21,6 +22,20 @@ const recCount = (opts: Option<string>[]): number =>
   opts.filter((o) => o.hint === 'recommended').length;
 const hintOf = (opts: Option<string>[], value: string): string | undefined =>
   opts.find((o) => o.value === value)?.hint;
+
+describe('loggerOptions', () => {
+  it('frontend: only a recommended centralized wrapper and none', () => {
+    const o = loggerOptions({ projectType: 'frontend', language: 'typescript' });
+    expect(vals(o)).toEqual(['centralized', 'none']);
+    expect(hintOf(o, 'centralized')).toBe('recommended');
+  });
+
+  it('backend keeps the language-specific third-party loggers', () => {
+    const o = loggerOptions({ projectType: 'backend', language: 'typescript' });
+    expect(vals(o)).toContain('pino');
+    expect(vals(o)).toContain('centralized');
+  });
+});
 
 describe('ormOptions', () => {
   it('TS + SQL: TypeORM recommended (not Prisma), raw-sql tail', () => {

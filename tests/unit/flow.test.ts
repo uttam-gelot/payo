@@ -53,5 +53,6 @@ describe('flow gating by project type', () => {
     expect(frontend.has('stateManagement')).toBe(true);
     expect(frontend.has('apiArchitecture')).toBe(false);
     expect(frontend.has('database')).toBe(false);
+    expect(frontend.has('logger')).toBe(true);
   });
 });

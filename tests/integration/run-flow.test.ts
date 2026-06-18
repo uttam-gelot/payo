@@ -107,7 +107,7 @@ describe('runFlow — manual (decline-all gates)', () => {
   });
 });
 
-/** A frontend persona with DB / logger left unanswered, so their gates decide. */
+/** A frontend persona with DB left unanswered, so their gates decide. */
 const FRONTEND: Answers = {
   aiTool: 'claude',
   projectType: 'frontend',
@@ -117,17 +117,19 @@ const FRONTEND: Answers = {
 };
 
 describe('runFlow — persona gates', () => {
-  it('does not ask database, orm, or logger for a frontend project', async () => {
+  it('does not ask database or orm for a frontend project, but asks logger', async () => {
     gateDecision = false; // customize every group
     const session = await runFlow(flow, freshSession(FRONTEND));
     const a = session.answers;
 
     expect(asked).not.toContain('database');
     expect(asked).not.toContain('orm');
-    expect(asked).not.toContain('logger');
     expect(a.database).toBeUndefined();
     expect(a.orm).toBeUndefined();
-    expect(a.logger).toBeUndefined();
+
+    // Browser apps still log — the question is asked, defaulting to a centralized wrapper.
+    expect(asked).toContain('logger');
+    expect(a.logger).toBe('centralized');
   });
 
   it('skips testRunner when only e2e is selected, asks it for unit/integration', async () => {

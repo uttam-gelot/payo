@@ -44,8 +44,7 @@ const core: Record<string, Question> = {
     id: 'projectDefinition',
     type: 'text',
     message: 'Describe your project (a few sentences — the more detail, the better).',
-    placeholder:
-      'e.g. REST API for an e-commerce platform with auth, payments, and admin dashboard',
+    placeholder: opt.projectDefinitionPlaceholder,
     validate: (input) => {
       if (!input?.trim()) return 'Please provide a short description.';
       return undefined;
@@ -195,7 +194,8 @@ const core: Record<string, Question> = {
     summary: 'Logger',
     message: 'Logging library?',
     optionsFrom: opt.loggerOptions,
-    when: (a) => a.projectType !== 'frontend',
+    // Closed set: the "centralized" choice already covers a bespoke logger.
+    allowOther: false,
   },
   testTypes: {
     id: 'testTypes',
