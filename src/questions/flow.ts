@@ -196,7 +196,6 @@ const core: Record<string, Question> = {
     optionsFrom: opt.loggerOptions,
     // Closed set: the "centralized" choice already covers a bespoke logger.
     allowOther: false,
-    when: (a) => a.projectType !== 'frontend',
   },
   testTypes: {
     id: 'testTypes',

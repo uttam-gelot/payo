@@ -277,6 +277,18 @@ export const projectDefinitionPlaceholder = (a: Answers): string => {
 };
 
 export const loggerOptions = (a: Answers): Option<string>[] => {
+  // Browser apps have no real logging library — a thin centralized wrapper over
+  // console is the sensible default; third-party browser loggers are niche.
+  if (a.projectType === 'frontend') {
+    return [
+      {
+        value: 'centralized',
+        label: 'Custom centralized logger (no third-party)',
+        hint: 'recommended',
+      },
+      { value: 'none', label: 'None' },
+    ];
+  }
   switch (a.language) {
     case 'typescript':
     case 'javascript':
