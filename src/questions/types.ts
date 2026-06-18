@@ -30,7 +30,8 @@ export interface Question {
   required?: boolean;
   /** text: validation message or undefined when valid. */
   validate?: (v: string) => string | undefined;
-  placeholder?: string;
+  /** text: placeholder shown in the input — static or derived from prior answers. */
+  placeholder?: string | ((a: Answers) => string);
   /**
    * Explicit recommended default for confirm/text questions. For select and
    * multiselect, the recommended value is derived from the option(s) carrying

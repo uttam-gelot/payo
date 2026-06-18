@@ -105,9 +105,10 @@ export async function runQuestion(q: Question, a: Answers): Promise<unknown> {
 
     case 'text': {
       const validate = q.validate;
+      const placeholder = typeof q.placeholder === 'function' ? q.placeholder(a) : q.placeholder;
       const value = await text({
         message: q.message,
-        placeholder: q.placeholder,
+        placeholder,
         validate: validate
           ? (v: string | undefined): string | undefined => validate(v ?? '')
           : undefined,

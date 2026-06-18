@@ -259,6 +259,23 @@ export const linterOptions = (a: Answers): Option<string>[] => {
   }
 };
 
+/** Example project description tailored to the selected project type. */
+export const projectDefinitionPlaceholder = (a: Answers): string => {
+  switch (a.projectType) {
+    case 'frontend':
+      return 'e.g. a React dashboard for an analytics product with charts, filters, and CSV export';
+    case 'backend':
+      return 'e.g. a REST API for an e-commerce platform with auth, payments, and admin endpoints';
+    case 'cli':
+      return 'e.g. a CLI that scaffolds project configs from an interactive questionnaire';
+    case 'script':
+      return 'e.g. a script that batch-resizes images in a folder and uploads them to S3';
+    case 'full-stack':
+    default:
+      return 'e.g. a full-stack e-commerce app: React storefront + REST API with auth, payments, and an admin dashboard';
+  }
+};
+
 export const loggerOptions = (a: Answers): Option<string>[] => {
   switch (a.language) {
     case 'typescript':
