@@ -118,10 +118,13 @@ describe('buildBaseRules', () => {
     expect(off).not.toContain(guard);
   });
 
-  it('emits centralized-logger guidance when logger=custom', () => {
-    const md = renderMarkdown('G', buildBaseRules({ ...contexts.tsBackend, logger: 'custom' }));
+  it('emits centralized-logger guidance when logger=centralized', () => {
+    const md = renderMarkdown(
+      'G',
+      buildBaseRules({ ...contexts.tsBackend, logger: 'centralized' }),
+    );
     expect(md).toContain('Build one simple centralized logger module');
-    expect(md).not.toContain('Log through custom');
+    expect(md).not.toContain('Log through centralized');
 
     const pino = renderMarkdown('G', buildBaseRules({ ...contexts.tsBackend, logger: 'pino' }));
     expect(pino).toContain('Log through pino');

@@ -48,14 +48,14 @@ describe('selectSkills', () => {
     expect(ids({ ...contexts.tsBackend, logger: 'pino' })).toContain('error-handling-logging');
   });
 
-  it('describes a centralized in-house logger when logger=custom', () => {
-    const skill = selectSkills({ ...contexts.tsBackend, logger: 'custom' }).find(
+  it('describes a centralized in-house logger when logger=centralized', () => {
+    const skill = selectSkills({ ...contexts.tsBackend, logger: 'centralized' }).find(
       (s) => s.id === 'error-handling-logging',
     );
-    const prompt = skill?.buildPrompt({ ...contexts.tsBackend, logger: 'custom' }) ?? '';
+    const prompt = skill?.buildPrompt({ ...contexts.tsBackend, logger: 'centralized' }) ?? '';
     expect(prompt).toContain('centralized logger');
     expect(prompt).toContain('no third-party logging library');
-    expect(prompt).not.toContain('selected logger (custom)');
+    expect(prompt).not.toContain('selected logger (centralized)');
   });
 
   it('adds .env-read guidance to coding-standards when envExampleOnly is set', () => {

@@ -195,6 +195,8 @@ const core: Record<string, Question> = {
     summary: 'Logger',
     message: 'Logging library?',
     optionsFrom: opt.loggerOptions,
+    // Closed set: the "centralized" choice already covers a bespoke logger.
+    allowOther: false,
     when: (a) => a.projectType !== 'frontend',
   },
   testTypes: {

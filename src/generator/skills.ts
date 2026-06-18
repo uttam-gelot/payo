@@ -146,7 +146,7 @@ const skills: SkillSpec[] = [
     buildPrompt: (a): string => {
       const logger = val(a, 'logger');
       const via =
-        logger === 'custom'
+        logger === 'centralized'
           ? 'a simple in-house centralized logger module — a thin wrapper over the language stdlib ' +
             'output, defined once and reused across the codebase, with no third-party logging library'
           : logger
