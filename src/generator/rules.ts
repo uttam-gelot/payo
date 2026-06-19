@@ -6,6 +6,7 @@
  */
 import type { Answers } from '../questions/types';
 import type { RuleSection } from './types';
+import { resolveGuidance } from './guidance';
 
 /** Read a string answer, treating empty / 'none' as unset. */
 function str(a: Answers, key: string): string | undefined {
@@ -193,6 +194,11 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
       lines.push('- Keep commits small and atomic — one logical change per commit.');
     sections.push({ title: 'Git Workflow', body: lines.join('\n') });
   }
+
+  // Provider-specific guidance from the selected modules (styling/auth/etc.).
+  // Appended after the generic sections above so it augments, never duplicates,
+  // the hard-coded Authentication / Tech Stack blocks.
+  sections.push(...resolveGuidance(answers));
 
   // Tech-specific follow-up answers (namespaced ids like 'nestjs.arch').
   const details = Object.keys(answers)

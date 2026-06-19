@@ -69,6 +69,17 @@ import { mysql } from './db/mysql';
 import { sqlite } from './db/sqlite';
 import { mongodb } from './db/mongodb';
 
+// Styling (follow-up questions + guidance)
+import { tailwind } from './styling/tailwind';
+import { shadcn } from './styling/shadcn';
+import { cssModules } from './styling/css-modules';
+
+// Auth providers (follow-up questions + guidance)
+import { clerk } from './auth/clerk';
+import { authjs } from './auth/authjs';
+import { betterAuth } from './auth/better-auth';
+import { supabaseAuth } from './auth/supabase-auth';
+
 // Compiler / tooling config
 import { tsconfig } from './config/tsconfig';
 
@@ -135,6 +146,15 @@ for (const m of [
   mysql,
   sqlite,
   mongodb,
+  // styling
+  tailwind,
+  shadcn,
+  cssModules,
+  // auth
+  clerk,
+  authjs,
+  betterAuth,
+  supabaseAuth,
   // config
   tsconfig,
 ]) {
