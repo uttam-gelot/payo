@@ -3,11 +3,13 @@
  * its option entry, and the follow-up questions asked once it is selected.
  */
 import type { Answers, Option, Question } from '../questions/types';
+import type { RuleSection } from '../generator/types';
 
 export type ContributorCategory =
   | 'framework'
   | 'orm'
   | 'styling'
+  | 'auth'
   | 'api'
   | 'lint'
   | 'format'
@@ -36,4 +38,10 @@ export interface TechModule {
   buildCommand?(a: Answers): string | undefined;
   /** Command that runs schema migrations (e.g. `prisma migrate dev`). Supplied by ORM/DB modules. */
   migrateCommand?(a: Answers): string | undefined;
+  /**
+   * Provider-specific rule sections merged into the generated CLAUDE.md.
+   * Lets a selected module emit real conventions (where files live, how to add
+   * them, what to avoid) instead of only a name-only Tech Stack bullet.
+   */
+  guidance?(a: Answers): RuleSection[];
 }
