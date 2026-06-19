@@ -294,6 +294,7 @@ export const flow: FlowSection[] = [
   expandSelected('framework'),
   single(core.apiArchitecture),
   single(core.styling),
+  expandSelected('stylingLibrary'),
   single(core.database),
   expandSelected('database'),
   single(core.orm),
@@ -307,6 +308,7 @@ export const flow: FlowSection[] = [
     gate: () => ({ id: 'auth.__recommended', title: 'Authentication' }),
     questions: () => [core.authApproach, core.authStrategy, core.rbac],
   },
+  expandSelected('authApproach'),
   // Conventions topic group — one recommended gate covers structure, standards,
   // documentation, and git workflow.
   {
