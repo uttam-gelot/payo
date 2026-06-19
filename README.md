@@ -161,9 +161,11 @@ questions to whatever you pick. Dimensions covered:
 - **Project** — type (frontend / backend / full-stack / CLI / script) and a short description
 - **Language & framework** — plus framework-specific conventions
 - **API** — REST, GraphQL, gRPC, tRPC
-- **Frontend** — styling and state management
+- **Frontend** — styling and state management, with provider-specific
+  conventions for Tailwind, shadcn/ui, and CSS Modules
 - **Data** — database and ORM/data-layer, with naming & migration conventions
-- **Auth** — approach, session strategy, RBAC
+- **Auth** — approach, session strategy, RBAC, plus provider-specific
+  conventions for Clerk, Auth.js, Better Auth, and Supabase Auth
 - **Validation & logging** — stack-appropriate libraries
 - **Testing** — unit / integration / component / E2E and runners
 - **Tooling** — package manager, runtime, formatter, linter
