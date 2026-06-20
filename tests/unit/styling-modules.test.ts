@@ -8,14 +8,31 @@ import type { Answers } from '../../src/questions/types';
 const md = (a: Answers): string => renderMarkdown('G', buildBaseRules(a));
 
 describe('styling modules', () => {
+  const stylingIds = [
+    'tailwind',
+    'shadcn',
+    'css-modules',
+    'styled-components',
+    'emotion',
+    'mui',
+    'mantine',
+    'chakra',
+    'antd',
+    'unocss',
+    'panda',
+    'bootstrap',
+    'daisyui',
+    'vanilla-css',
+  ];
+
   it('registers the styling modules under their answer-value ids', () => {
-    for (const id of ['tailwind', 'shadcn', 'css-modules']) {
+    for (const id of stylingIds) {
       expect(getModule(id)?.category).toBe('styling');
     }
   });
 
   it('expose no selectable options (lists stay in stylingOptions)', () => {
-    for (const id of ['tailwind', 'shadcn', 'css-modules']) {
+    for (const id of stylingIds) {
       expect(typeof getModule(id)?.options).toBe('undefined');
     }
   });
@@ -36,9 +53,14 @@ describe('styling modules', () => {
     expect(out).toContain('app/components/ui');
   });
 
-  it('contributes nothing for an unbacked styling option (e.g. mui)', () => {
+  it('emits a Material UI guidance section when stylingLibrary=mui', () => {
     const out = md({ ...contexts.tsFullstack, stylingLibrary: 'mui' });
+    expect(out).toContain('## Styling — Material UI (MUI)');
+    expect(out).toContain('createTheme');
+  });
+
+  it('contributes nothing for the none styling option', () => {
+    const out = md({ ...contexts.tsFullstack, stylingLibrary: 'none' });
     expect(out).not.toContain('## Styling — ');
-    expect(out).toContain('- Styling: mui');
   });
 });
