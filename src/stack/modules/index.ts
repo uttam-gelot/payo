@@ -73,12 +73,38 @@ import { mongodb } from './db/mongodb';
 import { tailwind } from './styling/tailwind';
 import { shadcn } from './styling/shadcn';
 import { cssModules } from './styling/css-modules';
+import { styledComponents } from './styling/styled-components';
+import { emotion } from './styling/emotion';
+import { mui } from './styling/mui';
+import { mantine } from './styling/mantine';
+import { chakra } from './styling/chakra';
+import { antd } from './styling/antd';
+import { unocss } from './styling/unocss';
+import { panda } from './styling/panda';
+import { bootstrap } from './styling/bootstrap';
+import { daisyui } from './styling/daisyui';
+import { vanillaCss } from './styling/vanilla-css';
 
 // Auth providers (follow-up questions + guidance)
 import { clerk } from './auth/clerk';
 import { authjs } from './auth/authjs';
 import { betterAuth } from './auth/better-auth';
 import { supabaseAuth } from './auth/supabase-auth';
+import { auth0 } from './auth/auth0';
+import { cognito } from './auth/cognito';
+import { passport } from './auth/passport';
+import { customAuth } from './auth/custom';
+import { customJwt } from './auth/custom-jwt';
+import { djangoAllauth } from './auth/django-allauth';
+import { djangoAuth } from './auth/django-auth';
+import { authlib } from './auth/authlib';
+import { fastapiUsers } from './auth/fastapi-users';
+import { golangJwt } from './auth/golang-jwt';
+import { goth } from './auth/goth';
+import { sessions } from './auth/sessions';
+import { jsonwebtoken } from './auth/jsonwebtoken';
+import { towerSessions } from './auth/tower-sessions';
+import { oauth2 } from './auth/oauth2';
 
 // Compiler / tooling config
 import { tsconfig } from './config/tsconfig';
@@ -150,11 +176,37 @@ for (const m of [
   tailwind,
   shadcn,
   cssModules,
+  styledComponents,
+  emotion,
+  mui,
+  mantine,
+  chakra,
+  antd,
+  unocss,
+  panda,
+  bootstrap,
+  daisyui,
+  vanillaCss,
   // auth
   clerk,
   authjs,
   betterAuth,
   supabaseAuth,
+  auth0,
+  cognito,
+  passport,
+  customAuth,
+  customJwt,
+  djangoAllauth,
+  djangoAuth,
+  authlib,
+  fastapiUsers,
+  golangJwt,
+  goth,
+  sessions,
+  jsonwebtoken,
+  towerSessions,
+  oauth2,
   // config
   tsconfig,
 ]) {
