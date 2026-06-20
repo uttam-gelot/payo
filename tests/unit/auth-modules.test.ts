@@ -8,14 +8,36 @@ import type { Answers } from '../../src/questions/types';
 const md = (a: Answers): string => renderMarkdown('G', buildBaseRules(a));
 
 describe('auth modules', () => {
+  const authIds = [
+    'clerk',
+    'authjs',
+    'better-auth',
+    'supabase-auth',
+    'auth0',
+    'cognito',
+    'passport',
+    'custom',
+    'custom-jwt',
+    'django-allauth',
+    'django-auth',
+    'authlib',
+    'fastapi-users',
+    'golang-jwt',
+    'goth',
+    'sessions',
+    'jsonwebtoken',
+    'tower-sessions',
+    'oauth2',
+  ];
+
   it('registers the auth modules under their answer-value ids', () => {
-    for (const id of ['clerk', 'authjs', 'better-auth', 'supabase-auth']) {
+    for (const id of authIds) {
       expect(getModule(id)?.category).toBe('auth');
     }
   });
 
   it('expose no selectable options (lists stay in authApproachOptions)', () => {
-    for (const id of ['clerk', 'authjs', 'better-auth', 'supabase-auth']) {
+    for (const id of authIds) {
       expect(typeof getModule(id)?.options).toBe('undefined');
     }
   });
@@ -37,9 +59,14 @@ describe('auth modules', () => {
     expect(out).not.toContain('Centralize route protection');
   });
 
-  it('contributes nothing for an unbacked auth approach (e.g. passport)', () => {
-    const out = md({ ...contexts.tsFullstack, authApproach: 'passport' });
+  it('emits a DIY hashing rule for a custom-jwt approach', () => {
+    const out = md({ ...contexts.tsFullstack, authApproach: 'custom-jwt' });
+    expect(out).toContain('## Authentication — Custom JWT / Sessions');
+    expect(out).toContain('argon2');
+  });
+
+  it('contributes nothing for the none auth approach', () => {
+    const out = md({ ...contexts.tsFullstack, authApproach: 'none' });
     expect(out).not.toContain('## Authentication — ');
-    expect(out).toContain('- Auth approach: passport');
   });
 });
