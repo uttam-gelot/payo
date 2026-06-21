@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'bun:test';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { isAvailable, runAgent } from '../../src/generator/agent';
+import { isAvailable, probeCommand, runAgent } from '../../src/generator/agent';
 import type { AgentRunner } from '../../src/generator/types';
 import { inTempProject } from '../helpers/tmpProject';
 
@@ -11,6 +11,17 @@ const shRunner = (cmd: string, timeoutMs?: number): AgentRunner => ({
   buildArgs: () => ['-c', cmd],
   outputPath: (id) => `${id}.md`,
   ...(timeoutMs ? { timeoutMs } : {}),
+});
+
+describe('probeCommand', () => {
+  it('uses `where` on Windows', () => {
+    expect(probeCommand('win32')).toBe('where');
+  });
+
+  it('uses `which` elsewhere', () => {
+    expect(probeCommand('linux')).toBe('which');
+    expect(probeCommand('darwin')).toBe('which');
+  });
 });
 
 describe('isAvailable', () => {

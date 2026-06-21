@@ -8,10 +8,16 @@ import { spawn, spawnSync } from 'child_process';
 import { config } from '../config';
 import type { AgentRunner } from './types';
 
+/** The PATH-probe command for a platform: `where` on Windows, `which` elsewhere. */
+export const probeCommand = (platform: NodeJS.Platform = process.platform): string =>
+  platform === 'win32' ? 'where' : 'which';
+
 /** True if the runner's binary is resolvable on PATH. */
 export function isAvailable(runner: AgentRunner): boolean {
   try {
-    const res = spawnSync('which', [runner.binary], { timeout: config.agent.availabilityProbeMs });
+    const res = spawnSync(probeCommand(), [runner.binary], {
+      timeout: config.agent.availabilityProbeMs,
+    });
     return res.status === 0;
   } catch {
     return false;
