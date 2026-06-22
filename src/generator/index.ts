@@ -304,18 +304,22 @@ function providerFor(answers: Answers): AiProvider {
  */
 export function predictTargets(answers: Answers): string[] {
   const provider = providerFor(answers);
+  const sections = buildBaseRules(answers);
+  const staticPaths = provider.generate({ answers, sections }).map((a) => a.path);
   const runner = provider.agent;
   if (runner && isAvailable(runner)) {
     const specs = selectSkills(answers);
     if (specs.length > 0) {
-      const paths = runner.singleFile
+      const aiPaths = runner.singleFile
         ? [runner.outputPath('')]
         : specs.map((s) => runner.outputPath(s.id));
-      return [...new Set(paths)];
+      // The static fallback (runStatic) still fires if every agent run fails,
+      // writing these targets — so guard them too. Otherwise a pre-existing
+      // CLAUDE.md is clobbered outside the user's overwrite choice (B2).
+      return [...new Set([...aiPaths, ...staticPaths])];
     }
   }
-  const sections = buildBaseRules(answers);
-  return provider.generate({ answers, sections }).map((a) => a.path);
+  return staticPaths;
 }
 
 /** Rename each existing file to `<path>.bak` (replacing a stale backup) and return the backups. */
