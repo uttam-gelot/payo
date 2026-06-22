@@ -28,13 +28,21 @@ describe('predictTargets — static mode', () => {
 describe('predictTargets — AI mode', () => {
   beforeEach(() => setAgentOverride({ isAvailable: true }));
 
-  it('predicts one native file per skill for a multi-file tool (claude)', () => {
+  it('predicts each skill file plus the static fallback target for a multi-file tool (claude)', () => {
     const answers = fullStackAnswers('claude');
-    const expected = selectSkills(answers).map((s) => `.claude/skills/${s.id}/SKILL.md`);
-    expect(predictTargets(answers)).toEqual(expected);
+    const skillPaths = selectSkills(answers).map((s) => `.claude/skills/${s.id}/SKILL.md`);
+    // CLAUDE.md is the runStatic fallback target — it must be guarded too (B2).
+    expect(predictTargets(answers)).toEqual([...skillPaths, 'CLAUDE.md']);
+  });
+
+  it('includes the static fallback target so it is not silently clobbered (B2)', () => {
+    // runStatic fires when every agent run fails, writing CLAUDE.md. If predictTargets
+    // omitted it, a pre-existing CLAUDE.md would be overwritten with no prompt/backup.
+    expect(predictTargets(fullStackAnswers('claude'))).toContain('CLAUDE.md');
   });
 
   it('predicts the single master file for a single-file tool (codex)', () => {
+    // AI master and static fallback are both AGENTS.md — the union dedupes to one.
     expect(predictTargets(fullStackAnswers('codex'))).toEqual(['AGENTS.md']);
   });
 });
