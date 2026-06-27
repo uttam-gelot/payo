@@ -1,4 +1,4 @@
-import { select, multiselect, text, confirm, isCancel, cancel } from '@clack/prompts';
+import { select, multiselect, text, confirm, isCancel, cancel, note } from '@clack/prompts';
 import type { Answers, Option, Question } from './types';
 
 // ---------------------------------------------------------------------------
@@ -37,7 +37,13 @@ async function runSelect(q: Question, a: Answers): Promise<string> {
     ? [...options, { value: OTHER, label: 'Other (specify)' }]
     : options;
 
-  const value = await select({ message: q.message, options: finalOptions });
+  // Pre-select a seeded/prior value when it is a valid option (e.g. a detected
+  // answer under the "review & edit" path). Ignored when out of range.
+  const prior = a[q.id];
+  const initialValue =
+    typeof prior === 'string' && finalOptions.some((o) => o.value === prior) ? prior : undefined;
+
+  const value = await select({ message: q.message, options: finalOptions, initialValue });
   guardCancel(value);
 
   if (value === OTHER || value === 'other' || value === 'custom') {
@@ -77,10 +83,17 @@ async function runMultiselect(q: Question, a: Answers): Promise<string[]> {
     ? [...options, { value: OTHER, label: 'Other (specify)' }]
     : options;
 
+  const prior = a[q.id];
+  const valid = new Set(finalOptions.map((o) => o.value));
+  const initialValues = Array.isArray(prior)
+    ? prior.filter((v): v is string => typeof v === 'string' && valid.has(v))
+    : undefined;
+
   const picked = await multiselect({
     message: q.message,
     options: finalOptions,
     required: q.required ?? true,
+    ...(initialValues && initialValues.length ? { initialValues } : {}),
   });
   guardCancel(picked);
   if (!picked.includes(OTHER)) return picked;
@@ -118,11 +131,81 @@ export async function runQuestion(q: Question, a: Answers): Promise<unknown> {
     }
 
     case 'confirm': {
-      const value = await confirm({ message: q.message });
+      // Pre-select a seeded/prior boolean (e.g. a detected tsconfig flag).
+      const prior = a[q.id];
+      const value = await confirm({
+        message: q.message,
+        ...(typeof prior === 'boolean' ? { initialValue: prior } : {}),
+      });
       guardCancel(value);
       return value;
     }
   }
+}
+
+/** Friendly label per detected answer id, for the detection summary. */
+const DETECT_LABELS: Record<string, string> = {
+  language: 'Language',
+  projectType: 'Project type',
+  framework: 'Framework',
+  packageManager: 'Package manager',
+  runtime: 'Runtime',
+  formatter: 'Formatter',
+  linter: 'Linter',
+  testRunner: 'Test runner',
+  database: 'Database',
+  orm: 'ORM',
+  stylingLibrary: 'Styling',
+  validation: 'Validation',
+  stateManagement: 'State management',
+  logger: 'Logger',
+};
+
+/** Order detected lines read top-down like the questionnaire. */
+const DETECT_ORDER = Object.keys(DETECT_LABELS);
+
+/** Gate 1 — whether to detect the existing project at all, or start fresh. */
+export async function confirmStartMode(ask: SelectPrompt = select): Promise<'fresh' | 'existing'> {
+  const value = await ask({
+    message: 'This directory looks like an existing project. How should payo proceed?',
+    options: [
+      {
+        value: 'existing',
+        label: 'Work with the existing project — detect its stack and pre-fill answers',
+      },
+      { value: 'fresh', label: 'Start fresh — ignore what is here and answer everything' },
+    ],
+  });
+  guardCancel(value);
+  return value as 'fresh' | 'existing';
+}
+
+/** Gate 2 — how deep detection should reach. */
+export async function confirmDetectionDepth(
+  ask: SelectPrompt = select,
+): Promise<'everything' | 'partial'> {
+  const value = await ask({
+    message: 'How much should payo detect?',
+    options: [
+      {
+        value: 'everything',
+        label: 'Detect everything — stack plus conventions (you still confirm conventions)',
+      },
+      { value: 'partial', label: 'Just the high-level stack — answer conventions yourself' },
+    ],
+  });
+  guardCancel(value);
+  return value as 'everything' | 'partial';
+}
+
+/** Read-only summary of what detection produced, shown before the interview continues. */
+export function summarizeDetection(detected: { answers: Record<string, unknown> }): void {
+  const lines = DETECT_ORDER.filter((id) => id in detected.answers).map((id) => {
+    const label = DETECT_LABELS[id];
+    return `• ${label.padEnd(16)} ${String(detected.answers[id])}`;
+  });
+  if (lines.length === 0) return;
+  note(lines.join('\n'), 'Detected from your project');
 }
 
 /** Resume / restart decision shown when a prior session exists. */
