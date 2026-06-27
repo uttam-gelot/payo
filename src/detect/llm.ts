@@ -80,7 +80,7 @@ export const defaultDeps: LlmDeps = {
 };
 
 /** The answer ids Stage 2 should try to fill, given what Stage 1 already found. */
-function targetIds(base: DetectionResult, depth: DetectDepth): string[] {
+export function targetIds(base: DetectionResult, depth: DetectDepth): string[] {
   const have = new Set(Object.keys(base.answers));
   const ids: string[] = [];
   for (const id of TIER1) {
