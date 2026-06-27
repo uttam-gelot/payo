@@ -89,6 +89,21 @@ export function recordAnswer(session: Session, id: string, value: unknown): Sess
 }
 
 /**
+ * Seed detected answer values WITHOUT marking them answered, so the flow still
+ * re-asks each question — but pre-selected to the detected value (runner reads
+ * the stored value as the prompt's initial highlight). Used by the "review &
+ * edit" detection path; the "use these" path uses recordAnswer instead.
+ */
+export function seedDetected(session: Session, values: Record<string, unknown>): Session {
+  const ids = Object.keys(values);
+  if (ids.length === 0) return session;
+  const answers: Answers = { ...session.answers, ...values };
+  const updated: Session = { ...session, answers };
+  saveSession(updated);
+  return updated;
+}
+
+/**
  * Drop one or more answers (value + answered entry) in a single persisted update.
  * Returns the session unchanged (no write) when none of the ids were present.
  * Used by edit-from-review, where one user action can clear several answers.
