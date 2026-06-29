@@ -28,6 +28,7 @@ project's conventions instead of guessing.
 - [Who is this for?](#who-is-this-for)
 - [Quick Start](#quick-start)
 - [How to use — a walkthrough](#how-to-use--a-walkthrough)
+- [Already have a project? Payo detects your stack](#already-have-a-project-payo-detects-your-stack)
 - [What gets generated](#what-gets-generated)
 - [What it asks about](#what-it-asks-about)
 - [AI vs. template generation](#ai-vs-template-generation)
@@ -117,23 +118,59 @@ guidance files straight into your repo.
 
 1. **Run Payo from your project root.** `npx @uge/payo` — it writes into the
    current directory, so `cd` into the repo first.
-2. **Answer the questionnaire.** Pick your AI tool, project type, language,
+2. **Existing repo? It's auto-detected.** If Payo finds a manifest, it reads your
+   stack and pre-fills the questionnaire, so most stack questions become a quick
+   confirm-and-skip instead of typing. See
+   [Already have a project?](#already-have-a-project-payo-detects-your-stack).
+3. **Answer the questionnaire.** Pick your AI tool, project type, language,
    framework, and so on. Questions **adapt to your answers** — choose Next.js
    and you get Next.js-specific follow-ups; choose Postgres and you're asked
    about migrations and naming. Most prompts ship a **recommended default**, so
    you can blast through with <kbd>Enter</kbd>.
-3. **Review your stack — and edit inline.** Before writing anything, Payo shows a
+4. **Review your stack — and edit inline.** Before writing anything, Payo shows a
    summary of every answer. Choose **Edit an answer** to change any response — or
    re-open a section you skipped — right from the review; dependent questions are
    re-asked automatically. Pick **Generate** when it looks right.
-4. **Payo generates the guidance.** It writes each tool's files in their native
+5. **Payo generates the guidance.** It writes each tool's files in their native
    format and location (see the table below). With the tool's CLI installed,
    files are generated in parallel by the AI; otherwise solid templates are used.
-5. **(Optional) Get a bootstrap prompt.** Payo offers to write a paste-ready
+6. **(Optional) Get a bootstrap prompt.** Payo offers to write a paste-ready
    `bootstrap-prompt.md` you hand to any LLM to scaffold a runnable project that
    honors the guidance it just generated.
-6. **Interrupted? Just rerun.** Progress lives under `.payo/`; Payo resumes and
+7. **Interrupted? Just rerun.** Progress lives under `.payo/`; Payo resumes and
    only generates what's missing.
+
+## Already have a project? Payo detects your stack
+
+Payo isn't just for empty repos. Run it in an established project and it **reads
+what's already there** — `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`,
+lockfiles, tool configs, and the folder layout — to figure out your stack across
+**TypeScript/JavaScript, Python, Go, and Rust**, then pre-fills the questionnaire
+from that evidence. You confirm or tweak instead of typing it all out.
+
+When detection finds a manifest, you get two quick choices:
+
+- **Work with the existing project, or start fresh?** Keep the detected answers, or
+  ignore them and answer from scratch.
+- **Detect everything, or just the stack?** Fill in stack facts only, or also
+  pre-fill the convention questions (folder structure and the like) that Payo can
+  infer from your layout.
+
+How detected answers are applied:
+
+- **Stack facts** (language, framework, database, ORM, package manager, test
+  runner, linter…) are filled in and **skipped** — they're things a manifest can
+  state authoritatively, so there's nothing to ask.
+- **Conventions and preferences** are surfaced as **pre-filled defaults you still
+  confirm** — a manifest can't encode intent, so Payo never silently decides these
+  for you.
+
+Detection runs deterministically from your files first. When the chosen AI tool's
+CLI is installed, an **optional second pass** uses **your own** assistant to fill
+gaps on unusual stacks — it reads only the manifest and the directory listing,
+runs under your own account, and never sends anything to a Payo server (see
+[Your data stays yours](#your-data-stays-yours)). If no CLI is present, the
+deterministic result stands on its own.
 
 ## What gets generated
 
@@ -213,12 +250,13 @@ generating what's missing. Finished runs clean the directory up automatically.
 
 Payo works today, but it's still early. Here's where it's headed:
 
-- **First-class existing-project support.** Right now Payo shines on a fresh
-  repo. The next big step is making it just as good on an established codebase:
-  **detect** the stack from what's already there (manifests, lockfiles, config,
-  folder layout), **auto-answer** the questionnaire from that evidence, and let
-  you confirm or tweak instead of typing it all out — then the normal generation
-  flow continues.
+- **Deeper existing-project detection.** Payo already detects an established
+  repo's stack and pre-fills the questionnaire (see
+  [Already have a project?](#already-have-a-project-payo-detects-your-stack)).
+  Next is making that just as sharp on **monorepos**: today detection reads the
+  root manifest, so a workspace whose real stack lives in `apps/*` and
+  `packages/*` underfills. Workspace-aware, multi-root detection — plus broader
+  signal coverage — is the next step.
 - **Broader stack coverage.** More languages, frameworks, ORMs, databases, and
   AI tools, plus deeper, more opinionated defaults for the ones already
   supported — so the guidance fits more of the ecosystem out of the box.

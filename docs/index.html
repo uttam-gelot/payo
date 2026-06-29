@@ -51,7 +51,7 @@
     "url": "https://payo.uttamgelot.com/",
     "image": "https://payo.uttamgelot.com/og.png",
     "downloadUrl": "https://www.npmjs.com/package/@uge/payo",
-    "softwareVersion": "0.1.7",
+    "softwareVersion": "0.3.5",
     "license": "https://opensource.org/licenses/MIT",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
   }
@@ -82,6 +82,11 @@
         "@type": "Question",
         "name": "Which AI coding tools does Payo support?",
         "acceptedAnswer": { "@type": "Answer", "text": "Claude, Cursor, GitHub Copilot, Codex CLI, Windsurf, and Antigravity. Payo writes each tool's guidance files in its own native format and location." }
+      },
+      {
+        "@type": "Question",
+        "name": "Does Payo work on an existing project?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Payo detects your stack from what's already in the repo — manifests like package.json, pyproject.toml, go.mod and Cargo.toml, plus lockfiles, tool configs, and folder layout — across TypeScript/JavaScript, Python, Go, and Rust, then pre-fills the questionnaire. Stack facts it can read for certain are filled and skipped; inferred conventions are surfaced as defaults you confirm." }
       }
     ]
   }
@@ -327,7 +332,7 @@
         <h2>Knows your stack, not just generic advice</h2>
         <p>
           Payo understands <strong>25 frameworks</strong>, <strong>24 ORMs</strong>, and
-          <strong>4 databases</strong> across four languages — and tailors its questions and the
+          <strong>16 databases</strong> across four languages — and tailors its questions and the
           generated rules to whatever you pick. Choose Next.js and you get Next.js follow-ups;
           choose Postgres and you're asked about migrations and naming; pick Tailwind or Clerk
           and you get provider-specific conventions in the generated rules.
@@ -393,7 +398,24 @@
       </div>
       <div class="db-row">
         <span class="kicker">Databases</span>
-        <span class="chip">PostgreSQL</span><span class="chip">MySQL</span><span class="chip">SQLite</span><span class="chip">MongoDB</span>
+        <span class="chip">PostgreSQL</span><span class="chip">MySQL</span><span class="chip">MariaDB</span><span class="chip">SQLite</span>
+        <span class="chip">Turso / libSQL</span><span class="chip">CockroachDB</span><span class="chip">Neon</span><span class="chip">MongoDB</span>
+        <span class="chip">Redis</span><span class="chip">DynamoDB</span><span class="chip">Supabase</span><span class="chip">Firebase</span>
+        <span class="chip">ClickHouse</span><span class="chip">Cassandra</span><span class="chip">Neo4j</span><span class="chip">Elasticsearch</span>
+      </div>
+    </section>
+
+    <section id="existing">
+      <div class="sec-head">
+        <h2>Works on existing projects too</h2>
+        <p>
+          Payo isn't just for empty repos. Run it in an established codebase and it
+          <strong>reads what's already there</strong> — <code>package.json</code>, <code>pyproject.toml</code>,
+          <code>go.mod</code>, <code>Cargo.toml</code>, lockfiles, tool configs, and your folder layout — to detect
+          your stack across TypeScript/JavaScript, Python, Go, and Rust, then pre-fills the questionnaire.
+          Stack facts it can read for certain are filled in and skipped; conventions it infers are surfaced as
+          defaults you still confirm. You review a summary and tweak — no typing it all out.
+        </p>
       </div>
     </section>
 
@@ -420,7 +442,7 @@
             <li><b>Get tailored guidance files.</b> <span>Rich AI-written docs when the tool's CLI is present, solid templates otherwise.</span></li>
             <li><b>Optional bootstrap prompt.</b> <span>A paste-ready prompt to scaffold a runnable project honoring the rules.</span></li>
           </ol>
-          <p class="stat">Understands <b>25 frameworks</b>, <b>24 ORMs</b>, and <b>4 databases</b> across TypeScript/JavaScript, Python, Go, and Rust.</p>
+          <p class="stat">Understands <b>25 frameworks</b>, <b>24 ORMs</b>, and <b>16 databases</b> across TypeScript/JavaScript, Python, Go, and Rust.</p>
         </div>
       </div>
     </section>
@@ -443,6 +465,10 @@
         <details>
           <summary>Which AI coding tools does Payo support?</summary>
           <p>Claude, Cursor, GitHub Copilot, Codex, Windsurf, and Antigravity — each in its own native format and location.</p>
+        </details>
+        <details>
+          <summary>Does Payo work on an existing project?</summary>
+          <p>Yes. Payo detects your stack from what's already in the repo — manifests (<code>package.json</code>, <code>pyproject.toml</code>, <code>go.mod</code>, <code>Cargo.toml</code>), lockfiles, tool configs, and folder layout — across TypeScript/JavaScript, Python, Go, and Rust, then pre-fills the questionnaire. Stack facts it reads for certain are filled and skipped; inferred conventions become defaults you confirm.</p>
         </details>
         <details>
           <summary>Is Payo free and open source?</summary>
