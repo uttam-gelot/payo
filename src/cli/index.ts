@@ -3,13 +3,26 @@ import {
   loadSession,
   createSession,
   clearSession,
+  recordAnswer,
   recordGenerated,
+  seedDetected,
   cleanupWorkspace,
   type Session,
 } from '../state/index';
 import fs from 'fs';
-import { confirmResume, confirmBootstrapPrompt, confirmOverwrite } from '../questions/runner';
-import { runFlow, reviewAndEdit } from '../questions/engine';
+import {
+  confirmResume,
+  confirmBootstrapPrompt,
+  confirmOverwrite,
+  confirmStartMode,
+  confirmDetectionDepth,
+  summarizeDetection,
+  runQuestion,
+} from '../questions/runner';
+import { detectStack } from '../detect/index';
+import { llmDetect } from '../detect/llm';
+import { splitByTier } from '../detect/tiers';
+import { runFlow, reviewAndEdit, findQuestion } from '../questions/engine';
 import { flow } from '../questions/flow';
 import { generate, generateBootstrap, predictTargets, backupFiles } from '../generator/index';
 import type { ResumeStore } from '../generator/types';
@@ -32,6 +45,50 @@ export async function run(): Promise<void> {
     }
   } else {
     session = existing ?? createSession();
+  }
+
+  // --- Auto-detect existing stack (fresh sessions only; resume keeps answers) ---
+  if (session.answered.length === 0) {
+    const detected = detectStack(process.cwd());
+    if (Object.keys(detected.answers).length > 0) {
+      // Existing project. aiTool is always the first question — ask it now so the
+      // Stage-2 LLM pass can use the chosen agent; recordAnswer ⇒ runFlow skips it.
+      const aiToolQ = findQuestion(flow, session.answers, 'aiTool');
+      if (aiToolQ) {
+        session = recordAnswer(session, 'aiTool', await runQuestion(aiToolQ, session.answers));
+      }
+
+      // Gate 1 — work with the existing project, or start fresh?
+      if ((await confirmStartMode()) === 'existing') {
+        // Gate 2 — detect everything (incl. convention pre-fills) or just the stack?
+        const depth = await confirmDetectionDepth();
+
+        // Stage 2 — LLM pass over the chosen agent (additive; static-only fallback).
+        const aiTool =
+          typeof session.answers.aiTool === 'string' ? session.answers.aiTool : undefined;
+        const s = spinner();
+        s.start('Analyzing your project');
+        let result = detected;
+        try {
+          result = await llmDetect(detected, aiTool, depth, process.cwd());
+        } finally {
+          s.stop('Analysis complete');
+        }
+
+        summarizeDetection(result);
+
+        // Apply by tier: Tier-1 stack facts are recorded (and skipped); Tier-2
+        // conventions are only pre-filled in "everything" mode and never skipped (§7).
+        const { tier1, tier2 } = splitByTier(result.answers as Record<string, unknown>);
+        for (const [id, value] of Object.entries(tier1)) {
+          session = recordAnswer(session, id, value);
+        }
+        if (depth === 'everything' && Object.keys(tier2).length > 0) {
+          session = seedDetected(session, tier2);
+        }
+      }
+      // Gate 1 "fresh" → seed nothing; normal flow (aiTool already answered).
+    }
   }
 
   // --- Dynamic questionnaire ---
