@@ -237,6 +237,15 @@ describe('detectStack — greenfield / tie-break', () => {
     expect(det.sources).toEqual({});
   });
 
+  it('never throws when a manifest makes a detector blow up', () => {
+    // `engines` as a string makes detectNode hit `'bun' in engines` on a
+    // non-object (a TypeError). detectStack must swallow it, not crash.
+    const pkg = JSON.stringify({ dependencies: { next: '15' }, engines: 'oops' });
+    const det = inProject({ 'package.json': pkg }, (dir) => detectStack(dir));
+    expect(det.answers).toEqual({});
+    expect(det.sources).toEqual({});
+  });
+
   it('prefers the ecosystem that yielded a framework', () => {
     // A go.mod with a framework should win over a package.json with none.
     const pkg = JSON.stringify({ dependencies: { lodash: '4' } });

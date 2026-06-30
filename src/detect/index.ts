@@ -24,7 +24,16 @@ const DETECTORS = [detectNode, detectPython, detectGo, detectRust];
  * seeded answers never mix conflicting languages.
  */
 export function detectStack(cwd: string = process.cwd()): DetectionResult {
-  const found = DETECTORS.map((d) => d(cwd)).filter((r): r is DetectionResult => r !== null);
+  // A malformed manifest must never crash the CLI: a detector that throws is
+  // treated as "no match" so the remaining detectors (and greenfield fallback)
+  // still work. Stage 1 stays the always-safe floor.
+  const found = DETECTORS.map((d) => {
+    try {
+      return d(cwd);
+    } catch {
+      return null;
+    }
+  }).filter((r): r is DetectionResult => r !== null);
   if (found.length === 0) return EMPTY_DETECTION;
   const withFramework = found.find((r) => 'framework' in r.answers);
   return coherent(withFramework ?? found[0]);
