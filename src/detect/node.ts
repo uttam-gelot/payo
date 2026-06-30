@@ -8,6 +8,7 @@ import {
   NODE_SERVER_FRAMEWORKS,
   NODE_FULLSTACK_FRAMEWORKS,
   NODE_CLI,
+  NODE_CLI_FRAMEWORK,
   NODE_DATABASE,
   NODE_ORM,
   NODE_STYLING,
@@ -30,8 +31,15 @@ const PRETTIER_CONFIGS = [
   '.prettierrc.cjs',
   '.prettierrc.yaml',
   '.prettierrc.yml',
+  '.prettierrc.json5',
+  '.prettierrc.toml',
+  '.prettierrc.mjs',
   'prettier.config.js',
   'prettier.config.cjs',
+  'prettier.config.mjs',
+  'prettier.config.ts',
+  'prettier.config.mts',
+  'prettier.config.cts',
 ];
 const ESLINT_CONFIGS = [
   '.eslintrc',
@@ -90,6 +98,12 @@ export function detectNode(cwd: string): DetectionResult | null {
   else if (isCli) projectType = 'cli';
   set('projectType', projectType, 'package.json');
 
+  // CLI arg-parser → framework value. NODE_FRAMEWORK only covers web frameworks,
+  // so a CLI's framework is otherwise never detected even though the dep is present.
+  if (projectType === 'cli' && framework === undefined) {
+    set('framework', firstMatch(deps, NODE_CLI_FRAMEWORK), 'package.json');
+  }
+
   // Package manager from lockfile, runtime from lockfile / engines / config.
   const pm = exists(cwd, 'pnpm-lock.yaml')
     ? 'pnpm'
@@ -127,13 +141,13 @@ export function detectNode(cwd: string): DetectionResult | null {
   set('logger', firstMatch(deps, NODE_LOGGER), 'package.json');
 
   // Formatter / linter: dep first, then config-file presence as a fallback.
+  // Prettier also supports a top-level `"prettier"` key in package.json; Biome's
+  // config may be biome.json or biome.jsonc.
+  const hasPrettierConfig = 'prettier' in pkg || PRETTIER_CONFIGS.some((f) => exists(cwd, f));
+  const hasBiomeConfig = exists(cwd, 'biome.json') || exists(cwd, 'biome.jsonc');
   const formatter =
     firstMatch(deps, NODE_FORMATTER) ??
-    (PRETTIER_CONFIGS.some((f) => exists(cwd, f))
-      ? 'prettier'
-      : exists(cwd, 'biome.json')
-        ? 'biome'
-        : undefined);
+    (hasPrettierConfig ? 'prettier' : hasBiomeConfig ? 'biome' : undefined);
   set(
     'formatter',
     formatter,
@@ -144,11 +158,7 @@ export function detectNode(cwd: string): DetectionResult | null {
 
   const linter =
     firstMatch(deps, NODE_LINTER) ??
-    (ESLINT_CONFIGS.some((f) => exists(cwd, f))
-      ? 'eslint'
-      : exists(cwd, 'biome.json')
-        ? 'biome'
-        : undefined);
+    (ESLINT_CONFIGS.some((f) => exists(cwd, f)) ? 'eslint' : hasBiomeConfig ? 'biome' : undefined);
   set(
     'linter',
     linter,

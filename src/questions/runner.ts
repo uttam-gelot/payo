@@ -159,6 +159,8 @@ const DETECT_LABELS: Record<string, string> = {
   validation: 'Validation',
   stateManagement: 'State management',
   logger: 'Logger',
+  // Tier-2 conventions detection can infer (shown so "detect everything" is visible).
+  structure: 'Structure',
 };
 
 /** Order detected lines read top-down like the questionnaire. */

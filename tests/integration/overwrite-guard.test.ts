@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { setAgentOverride, resetAgentOverride } from '../helpers/agentMock';
-import { predictTargets, backupFiles, resolveContained } from '../../src/generator/index';
+import {
+  predictTargets,
+  existingTargets,
+  backupFiles,
+  resolveContained,
+} from '../../src/generator/index';
 import { listProviders } from '../../src/providers/index';
 import { selectSkills } from '../../src/generator/skills';
 import { buildBaseRules } from '../../src/generator/rules';
@@ -44,6 +49,28 @@ describe('predictTargets — AI mode', () => {
   it('predicts the single master file for a single-file tool (codex)', () => {
     // AI master and static fallback are both AGENTS.md — the union dedupes to one.
     expect(predictTargets(fullStackAnswers('codex'))).toEqual(['AGENTS.md']);
+  });
+});
+
+describe('existingTargets — cross-tool config', () => {
+  beforeEach(() => setAgentOverride({ isAvailable: false }));
+
+  it('warns about CLAUDE.md even when a different tool (antigravity) is selected', async () => {
+    // The exact reported bug: a repo with Claude config, user picks Antigravity.
+    // predictTargets only knows AGENTS.md, so without the union the guard never fires.
+    await inTempProject((dir) => {
+      writeFileSync(join(dir, 'CLAUDE.md'), 'hand-tuned', 'utf-8');
+      const answers = fullStackAnswers('antigravity');
+      expect(predictTargets(answers)).not.toContain('CLAUDE.md');
+      expect(existingTargets(answers)).toContain('CLAUDE.md');
+    });
+  });
+
+  it('only reports config that actually exists on disk', async () => {
+    await inTempProject(() => {
+      // Nothing written → no existing AI config, and the static target is absent too.
+      expect(existingTargets(fullStackAnswers('antigravity'))).toEqual([]);
+    });
   });
 });
 

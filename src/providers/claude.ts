@@ -4,6 +4,7 @@ import { renderMarkdown } from '../generator/rules';
 export const claudeProvider: AiProvider = {
   id: 'claude',
   displayName: 'Claude (Anthropic)',
+  knownArtifacts: ['CLAUDE.md', '.claude/skills'],
   generate: (ctx) => [
     { path: 'CLAUDE.md', content: renderMarkdown('Project Guide for Claude', ctx.sections) },
   ],

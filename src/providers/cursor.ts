@@ -4,6 +4,7 @@ import { renderMarkdown } from '../generator/rules';
 export const cursorProvider: AiProvider = {
   id: 'cursor',
   displayName: 'Cursor',
+  knownArtifacts: ['.cursorrules', '.cursor/rules'],
   generate: (ctx) => [
     { path: '.cursorrules', content: renderMarkdown('Cursor Rules', ctx.sections) },
   ],

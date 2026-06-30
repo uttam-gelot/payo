@@ -4,6 +4,7 @@ import { renderMarkdown } from '../generator/rules';
 export const copilotProvider: AiProvider = {
   id: 'copilot',
   displayName: 'GitHub Copilot',
+  knownArtifacts: ['.github/copilot-instructions.md', '.github/instructions'],
   generate: (ctx) => [
     {
       path: '.github/copilot-instructions.md',

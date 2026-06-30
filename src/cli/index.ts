@@ -9,7 +9,6 @@ import {
   cleanupWorkspace,
   type Session,
 } from '../state/index';
-import fs from 'fs';
 import {
   confirmResume,
   confirmBootstrapPrompt,
@@ -20,11 +19,12 @@ import {
   runQuestion,
 } from '../questions/runner';
 import { detectStack } from '../detect/index';
-import { llmDetect } from '../detect/llm';
+import { scanExistingAiConfigs, detectAiTool } from '../detect/aiconfig';
+import { llmDetect, willLlmDetectRun } from '../detect/llm';
 import { splitByTier } from '../detect/tiers';
 import { runFlow, reviewAndEdit, findQuestion, reconcile } from '../questions/engine';
 import { flow } from '../questions/flow';
-import { generate, generateBootstrap, predictTargets, backupFiles } from '../generator/index';
+import { generate, generateBootstrap, existingTargets, backupFiles } from '../generator/index';
 import type { ResumeStore } from '../generator/types';
 import { printBanner } from './banner';
 
@@ -51,11 +51,26 @@ export async function run(): Promise<void> {
   if (session.answered.length === 0) {
     const detected = detectStack(process.cwd());
     if (Object.keys(detected.answers).length > 0) {
+      // The repo may already hold AI config — possibly for a different tool than
+      // the user is about to pick. Surface it and pre-select the tool in use.
+      const existingAiConfigs = scanExistingAiConfigs(process.cwd());
+      const detectedAiTool = detectAiTool(process.cwd());
+      if (existingAiConfigs.length > 0) {
+        note(
+          existingAiConfigs.map((f) => `• ${f}`).join('\n'),
+          detectedAiTool
+            ? `Existing AI config detected (looks like ${detectedAiTool})`
+            : 'Existing AI config detected',
+        );
+      }
+
       // Existing project. aiTool is always the first question — ask it now so the
       // Stage-2 LLM pass can use the chosen agent; recordAnswer ⇒ runFlow skips it.
       const aiToolQ = findQuestion(flow, session.answers, 'aiTool');
       if (aiToolQ) {
-        session = recordAnswer(session, 'aiTool', await runQuestion(aiToolQ, session.answers));
+        // Seed the detected tool so the prompt pre-selects it; the user's pick wins.
+        const seeded = detectedAiTool ? seedDetected(session, { aiTool: detectedAiTool }) : session;
+        session = recordAnswer(session, 'aiTool', await runQuestion(aiToolQ, seeded.answers));
       }
 
       // Gate 1 — work with the existing project, or start fresh?
@@ -66,25 +81,34 @@ export async function run(): Promise<void> {
         // Stage 2 — LLM pass over the chosen agent (additive; static-only fallback).
         const aiTool =
           typeof session.answers.aiTool === 'string' ? session.answers.aiTool : undefined;
-        const s = spinner();
-        s.start('Analyzing your project');
         let result = detected;
-        try {
-          result = await llmDetect(detected, aiTool, depth, process.cwd());
-        } finally {
-          s.stop('Analysis complete');
+        // Only spin when the pass will actually run — otherwise the spinner lies
+        // ("Analysis complete") on the common no-agent / nothing-to-fill path.
+        if (willLlmDetectRun(detected, aiTool, depth)) {
+          const s = spinner();
+          s.start(`Analyzing your project with ${aiTool}`);
+          try {
+            result = await llmDetect(detected, aiTool, depth, process.cwd());
+          } finally {
+            s.stop('Analysis complete');
+          }
         }
 
         summarizeDetection(result);
 
-        // Apply by tier: Tier-1 stack facts are recorded (and skipped); Tier-2
-        // conventions are only pre-filled in "everything" mode and never skipped (§7).
+        // Apply by tier. Tier-1 stack facts are always recorded (and so skipped).
+        // In "everything" mode, detected Tier-2 conventions are recorded too, so
+        // the interview asks only what detection could NOT find — the user still
+        // reviews/edits every recorded answer before generating. In "partial"
+        // mode conventions are left entirely to the interview.
         const { tier1, tier2 } = splitByTier(result.answers as Record<string, unknown>);
         for (const [id, value] of Object.entries(tier1)) {
           session = recordAnswer(session, id, value);
         }
-        if (depth === 'everything' && Object.keys(tier2).length > 0) {
-          session = seedDetected(session, tier2);
+        if (depth === 'everything') {
+          for (const [id, value] of Object.entries(tier2)) {
+            session = recordAnswer(session, id, value);
+          }
         }
 
         // Detectors seed facts independent of project shape (e.g. a styling lib
@@ -115,7 +139,7 @@ export async function run(): Promise<void> {
   // run the user then abandons. Skipped on resume: those files exist because
   // payo's own interrupted run wrote them.
   if (resumeCount === 0) {
-    const existing = predictTargets(session.answers).filter((rel) => fs.existsSync(rel));
+    const existing = existingTargets(session.answers);
     if (existing.length > 0) {
       const choice = await confirmOverwrite(existing);
       if (choice === 'skip') {

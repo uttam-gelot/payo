@@ -52,6 +52,15 @@ export const TIER2: ReadonlySet<string> = new Set([
   'rbac',
 ]);
 
+/**
+ * Tier-2 convention ids Stage 2 is allowed to infer in "everything" mode. Kept
+ * deliberately narrow: only conventions a directory tree can show (e.g. monorepo
+ * `structure`) belong here. Git/commit policy and pure-intent conventions stay
+ * manual — the git log is never sent (see §10). Extend as new tree-inferable
+ * convention questions land.
+ */
+export const TIER2_HINTABLE: readonly string[] = ['structure'];
+
 /** True for a Tier-1 id, including the `tsconfig.*` compiler-config family. */
 export function isTier1(id: string): boolean {
   return TIER1.has(id) || id.startsWith('tsconfig.');
