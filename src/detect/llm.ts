@@ -25,13 +25,10 @@ import type { Answers } from '../questions/types';
 import type { DetectionResult } from './types';
 import { exists, readText } from './manifest';
 import { optionValuesFor, hasVocab } from './optionVocab';
-import { TIER1 } from './tiers';
+import { TIER1, TIER2_HINTABLE } from './tiers';
 import { dirTree } from './tree';
 
 export type DetectDepth = 'everything' | 'partial';
-
-/** Tier-2 convention ids Stage 2 is allowed to hint (the rest stay manual, §10). */
-const TIER2_HINTABLE = ['structure'];
 
 /** Root manifests, in the same priority order as the Stage-1 detectors. */
 const MANIFESTS = [
@@ -92,6 +89,22 @@ export function targetIds(base: DetectionResult, depth: DetectDepth): string[] {
     }
   }
   return ids;
+}
+
+/**
+ * Whether a Stage-2 pass would actually do work: an agent is available and there
+ * is at least one id to fill. Lets the CLI show its "Analyzing…" spinner only
+ * when the pass really runs, instead of lying on the no-op path.
+ */
+export function willLlmDetectRun(
+  base: DetectionResult,
+  aiTool: string | undefined,
+  depth: DetectDepth,
+  deps: LlmDeps = defaultDeps,
+): boolean {
+  const runner = deps.resolveRunner(aiTool);
+  if (!runner || !deps.isAvailable(runner)) return false;
+  return targetIds(base, depth).length > 0;
 }
 
 /** Build the schema-constrained prompt: manifest + tree + per-id allowed values. */

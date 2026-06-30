@@ -20,7 +20,7 @@ import {
 } from '../questions/runner';
 import { detectStack } from '../detect/index';
 import { scanExistingAiConfigs, detectAiTool } from '../detect/aiconfig';
-import { llmDetect } from '../detect/llm';
+import { llmDetect, willLlmDetectRun } from '../detect/llm';
 import { splitByTier } from '../detect/tiers';
 import { runFlow, reviewAndEdit, findQuestion, reconcile } from '../questions/engine';
 import { flow } from '../questions/flow';
@@ -81,13 +81,17 @@ export async function run(): Promise<void> {
         // Stage 2 — LLM pass over the chosen agent (additive; static-only fallback).
         const aiTool =
           typeof session.answers.aiTool === 'string' ? session.answers.aiTool : undefined;
-        const s = spinner();
-        s.start('Analyzing your project');
         let result = detected;
-        try {
-          result = await llmDetect(detected, aiTool, depth, process.cwd());
-        } finally {
-          s.stop('Analysis complete');
+        // Only spin when the pass will actually run — otherwise the spinner lies
+        // ("Analysis complete") on the common no-agent / nothing-to-fill path.
+        if (willLlmDetectRun(detected, aiTool, depth)) {
+          const s = spinner();
+          s.start(`Analyzing your project with ${aiTool}`);
+          try {
+            result = await llmDetect(detected, aiTool, depth, process.cwd());
+          } finally {
+            s.stop('Analysis complete');
+          }
         }
 
         summarizeDetection(result);

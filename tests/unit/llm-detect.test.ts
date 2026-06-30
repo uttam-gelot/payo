@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import '../../src/stack/modules/index'; // populate the module registry (vocab reads it)
-import { llmDetect, type LlmDeps } from '../../src/detect/llm';
+import { llmDetect, willLlmDetectRun, type LlmDeps } from '../../src/detect/llm';
 import type { DetectionResult } from '../../src/detect/types';
 import type { AgentRunner } from '../../src/generator/types';
 
@@ -105,5 +105,54 @@ describe('llmDetect — Stage 2', () => {
   it('falls back when no parseable result is written', async () => {
     const res = await llmDetect(base(), 'claude', 'partial', '/tmp', deps(undefined));
     expect(res).toEqual(base());
+  });
+});
+
+describe('willLlmDetectRun', () => {
+  it('is true when an agent is available and there are blanks to fill', () => {
+    expect(willLlmDetectRun(base(), 'claude', 'partial', deps({}))).toBe(true);
+  });
+
+  it('is false when no agent resolves', () => {
+    expect(willLlmDetectRun(base(), undefined, 'partial', deps({}, { runner: undefined }))).toBe(
+      false,
+    );
+  });
+
+  it('is false when the agent is unavailable', () => {
+    expect(willLlmDetectRun(base(), 'claude', 'partial', deps({}, { available: false }))).toBe(
+      false,
+    );
+  });
+
+  it('is false when every target id is already filled', () => {
+    // A fully-detected project leaves nothing for Stage 2 to do.
+    const full: DetectionResult = {
+      answers: Object.fromEntries(
+        [
+          'projectType',
+          'language',
+          'framework',
+          'apiArchitecture',
+          'stylingLibrary',
+          'database',
+          'orm',
+          'formatter',
+          'linter',
+          'logger',
+          'testTypes',
+          'testRunner',
+          'e2eTool',
+          'authApproach',
+          'packageManager',
+          'runtime',
+          'validation',
+          'stateManagement',
+          'structure',
+        ].map((id) => [id, 'x']),
+      ),
+      sources: {},
+    };
+    expect(willLlmDetectRun(full, 'claude', 'everything', deps({}))).toBe(false);
   });
 });
