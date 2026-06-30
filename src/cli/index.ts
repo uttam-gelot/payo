@@ -9,7 +9,6 @@ import {
   cleanupWorkspace,
   type Session,
 } from '../state/index';
-import fs from 'fs';
 import {
   confirmResume,
   confirmBootstrapPrompt,
@@ -25,7 +24,7 @@ import { llmDetect } from '../detect/llm';
 import { splitByTier } from '../detect/tiers';
 import { runFlow, reviewAndEdit, findQuestion, reconcile } from '../questions/engine';
 import { flow } from '../questions/flow';
-import { generate, generateBootstrap, predictTargets, backupFiles } from '../generator/index';
+import { generate, generateBootstrap, existingTargets, backupFiles } from '../generator/index';
 import type { ResumeStore } from '../generator/types';
 import { printBanner } from './banner';
 
@@ -131,7 +130,7 @@ export async function run(): Promise<void> {
   // run the user then abandons. Skipped on resume: those files exist because
   // payo's own interrupted run wrote them.
   if (resumeCount === 0) {
-    const existing = predictTargets(session.answers).filter((rel) => fs.existsSync(rel));
+    const existing = existingTargets(session.answers);
     if (existing.length > 0) {
       const choice = await confirmOverwrite(existing);
       if (choice === 'skip') {

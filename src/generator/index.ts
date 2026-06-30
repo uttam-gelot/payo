@@ -28,6 +28,7 @@ import { isAvailable, runAgent } from './agent';
 import { resolveCommands } from './commands';
 import { buildBootstrapMetaPrompt, writeBootstrapPrompt } from './bootstrap';
 import { getProvider } from '../providers/index';
+import { scanExistingAiConfigs } from '../detect/aiconfig';
 import { config } from '../config';
 import { writeFileAtomic } from '../fsutil';
 
@@ -320,6 +321,18 @@ export function predictTargets(answers: Answers): string[] {
     }
   }
   return staticPaths;
+}
+
+/**
+ * Existing files the overwrite guard should warn about: the predicted targets
+ * for this run that already exist, unioned with any AI config already in the
+ * repo for *other* tools. Without the union, selecting (say) Antigravity in a
+ * project that holds CLAUDE.md / .claude/skills would generate with no warning,
+ * because predictTargets only knows the selected tool's paths.
+ */
+export function existingTargets(answers: Answers, cwd: string = process.cwd()): string[] {
+  const predicted = predictTargets(answers).filter((rel) => fs.existsSync(path.resolve(cwd, rel)));
+  return [...new Set([...predicted, ...scanExistingAiConfigs(cwd)])];
 }
 
 /** Rename each existing file to `<path>.bak` (replacing a stale backup) and return the backups. */
