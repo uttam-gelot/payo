@@ -6,6 +6,8 @@ import { inTempProject } from '../helpers/tmpProject';
 import { detectStack } from '../../src/detect/index';
 import { splitByTier } from '../../src/detect/tiers';
 import { createSession, recordAnswer, seedDetected, loadSession } from '../../src/state/index';
+import { reconcile } from '../../src/questions/engine';
+import { flow } from '../../src/questions/flow';
 
 /**
  * End-to-end apply policy (mirrors src/cli/index.ts): Tier-1 stack facts are
@@ -69,6 +71,45 @@ describe('detection apply policy', () => {
       expect(s.answered).toContain('framework');
       expect(s.answered).not.toContain('structure');
       expect('structure' in s.answers).toBe(false);
+    }));
+
+  it('reconcile drops orphaned facts a detector seeded for the wrong project shape', () =>
+    inTempProject((dir) => {
+      // A backend API that happens to depend on a styling lib + a state lib.
+      // Detection seeds those regardless of project shape; their questions are
+      // gated on hasUI, so on a backend project they must not survive.
+      writeFileSync(
+        join(dir, 'package.json'),
+        JSON.stringify({
+          dependencies: {
+            express: '4',
+            tailwindcss: '3',
+            '@tanstack/react-query': '5',
+          },
+        }),
+      );
+      writeFileSync(join(dir, 'package-lock.json'), '');
+
+      const det = detectStack(dir);
+      expect(det.answers.projectType).toBe('backend');
+      expect(det.answers.stylingLibrary).toBe('tailwind');
+      expect(det.answers.stateManagement).toBe('tanstack-query');
+
+      const { tier1 } = splitByTier(det.answers as Record<string, unknown>);
+      let s = createSession();
+      for (const [id, value] of Object.entries(tier1)) s = recordAnswer(s, id, value);
+      s = reconcile(flow, s);
+
+      // The UI-gated facts are gone from both answered and answers — no leak.
+      expect(s.answered).not.toContain('stylingLibrary');
+      expect(s.answered).not.toContain('stateManagement');
+      expect('stylingLibrary' in s.answers).toBe(false);
+      expect('stateManagement' in s.answers).toBe(false);
+
+      // The reachable backend facts stay.
+      expect(s.answered).toContain('framework');
+      expect(s.answered).toContain('language');
+      expect(s.answered).toContain('packageManager');
     }));
 
   it('drops unknown ids — only classified ids are ever applied', () => {

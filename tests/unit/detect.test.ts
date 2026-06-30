@@ -132,6 +132,31 @@ describe('detectStack — Node', () => {
     const det = inProject({ 'package.json': pkg }, (dir) => detectStack(dir));
     expect(det.answers.projectType).toBe('cli');
   });
+
+  it('recovers the DB from schema.prisma so a driverless Prisma ORM survives', () => {
+    // Prisma + SQLite: no DB driver dep at all, only schema.prisma. The engine
+    // must come from the datasource provider, and the ORM must not be dropped.
+    const pkg = JSON.stringify({ dependencies: { express: '4', '@prisma/client': '5' } });
+    const schema =
+      'generator client {\n  provider = "prisma-client-js"\n}\n' +
+      'datasource db {\n  provider = "sqlite"\n  url = env("DATABASE_URL")\n}\n';
+    const det = inProject({ 'package.json': pkg, 'prisma/schema.prisma': schema }, (dir) =>
+      detectStack(dir),
+    );
+    expect(det.answers.database).toBe('sqlite');
+    expect(det.answers.orm).toBe('prisma');
+    assertWithinOptions(det.answers);
+  });
+
+  it('reads a root-level schema.prisma postgres provider', () => {
+    const pkg = JSON.stringify({ dependencies: { express: '4', '@prisma/client': '5' } });
+    const schema = 'datasource db {\n  provider = "postgresql"\n}\n';
+    const det = inProject({ 'package.json': pkg, 'schema.prisma': schema }, (dir) =>
+      detectStack(dir),
+    );
+    expect(det.answers.database).toBe('postgresql');
+    expect(det.answers.orm).toBe('prisma');
+  });
 });
 
 describe('detectStack — Python', () => {
@@ -201,6 +226,21 @@ describe('detectStack — Go', () => {
     });
     assertWithinOptions(det.answers);
   });
+
+  it('detects SQLite via a driver so GORM is not dropped', () => {
+    const gomod = [
+      'module example.com/app',
+      'go 1.22',
+      'require (',
+      '  gorm.io/gorm v1.25.0',
+      '  github.com/mattn/go-sqlite3 v1.14.0',
+      ')',
+    ].join('\n');
+    const det = inProject({ 'go.mod': gomod }, (dir) => detectStack(dir));
+    expect(det.answers.database).toBe('sqlite');
+    expect(det.answers.orm).toBe('gorm');
+    assertWithinOptions(det.answers);
+  });
 });
 
 describe('detectStack — Rust', () => {
@@ -233,6 +273,15 @@ describe('detectStack — Rust', () => {
 describe('detectStack — greenfield / tie-break', () => {
   it('returns an empty result when no manifest exists', () => {
     const det = inProject({ 'README.md': '# hi' }, (dir) => detectStack(dir));
+    expect(det.answers).toEqual({});
+    expect(det.sources).toEqual({});
+  });
+
+  it('never throws when a manifest makes a detector blow up', () => {
+    // `engines` as a string makes detectNode hit `'bun' in engines` on a
+    // non-object (a TypeError). detectStack must swallow it, not crash.
+    const pkg = JSON.stringify({ dependencies: { next: '15' }, engines: 'oops' });
+    const det = inProject({ 'package.json': pkg }, (dir) => detectStack(dir));
     expect(det.answers).toEqual({});
     expect(det.sources).toEqual({});
   });

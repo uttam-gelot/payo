@@ -22,7 +22,7 @@ import {
 import { detectStack } from '../detect/index';
 import { llmDetect } from '../detect/llm';
 import { splitByTier } from '../detect/tiers';
-import { runFlow, reviewAndEdit, findQuestion } from '../questions/engine';
+import { runFlow, reviewAndEdit, findQuestion, reconcile } from '../questions/engine';
 import { flow } from '../questions/flow';
 import { generate, generateBootstrap, predictTargets, backupFiles } from '../generator/index';
 import type { ResumeStore } from '../generator/types';
@@ -86,6 +86,13 @@ export async function run(): Promise<void> {
         if (depth === 'everything' && Object.keys(tier2).length > 0) {
           session = seedDetected(session, tier2);
         }
+
+        // Detectors seed facts independent of project shape (e.g. a styling lib
+        // on a backend project). Drop any recorded answer whose question is
+        // unreachable under the detected answers, so orphaned facts don't leak
+        // into generation or show a phantom line in the review screen. Seeded
+        // Tier-2 hints live in `answers` only (not `answered`) and are untouched.
+        session = reconcile(flow, session);
       }
       // Gate 1 "fresh" → seed nothing; normal flow (aiTool already answered).
     }

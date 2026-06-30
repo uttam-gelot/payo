@@ -1,6 +1,6 @@
 /** Detect a Node/TypeScript/JavaScript stack from package.json + sibling files. */
 import type { DetectionResult, DetectionSource } from './types';
-import { exists, readJson, readJsonc, packageJsonDeps } from './manifest';
+import { exists, readJson, readJsonc, packageJsonDeps, prismaProvider } from './manifest';
 import {
   firstMatch,
   NODE_FRAMEWORK,
@@ -45,6 +45,16 @@ const ESLINT_CONFIGS = [
   'eslint.config.cjs',
   'eslint.config.ts',
 ];
+
+/** Prisma datasource provider → DB answer value (only vocab-valid engines). */
+const PRISMA_DB: Record<string, string> = {
+  postgresql: 'postgresql',
+  postgres: 'postgresql',
+  mysql: 'mysql',
+  sqlite: 'sqlite',
+  cockroachdb: 'cockroachdb',
+  mongodb: 'mongodb',
+};
 
 export function detectNode(cwd: string): DetectionResult | null {
   const pkg = readJson(cwd, 'package.json');
@@ -101,8 +111,16 @@ export function detectNode(cwd: string): DetectionResult | null {
         : 'node';
   set('runtime', runtime, 'config');
 
-  set('database', firstMatch(deps, NODE_DATABASE), 'package.json');
-  set('orm', firstMatch(deps, NODE_ORM), 'package.json');
+  const orm = firstMatch(deps, NODE_ORM);
+  let database = firstMatch(deps, NODE_DATABASE);
+  // Prisma ships no DB driver dep, so a Prisma project usually yields an ORM
+  // with no database — which the coherence rule would then drop. Recover the
+  // engine from `schema.prisma`'s datasource provider so the ORM survives.
+  if (database === undefined && orm === 'prisma') {
+    database = PRISMA_DB[prismaProvider(cwd) ?? ''];
+  }
+  set('database', database, 'package.json');
+  set('orm', orm, 'package.json');
   set('stylingLibrary', firstMatch(deps, NODE_STYLING), 'package.json');
   set('validation', firstMatch(deps, NODE_VALIDATION), 'package.json');
   set('stateManagement', firstMatch(deps, NODE_STATE), 'package.json');
