@@ -47,6 +47,22 @@ export function readJsonc(dir: string, file: string): Record<string, unknown> | 
   }
 }
 
+/**
+ * Read the `datasource` provider from a Prisma schema, or undefined. Prisma
+ * ships no DB driver dependency (it talks to the database through its own
+ * engine), so the engine is only knowable from `schema.prisma`. Checks the
+ * default `prisma/schema.prisma` then a root-level `schema.prisma`.
+ */
+export function prismaProvider(dir: string): string | undefined {
+  const raw = readText(dir, path.join('prisma', 'schema.prisma')) ?? readText(dir, 'schema.prisma');
+  if (raw === undefined) return undefined;
+  // Scope to the `datasource` block — the `generator` block also has a
+  // `provider` (e.g. "prisma-client-js") that must not be mistaken for a DB.
+  const block = raw.match(/datasource\s+\w+\s*\{([^}]*)\}/)?.[1];
+  if (block === undefined) return undefined;
+  return block.match(/provider\s*=\s*"([^"]+)"/)?.[1];
+}
+
 /** Read a UTF-8 file, or undefined if missing / unreadable. */
 export function readText(dir: string, file: string): string | undefined {
   const p = path.join(dir, file);

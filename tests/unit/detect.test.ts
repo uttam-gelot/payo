@@ -132,6 +132,33 @@ describe('detectStack — Node', () => {
     const det = inProject({ 'package.json': pkg }, (dir) => detectStack(dir));
     expect(det.answers.projectType).toBe('cli');
   });
+
+  it('recovers the DB from schema.prisma so a driverless Prisma ORM survives', () => {
+    // Prisma + SQLite: no DB driver dep at all, only schema.prisma. The engine
+    // must come from the datasource provider, and the ORM must not be dropped.
+    const pkg = JSON.stringify({ dependencies: { express: '4', '@prisma/client': '5' } });
+    const schema =
+      'generator client {\n  provider = "prisma-client-js"\n}\n' +
+      'datasource db {\n  provider = "sqlite"\n  url = env("DATABASE_URL")\n}\n';
+    const det = inProject(
+      { 'package.json': pkg, 'prisma/schema.prisma': schema },
+      (dir) => detectStack(dir),
+    );
+    expect(det.answers.database).toBe('sqlite');
+    expect(det.answers.orm).toBe('prisma');
+    assertWithinOptions(det.answers);
+  });
+
+  it('reads a root-level schema.prisma postgres provider', () => {
+    const pkg = JSON.stringify({ dependencies: { express: '4', '@prisma/client': '5' } });
+    const schema = 'datasource db {\n  provider = "postgresql"\n}\n';
+    const det = inProject(
+      { 'package.json': pkg, 'schema.prisma': schema },
+      (dir) => detectStack(dir),
+    );
+    expect(det.answers.database).toBe('postgresql');
+    expect(det.answers.orm).toBe('prisma');
+  });
 });
 
 describe('detectStack — Python', () => {
@@ -199,6 +226,21 @@ describe('detectStack — Go', () => {
       formatter: 'gofmt',
       testRunner: 'go-test',
     });
+    assertWithinOptions(det.answers);
+  });
+
+  it('detects SQLite via a driver so GORM is not dropped', () => {
+    const gomod = [
+      'module example.com/app',
+      'go 1.22',
+      'require (',
+      '  gorm.io/gorm v1.25.0',
+      '  github.com/mattn/go-sqlite3 v1.14.0',
+      ')',
+    ].join('\n');
+    const det = inProject({ 'go.mod': gomod }, (dir) => detectStack(dir));
+    expect(det.answers.database).toBe('sqlite');
+    expect(det.answers.orm).toBe('gorm');
     assertWithinOptions(det.answers);
   });
 });

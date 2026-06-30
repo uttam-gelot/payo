@@ -274,6 +274,8 @@ export const GO_DATABASE: readonly (readonly [string, string])[] = [
   ['github.com/jackc/pgx', 'postgresql'],
   ['github.com/lib/pq', 'postgresql'],
   ['github.com/go-sql-driver/mysql', 'mysql'],
+  ['github.com/mattn/go-sqlite3', 'sqlite'],
+  ['modernc.org/sqlite', 'sqlite'],
   ['go.mongodb.org/mongo-driver', 'mongodb'],
 ];
 
