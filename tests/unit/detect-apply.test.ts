@@ -5,15 +5,15 @@ import { join } from 'path';
 import { inTempProject } from '../helpers/tmpProject';
 import { detectStack } from '../../src/detect/index';
 import { splitByTier } from '../../src/detect/tiers';
-import { createSession, recordAnswer, seedDetected, loadSession } from '../../src/state/index';
+import { createSession, recordAnswer, loadSession } from '../../src/state/index';
 import { reconcile } from '../../src/questions/engine';
 import { flow } from '../../src/questions/flow';
 
 /**
  * End-to-end apply policy (mirrors src/cli/index.ts): Tier-1 stack facts are
- * recorded (and so skipped by the flow); Tier-2 conventions are only pre-filled
- * in "everything" mode and are NEVER marked answered. This is the regression
- * guard for the original bug where `structure` (monorepo) was auto-skipped.
+ * always recorded (and so skipped by the flow). In "everything" mode, detected
+ * Tier-2 conventions are recorded too — so the interview asks only what detection
+ * could not find. In "partial" mode conventions are left to the interview.
  */
 
 /** A Next.js + Prisma + Turbo monorepo — yields a Tier-2 `structure: monorepo`. */
@@ -31,7 +31,7 @@ const writeMonorepo = (dir: string): void => {
 };
 
 describe('detection apply policy', () => {
-  it('records Tier-1 facts but never records the Tier-2 structure (everything mode)', () =>
+  it('records Tier-1 facts and detected Tier-2 conventions (everything mode)', () =>
     inTempProject((dir) => {
       writeMonorepo(dir);
       const det = detectStack(dir);
@@ -39,22 +39,23 @@ describe('detection apply policy', () => {
 
       let s = createSession();
       for (const [id, value] of Object.entries(tier1)) s = recordAnswer(s, id, value);
-      s = seedDetected(s, tier2); // everything mode pre-fills conventions
+      for (const [id, value] of Object.entries(tier2)) s = recordAnswer(s, id, value); // everything mode
 
       // Tier-1 facts are answered (and therefore skipped by runFlow).
       expect(s.answered).toContain('framework');
       expect(s.answered).toContain('database');
       expect(s.answered).toContain('formatter');
 
-      // `structure` was detected as monorepo...
+      // `structure` was detected as monorepo and is now recorded too, so the
+      // question is skipped — only unfound questions get asked. The user still
+      // edits it on the review screen.
       expect(det.answers.structure).toBe('monorepo');
-      // ...but it is seeded (pre-filled), never recorded — the question still gets asked.
-      expect(s.answered).not.toContain('structure');
+      expect(s.answered).toContain('structure');
       expect(s.answers.structure).toBe('monorepo');
 
       // Persisted state agrees.
       const loaded = loadSession();
-      expect(loaded?.answered).not.toContain('structure');
+      expect(loaded?.answered).toContain('structure');
       expect(loaded?.answers.structure).toBe('monorepo');
     }));
 

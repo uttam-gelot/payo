@@ -96,14 +96,19 @@ export async function run(): Promise<void> {
 
         summarizeDetection(result);
 
-        // Apply by tier: Tier-1 stack facts are recorded (and skipped); Tier-2
-        // conventions are only pre-filled in "everything" mode and never skipped (§7).
+        // Apply by tier. Tier-1 stack facts are always recorded (and so skipped).
+        // In "everything" mode, detected Tier-2 conventions are recorded too, so
+        // the interview asks only what detection could NOT find — the user still
+        // reviews/edits every recorded answer before generating. In "partial"
+        // mode conventions are left entirely to the interview.
         const { tier1, tier2 } = splitByTier(result.answers as Record<string, unknown>);
         for (const [id, value] of Object.entries(tier1)) {
           session = recordAnswer(session, id, value);
         }
-        if (depth === 'everything' && Object.keys(tier2).length > 0) {
-          session = seedDetected(session, tier2);
+        if (depth === 'everything') {
+          for (const [id, value] of Object.entries(tier2)) {
+            session = recordAnswer(session, id, value);
+          }
         }
 
         // Detectors seed facts independent of project shape (e.g. a styling lib
