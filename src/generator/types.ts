@@ -53,6 +53,13 @@ export interface AiProvider {
   displayName: string;
   /** Shown as the `hint` on the AI-tool select prompt. */
   hint?: string;
+  /**
+   * Files/dirs (project-relative) whose presence signals this tool already has
+   * config in the repo. Used to detect the in-use tool and to widen the
+   * overwrite guard beyond the selected tool's own targets. Paths shared by
+   * more than one provider (e.g. AGENTS.md) can't identify a single tool.
+   */
+  knownArtifacts: readonly string[];
   /** Static template renderer — the fallback floor when no agent runs. */
   generate(ctx: GenerationContext): GeneratedArtifact[];
   /** Optional headless-CLI capability; absent ⇒ static-only. */

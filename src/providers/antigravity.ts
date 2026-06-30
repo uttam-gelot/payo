@@ -4,6 +4,7 @@ import { renderMarkdown } from '../generator/rules';
 export const antigravityProvider: AiProvider = {
   id: 'antigravity',
   displayName: 'Antigravity (Google)',
+  knownArtifacts: ['AGENTS.md', '.agents/skills'],
   generate: (ctx) => [
     { path: 'AGENTS.md', content: renderMarkdown('Project Guide for Antigravity', ctx.sections) },
   ],

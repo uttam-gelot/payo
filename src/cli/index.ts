@@ -20,6 +20,7 @@ import {
   runQuestion,
 } from '../questions/runner';
 import { detectStack } from '../detect/index';
+import { scanExistingAiConfigs, detectAiTool } from '../detect/aiconfig';
 import { llmDetect } from '../detect/llm';
 import { splitByTier } from '../detect/tiers';
 import { runFlow, reviewAndEdit, findQuestion, reconcile } from '../questions/engine';
@@ -51,11 +52,26 @@ export async function run(): Promise<void> {
   if (session.answered.length === 0) {
     const detected = detectStack(process.cwd());
     if (Object.keys(detected.answers).length > 0) {
+      // The repo may already hold AI config — possibly for a different tool than
+      // the user is about to pick. Surface it and pre-select the tool in use.
+      const existingAiConfigs = scanExistingAiConfigs(process.cwd());
+      const detectedAiTool = detectAiTool(process.cwd());
+      if (existingAiConfigs.length > 0) {
+        note(
+          existingAiConfigs.map((f) => `• ${f}`).join('\n'),
+          detectedAiTool
+            ? `Existing AI config detected (looks like ${detectedAiTool})`
+            : 'Existing AI config detected',
+        );
+      }
+
       // Existing project. aiTool is always the first question — ask it now so the
       // Stage-2 LLM pass can use the chosen agent; recordAnswer ⇒ runFlow skips it.
       const aiToolQ = findQuestion(flow, session.answers, 'aiTool');
       if (aiToolQ) {
-        session = recordAnswer(session, 'aiTool', await runQuestion(aiToolQ, session.answers));
+        // Seed the detected tool so the prompt pre-selects it; the user's pick wins.
+        const seeded = detectedAiTool ? seedDetected(session, { aiTool: detectedAiTool }) : session;
+        session = recordAnswer(session, 'aiTool', await runQuestion(aiToolQ, seeded.answers));
       }
 
       // Gate 1 — work with the existing project, or start fresh?

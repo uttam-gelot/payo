@@ -5,5 +5,6 @@ import { renderMarkdown } from '../generator/rules';
 export const genericProvider: AiProvider = {
   id: 'other',
   displayName: 'Other',
+  knownArtifacts: ['AI_RULES.md'],
   generate: (ctx) => [{ path: 'AI_RULES.md', content: renderMarkdown('AI Rules', ctx.sections) }],
 };

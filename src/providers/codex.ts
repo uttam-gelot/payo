@@ -4,6 +4,7 @@ import { renderMarkdown } from '../generator/rules';
 export const codexProvider: AiProvider = {
   id: 'codex',
   displayName: 'Codex CLI',
+  knownArtifacts: ['AGENTS.md'],
   generate: (ctx) => [{ path: 'AGENTS.md', content: renderMarkdown('Agent Guide', ctx.sections) }],
   agent: {
     binary: 'codex',
