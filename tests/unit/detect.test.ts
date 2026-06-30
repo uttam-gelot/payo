@@ -140,9 +140,8 @@ describe('detectStack — Node', () => {
     const schema =
       'generator client {\n  provider = "prisma-client-js"\n}\n' +
       'datasource db {\n  provider = "sqlite"\n  url = env("DATABASE_URL")\n}\n';
-    const det = inProject(
-      { 'package.json': pkg, 'prisma/schema.prisma': schema },
-      (dir) => detectStack(dir),
+    const det = inProject({ 'package.json': pkg, 'prisma/schema.prisma': schema }, (dir) =>
+      detectStack(dir),
     );
     expect(det.answers.database).toBe('sqlite');
     expect(det.answers.orm).toBe('prisma');
@@ -152,9 +151,8 @@ describe('detectStack — Node', () => {
   it('reads a root-level schema.prisma postgres provider', () => {
     const pkg = JSON.stringify({ dependencies: { express: '4', '@prisma/client': '5' } });
     const schema = 'datasource db {\n  provider = "postgresql"\n}\n';
-    const det = inProject(
-      { 'package.json': pkg, 'schema.prisma': schema },
-      (dir) => detectStack(dir),
+    const det = inProject({ 'package.json': pkg, 'schema.prisma': schema }, (dir) =>
+      detectStack(dir),
     );
     expect(det.answers.database).toBe('postgresql');
     expect(det.answers.orm).toBe('prisma');
