@@ -133,6 +133,36 @@ describe('detectStack — Node', () => {
     expect(det.answers.projectType).toBe('cli');
   });
 
+  it('detects prettier from a package.json "prettier" key (no dep, no dotfile)', () => {
+    const pkg = JSON.stringify({ dependencies: { react: '18' }, prettier: { semi: false } });
+    const det = inProject({ 'package.json': pkg }, (dir) => detectStack(dir));
+    expect(det.answers.formatter).toBe('prettier');
+  });
+
+  it('detects prettier from a modern config variant (prettier.config.mjs)', () => {
+    const pkg = JSON.stringify({ dependencies: { react: '18' } });
+    const det = inProject(
+      { 'package.json': pkg, 'prettier.config.mjs': 'export default {}' },
+      (dir) => detectStack(dir),
+    );
+    expect(det.answers.formatter).toBe('prettier');
+  });
+
+  it('detects biome from biome.jsonc as both formatter and linter', () => {
+    const pkg = JSON.stringify({ dependencies: { react: '18' } });
+    const det = inProject({ 'package.json': pkg, 'biome.jsonc': '{}' }, (dir) => detectStack(dir));
+    expect(det.answers.formatter).toBe('biome');
+    expect(det.answers.linter).toBe('biome');
+  });
+
+  it('detects the CLI framework value from the arg-parser dep', () => {
+    const pkg = JSON.stringify({ bin: { mycli: 'index.js' }, dependencies: { commander: '12' } });
+    const det = inProject({ 'package.json': pkg }, (dir) => detectStack(dir));
+    expect(det.answers.projectType).toBe('cli');
+    expect(det.answers.framework).toBe('commander');
+    assertWithinOptions(det.answers);
+  });
+
   it('recovers the DB from schema.prisma so a driverless Prisma ORM survives', () => {
     // Prisma + SQLite: no DB driver dep at all, only schema.prisma. The engine
     // must come from the datasource provider, and the ORM must not be dropped.

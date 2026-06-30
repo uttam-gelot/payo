@@ -78,6 +78,19 @@ export const NODE_FULLSTACK_FRAMEWORKS = new Set(['nextjs', 'nuxtjs', 'sveltekit
 /** CLI arg-parsing libraries → project is a CLI tool. */
 export const NODE_CLI = new Set(['commander', 'oclif', 'yargs', 'cac', '@oclif/core']);
 
+/**
+ * CLI arg-parser dep → framework answer value (the cliFrameworkOptions ids).
+ * NODE_FRAMEWORK only covers web frameworks, so a CLI's framework is never set
+ * from it; this fills the gap. oclif's scoped package is matched first.
+ */
+export const NODE_CLI_FRAMEWORK: readonly (readonly [string, string])[] = [
+  ['@oclif/core', 'oclif'],
+  ['oclif', 'oclif'],
+  ['commander', 'commander'],
+  ['yargs', 'yargs'],
+  ['cac', 'cac'],
+];
+
 export const NODE_DATABASE: readonly (readonly [string, string])[] = [
   ['pg', 'postgresql'],
   ['postgres', 'postgresql'],
