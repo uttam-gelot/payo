@@ -305,6 +305,15 @@ describe('detectStack — Go', () => {
     expect(det.answers.orm).toBe('gorm');
     assertWithinOptions(det.answers);
   });
+
+  it('detects golangci-lint from a .golangci.yml config file', () => {
+    const gomod = ['module example.com/app', 'go 1.22'].join('\n');
+    const det = inProject({ 'go.mod': gomod, '.golangci.yml': 'linters:\n  enable: [gofmt]' }, (dir) =>
+      detectStack(dir),
+    );
+    expect(det.answers.linter).toBe('golangci-lint');
+    assertWithinOptions(det.answers);
+  });
 });
 
 describe('detectStack — Rust', () => {
