@@ -74,11 +74,11 @@ describe('detection apply policy', () => {
       expect('structure' in s.answers).toBe(false);
     }));
 
-  it('reconcile drops orphaned facts a detector seeded for the wrong project shape', () =>
+  it('never seeds UI-only facts for a backend project, and reconcile keeps it clean', () =>
     inTempProject((dir) => {
       // A backend API that happens to depend on a styling lib + a state lib.
-      // Detection seeds those regardless of project shape; their questions are
-      // gated on hasUI, so on a backend project they must not survive.
+      // Their questions are gated on hasUI, so detection must not seed them on a
+      // backend project in the first place (no seed-then-drop round trip).
       writeFileSync(
         join(dir, 'package.json'),
         JSON.stringify({
@@ -93,15 +93,16 @@ describe('detection apply policy', () => {
 
       const det = detectStack(dir);
       expect(det.answers.projectType).toBe('backend');
-      expect(det.answers.stylingLibrary).toBe('tailwind');
-      expect(det.answers.stateManagement).toBe('tanstack-query');
+      // Gated out at the detector, not merely dropped later by reconcile.
+      expect('stylingLibrary' in det.answers).toBe(false);
+      expect('stateManagement' in det.answers).toBe(false);
 
       const { tier1 } = splitByTier(det.answers as Record<string, unknown>);
       let s = createSession();
       for (const [id, value] of Object.entries(tier1)) s = recordAnswer(s, id, value);
       s = reconcile(flow, s);
 
-      // The UI-gated facts are gone from both answered and answers — no leak.
+      // Still absent after apply + reconcile — no leak into generation.
       expect(s.answered).not.toContain('stylingLibrary');
       expect(s.answered).not.toContain('stateManagement');
       expect('stylingLibrary' in s.answers).toBe(false);

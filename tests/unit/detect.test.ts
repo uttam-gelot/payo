@@ -48,7 +48,7 @@ describe('detectStack — Node', () => {
         pg: '8',
         zod: '3',
         'next-auth': '5',
-        graphql: '16',
+        '@apollo/server': '4',
       },
       devDependencies: {
         typescript: '5',
@@ -125,6 +125,40 @@ describe('detectStack — Node', () => {
       database: 'mysql',
       orm: 'sequelize',
     });
+  });
+
+  it('does not record UI-only facts (styling/state) on a backend project', () => {
+    const pkg = JSON.stringify({
+      dependencies: { express: '4', tailwindcss: '3', '@tanstack/react-query': '5' },
+    });
+    const det = inProject({ 'package.json': pkg }, (dir) => detectStack(dir));
+    expect(det.answers.projectType).toBe('backend');
+    expect('stylingLibrary' in det.answers).toBe(false);
+    expect('stateManagement' in det.answers).toBe(false);
+    assertWithinOptions(det.answers);
+  });
+
+  it('does not record a library logger for a frontend app (out-of-vocab guard)', () => {
+    // A frontend's logger question only offers centralized/none, so pino must
+    // not be recorded — it is not a valid option there.
+    const pkg = JSON.stringify({ dependencies: { react: '18', pino: '9' } });
+    const det = inProject({ 'package.json': pkg }, (dir) => detectStack(dir));
+    expect(det.answers.projectType).toBe('frontend');
+    expect('logger' in det.answers).toBe(false);
+    assertWithinOptions(det.answers);
+  });
+
+  it('does not treat a cache-only redis dependency as the database', () => {
+    const pkg = JSON.stringify({ dependencies: { express: '4', ioredis: '5' } });
+    const det = inProject({ 'package.json': pkg }, (dir) => detectStack(dir));
+    expect(det.answers.projectType).toBe('backend');
+    expect('database' in det.answers).toBe(false);
+  });
+
+  it('does not infer apiArchitecture from a bare transitive graphql dependency', () => {
+    const pkg = JSON.stringify({ dependencies: { express: '4', graphql: '16' } });
+    const det = inProject({ 'package.json': pkg }, (dir) => detectStack(dir));
+    expect('apiArchitecture' in det.answers).toBe(false);
   });
 
   it('classifies a bin-declaring package as a CLI', () => {

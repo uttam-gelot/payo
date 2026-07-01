@@ -135,10 +135,23 @@ export function detectNode(cwd: string): DetectionResult | null {
   }
   set('database', database, 'package.json');
   set('orm', orm, 'package.json');
-  set('stylingLibrary', firstMatch(deps, NODE_STYLING), 'package.json');
+
+  // UI-only facts (styling, client state) belong to projects that render a UI.
+  // Seeding them on a backend/CLI records answers whose questions are never
+  // asked — dropped later by reconcile, but they would still appear in the
+  // detection summary. Gate them on project shape.
+  const hasUI = projectType === 'frontend' || projectType === 'full-stack';
+  if (hasUI) {
+    set('stylingLibrary', firstMatch(deps, NODE_STYLING), 'package.json');
+    set('stateManagement', firstMatch(deps, NODE_STATE), 'package.json');
+  }
   set('validation', firstMatch(deps, NODE_VALIDATION), 'package.json');
-  set('stateManagement', firstMatch(deps, NODE_STATE), 'package.json');
-  set('logger', firstMatch(deps, NODE_LOGGER), 'package.json');
+  // A frontend's logger question only offers centralized/none, so a UI app on
+  // pino/winston would record an out-of-vocab value. Only seed a library logger
+  // for projects with a server side.
+  if (projectType !== 'frontend') {
+    set('logger', firstMatch(deps, NODE_LOGGER), 'package.json');
+  }
 
   // Formatter / linter: dep first, then config-file presence as a fallback.
   // Prettier also supports a top-level `"prettier"` key in package.json; Biome's
