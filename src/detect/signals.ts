@@ -323,7 +323,16 @@ export const RUST_FRAMEWORK: readonly (readonly [string, string])[] = [
 
 export const RUST_CLI = new Set(['clap', 'argh']);
 
-export const RUST_DATABASE: readonly (readonly [string, string])[] = [['mongodb', 'mongodb']];
+// Plain driver crates that name the engine directly. SQL ORMs (sqlx/diesel/
+// sea-orm) instead carry the engine as a Cargo feature — handled in rust.ts.
+export const RUST_DATABASE: readonly (readonly [string, string])[] = [
+  ['tokio-postgres', 'postgresql'],
+  ['postgres', 'postgresql'],
+  ['mysql_async', 'mysql'],
+  ['mysql', 'mysql'],
+  ['rusqlite', 'sqlite'],
+  ['mongodb', 'mongodb'],
+];
 
 export const RUST_ORM: readonly (readonly [string, string])[] = [
   ['diesel', 'diesel'],

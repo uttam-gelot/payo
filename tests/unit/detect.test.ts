@@ -333,12 +333,41 @@ describe('detectStack — Rust', () => {
       projectType: 'backend',
       framework: 'axum',
       orm: 'sqlx-rust',
+      database: 'postgresql',
       validation: 'validator',
       logger: 'tracing',
       formatter: 'rustfmt',
       linter: 'clippy',
       testRunner: 'cargo-test',
     });
+    assertWithinOptions(det.answers);
+  });
+
+  it('reads the SQLx engine from its own feature list, ignoring unrelated mentions', () => {
+    const cargo = [
+      '[package]',
+      'name = "app"',
+      '# we migrated off sqlite long ago',
+      'sqlite-cache = "1.0"', // a crate that merely contains the word sqlite
+      '[dependencies]',
+      'axum = "0.7"',
+      'sqlx = { version = "0.7", features = ["runtime-tokio", "postgres"] }',
+    ].join('\n');
+    const det = inProject({ 'Cargo.toml': cargo }, (dir) => detectStack(dir));
+    expect(det.answers.database).toBe('postgresql');
+    assertWithinOptions(det.answers);
+  });
+
+  it('detects a plain driver crate without an ORM feature', () => {
+    const cargo = [
+      '[package]',
+      'name = "app"',
+      '[dependencies]',
+      'axum = "0.7"',
+      'tokio-postgres = "0.7"',
+    ].join('\n');
+    const det = inProject({ 'Cargo.toml': cargo }, (dir) => detectStack(dir));
+    expect(det.answers.database).toBe('postgresql');
     assertWithinOptions(det.answers);
   });
 });
