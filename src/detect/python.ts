@@ -44,17 +44,26 @@ export function detectPython(cwd: string): DetectionResult | null {
   else if ([...deps].some((d) => PY_CLI.has(d))) projectType = 'cli';
   set('projectType', projectType);
 
-  // Package manager from lockfile / manifest markers.
+  // Package manager from lockfile / manifest markers. A pyproject declaring
+  // Poetry implies poetry even without a committed lockfile; any other pyproject
+  // (or a bare requirements.txt) falls back to pip + venv rather than nothing.
+  const usesPoetry = pyproject !== undefined && /^\s*\[tool\.poetry\]/m.test(pyproject);
   const pm = exists(cwd, 'uv.lock')
     ? 'uv'
     : exists(cwd, 'poetry.lock')
       ? 'poetry'
       : exists(cwd, 'Pipfile') || exists(cwd, 'Pipfile.lock')
         ? 'pipenv'
-        : requirements !== undefined
-          ? 'pip-venv'
-          : undefined;
-  set('packageManager', pm, 'lockfile');
+        : usesPoetry
+          ? 'poetry'
+          : requirements !== undefined || pyproject !== undefined
+            ? 'pip-venv'
+            : undefined;
+  set(
+    'packageManager',
+    pm,
+    pm === 'pip-venv' && requirements === undefined ? 'pyproject.toml' : 'lockfile',
+  );
 
   set('database', firstMatch(deps, PY_DATABASE));
   // Django's ORM is part of the framework, not a separate dependency.

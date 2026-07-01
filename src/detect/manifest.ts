@@ -116,49 +116,58 @@ export function requirementsDeps(body: string): Set<string> {
 }
 
 /**
- * Dependency names from pyproject.toml — covers PEP 621 `[project] dependencies`
- * (array of PEP 508 strings) and Poetry's `[tool.poetry.dependencies]` table
- * (key = name). Section-scoped line scan; good enough for names only.
+ * Dependency names from pyproject.toml. Covers:
+ *  - PEP 621 `[project] dependencies` (array of PEP 508 strings),
+ *  - PEP 621 `[project.optional-dependencies]` (a table of `group = [ … ]` arrays),
+ *  - Poetry's `[tool.poetry.dependencies]` **and every** `[tool.poetry.group.*.dependencies]`.
+ * Section-scoped line scan; good enough for names only.
  */
 export function pyprojectDeps(body: string): Set<string> {
   const deps = new Set<string>();
   const lines = body.split('\n');
-  let mode: 'none' | 'pep621-array' | 'poetry-table' = 'none';
+  let mode: 'none' | 'pep621-array' | 'quoted-values' | 'poetry-table' = 'none';
+
+  /** Add every quoted PEP 508 dependency string found on a line. */
+  const addQuoted = (s: string): void => {
+    for (const m of s.matchAll(/["']([^"']+)["']/g)) {
+      const name = pep508Name(m[1]);
+      if (name) deps.add(name);
+    }
+  };
 
   for (const raw of lines) {
     const line = raw.trim();
     if (line.startsWith('[')) {
       if (
         line === '[tool.poetry.dependencies]' ||
-        line === '[tool.poetry.group.dev.dependencies]'
+        /^\[tool\.poetry\.group\.[^.\]]+\.dependencies\]$/.test(line)
       ) {
         mode = 'poetry-table';
+      } else if (line === '[project.optional-dependencies]') {
+        // Table of `extra = ["dep", …]` arrays — collect the quoted deps.
+        mode = 'quoted-values';
       } else {
         mode = 'none';
       }
       continue;
     }
-    // PEP 621: dependencies = [ "a", "b" ] (may span lines)
-    if (/^dependencies\s*=/.test(line) || /^optional-dependencies/.test(line)) {
-      mode = 'pep621-array';
-      // names on the same line, if any
-      for (const m of line.matchAll(/["']([A-Za-z0-9._-]+[^"']*)["']/g)) {
-        const name = pep508Name(m[1]);
-        if (name) deps.add(name);
-      }
-      if (line.includes(']')) mode = 'none';
+
+    // PEP 621 top-level: dependencies = [ "a", "b" ] (may span lines).
+    if (mode === 'none' && /^dependencies\s*=/.test(line)) {
+      addQuoted(line);
+      mode = line.includes(']') ? 'none' : 'pep621-array';
       continue;
     }
 
     if (mode === 'pep621-array') {
-      if (line.includes(']')) {
-        mode = 'none';
-      }
-      const m = line.match(/["']([^"']+)["']/);
-      if (m) {
-        const name = pep508Name(m[1]);
-        if (name) deps.add(name);
-      }
+      addQuoted(line);
+      if (line.includes(']')) mode = 'none';
+      continue;
+    }
+
+    if (mode === 'quoted-values') {
+      // The `extra =` keys are unquoted (ignored); only the deps are quoted.
+      addQuoted(line);
       continue;
     }
 

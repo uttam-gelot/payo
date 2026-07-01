@@ -265,6 +265,47 @@ describe('detectStack — Python', () => {
     });
     assertWithinOptions(det.answers);
   });
+
+  it('reads PEP 621 optional-dependencies and all Poetry groups', () => {
+    const pyproject = [
+      '[project]',
+      'name = "svc"',
+      'dependencies = ["fastapi>=0.110"]',
+      '',
+      '[project.optional-dependencies]',
+      'test = ["pytest>=8", "httpx"]',
+      'lint = ["ruff"]',
+    ].join('\n');
+    const det = inProject({ 'pyproject.toml': pyproject }, (dir) => detectStack(dir));
+    expect(det.answers.framework).toBe('fastapi');
+    expect(det.answers.testRunner).toBe('pytest');
+    expect(det.answers.linter).toBe('ruff');
+    assertWithinOptions(det.answers);
+  });
+
+  it('detects poetry from a non-dev group and no committed lockfile', () => {
+    const pyproject = [
+      '[tool.poetry]',
+      'name = "svc"',
+      '[tool.poetry.dependencies]',
+      'python = "^3.12"',
+      'flask = "^3.0"',
+      '[tool.poetry.group.test.dependencies]',
+      'pytest = "^8.0"',
+    ].join('\n');
+    const det = inProject({ 'pyproject.toml': pyproject }, (dir) => detectStack(dir));
+    expect(det.answers.framework).toBe('flask');
+    expect(det.answers.testRunner).toBe('pytest');
+    expect(det.answers.packageManager).toBe('poetry');
+    assertWithinOptions(det.answers);
+  });
+
+  it('falls back to pip-venv for a pyproject with no lockfile', () => {
+    const pyproject = ['[project]', 'name = "svc"', 'dependencies = ["flask"]'].join('\n');
+    const det = inProject({ 'pyproject.toml': pyproject }, (dir) => detectStack(dir));
+    expect(det.answers.packageManager).toBe('pip-venv');
+    assertWithinOptions(det.answers);
+  });
 });
 
 describe('detectStack — Go', () => {
@@ -308,8 +349,9 @@ describe('detectStack — Go', () => {
 
   it('detects golangci-lint from a .golangci.yml config file', () => {
     const gomod = ['module example.com/app', 'go 1.22'].join('\n');
-    const det = inProject({ 'go.mod': gomod, '.golangci.yml': 'linters:\n  enable: [gofmt]' }, (dir) =>
-      detectStack(dir),
+    const det = inProject(
+      { 'go.mod': gomod, '.golangci.yml': 'linters:\n  enable: [gofmt]' },
+      (dir) => detectStack(dir),
     );
     expect(det.answers.linter).toBe('golangci-lint');
     assertWithinOptions(det.answers);
