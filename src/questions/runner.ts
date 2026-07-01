@@ -148,17 +148,27 @@ const DETECT_LABELS: Record<string, string> = {
   language: 'Language',
   projectType: 'Project type',
   framework: 'Framework',
+  apiArchitecture: 'API architecture',
   packageManager: 'Package manager',
   runtime: 'Runtime',
   formatter: 'Formatter',
   linter: 'Linter',
   testRunner: 'Test runner',
+  testTypes: 'Test types',
+  e2eTool: 'E2E tool',
   database: 'Database',
   orm: 'ORM',
   stylingLibrary: 'Styling',
   validation: 'Validation',
   stateManagement: 'State management',
+  authApproach: 'Auth',
   logger: 'Logger',
+  // tsconfig knobs read straight from tsconfig.json — every recorded id is
+  // listed so the summary never hides an answer it silently pre-filled.
+  'tsconfig.strict': 'TS strict',
+  'tsconfig.target': 'TS target',
+  'tsconfig.module-resolution': 'TS module res',
+  'tsconfig.path-aliases': 'TS path aliases',
   // Tier-2 conventions detection can infer (shown so "detect everything" is visible).
   structure: 'Structure',
 };
@@ -200,12 +210,17 @@ export async function confirmDetectionDepth(
   return value as 'everything' | 'partial';
 }
 
-/** Read-only summary of what detection produced, shown before the interview continues. */
-export function summarizeDetection(detected: { answers: Record<string, unknown> }): void {
-  const lines = DETECT_ORDER.filter((id) => id in detected.answers).map((id) => {
+/** Build the "Detected from your project" lines — one per recorded id, in order. */
+export function detectionSummaryLines(detected: { answers: Record<string, unknown> }): string[] {
+  return DETECT_ORDER.filter((id) => id in detected.answers).map((id) => {
     const label = DETECT_LABELS[id];
     return `• ${label.padEnd(16)} ${String(detected.answers[id])}`;
   });
+}
+
+/** Read-only summary of what detection produced, shown before the interview continues. */
+export function summarizeDetection(detected: { answers: Record<string, unknown> }): void {
+  const lines = detectionSummaryLines(detected);
   if (lines.length === 0) return;
   note(lines.join('\n'), 'Detected from your project');
 }

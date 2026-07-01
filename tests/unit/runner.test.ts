@@ -8,6 +8,7 @@ import {
   resolveOptions,
   reviewAction,
   selectAnswerToEdit,
+  detectionSummaryLines,
 } from '../../src/questions/runner';
 import { validationOptions } from '../../src/questions/options';
 import type { Option, Question } from '../../src/questions/types';
@@ -113,6 +114,32 @@ describe('selectAnswerToEdit', () => {
 
   it('maps the Back sentinel to undefined', async () => {
     expect(await selectAnswerToEdit(items, () => Promise.resolve('__back__'))).toBeUndefined();
+  });
+});
+
+describe('detectionSummaryLines', () => {
+  it('lists every recorded id, including ones that used to be applied silently', () => {
+    const lines = detectionSummaryLines({
+      answers: {
+        language: 'typescript',
+        apiArchitecture: 'trpc',
+        testTypes: ['unit', 'e2e'],
+        e2eTool: 'playwright',
+        authApproach: 'authjs',
+        'tsconfig.strict': true,
+        'tsconfig.path-aliases': true,
+      },
+    });
+    const blob = lines.join('\n');
+    for (const label of ['API architecture', 'Test types', 'E2E tool', 'Auth', 'TS strict']) {
+      expect(blob).toContain(label);
+    }
+    // Order follows the questionnaire: apiArchitecture before authApproach.
+    expect(blob.indexOf('API architecture')).toBeLessThan(blob.indexOf('Auth'));
+  });
+
+  it('returns no lines when nothing was detected', () => {
+    expect(detectionSummaryLines({ answers: {} })).toEqual([]);
   });
 });
 
