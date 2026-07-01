@@ -102,8 +102,9 @@ export const NODE_DATABASE: readonly (readonly [string, string])[] = [
   ['@supabase/supabase-js', 'supabase'],
   ['mongoose', 'mongodb'],
   ['mongodb', 'mongodb'],
-  ['ioredis', 'redis'],
-  ['redis', 'redis'],
+  // `redis`/`ioredis` deliberately omitted: they are used far more often as a
+  // cache than as the modeled data store, so presence alone is a weak signal
+  // for the `database` answer. Left to the interview instead of a false positive.
   ['@aws-sdk/client-dynamodb', 'dynamodb'],
   ['firebase-admin', 'firebase'],
   ['firebase', 'firebase'],
@@ -185,15 +186,19 @@ export const NODE_E2E: readonly (readonly [string, string])[] = [
   ['webdriverio', 'webdriverio'],
 ];
 
+// Only server-side packages that pin the API style are listed. Bare `graphql`
+// and `grpc` are omitted: they arrive as transitive/tooling deps in many stacks
+// (codegen, client libs), so their presence does not establish the API design.
 export const NODE_API: readonly (readonly [string, string])[] = [
   ['@trpc/server', 'trpc'],
   ['@trpc/client', 'trpc'],
   ['@apollo/server', 'graphql'],
   ['apollo-server', 'graphql'],
   ['@nestjs/graphql', 'graphql'],
-  ['graphql', 'graphql'],
+  ['graphql-yoga', 'graphql'],
+  ['mercurius', 'graphql'],
   ['@grpc/grpc-js', 'grpc'],
-  ['grpc', 'grpc'],
+  ['nice-grpc', 'grpc'],
 ];
 
 /**
@@ -318,7 +323,16 @@ export const RUST_FRAMEWORK: readonly (readonly [string, string])[] = [
 
 export const RUST_CLI = new Set(['clap', 'argh']);
 
-export const RUST_DATABASE: readonly (readonly [string, string])[] = [['mongodb', 'mongodb']];
+// Plain driver crates that name the engine directly. SQL ORMs (sqlx/diesel/
+// sea-orm) instead carry the engine as a Cargo feature — handled in rust.ts.
+export const RUST_DATABASE: readonly (readonly [string, string])[] = [
+  ['tokio-postgres', 'postgresql'],
+  ['postgres', 'postgresql'],
+  ['mysql_async', 'mysql'],
+  ['mysql', 'mysql'],
+  ['rusqlite', 'sqlite'],
+  ['mongodb', 'mongodb'],
+];
 
 export const RUST_ORM: readonly (readonly [string, string])[] = [
   ['diesel', 'diesel'],

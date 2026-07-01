@@ -48,7 +48,7 @@ describe('detectStack — Node', () => {
         pg: '8',
         zod: '3',
         'next-auth': '5',
-        graphql: '16',
+        '@apollo/server': '4',
       },
       devDependencies: {
         typescript: '5',
@@ -125,6 +125,40 @@ describe('detectStack — Node', () => {
       database: 'mysql',
       orm: 'sequelize',
     });
+  });
+
+  it('does not record UI-only facts (styling/state) on a backend project', () => {
+    const pkg = JSON.stringify({
+      dependencies: { express: '4', tailwindcss: '3', '@tanstack/react-query': '5' },
+    });
+    const det = inProject({ 'package.json': pkg }, (dir) => detectStack(dir));
+    expect(det.answers.projectType).toBe('backend');
+    expect('stylingLibrary' in det.answers).toBe(false);
+    expect('stateManagement' in det.answers).toBe(false);
+    assertWithinOptions(det.answers);
+  });
+
+  it('does not record a library logger for a frontend app (out-of-vocab guard)', () => {
+    // A frontend's logger question only offers centralized/none, so pino must
+    // not be recorded — it is not a valid option there.
+    const pkg = JSON.stringify({ dependencies: { react: '18', pino: '9' } });
+    const det = inProject({ 'package.json': pkg }, (dir) => detectStack(dir));
+    expect(det.answers.projectType).toBe('frontend');
+    expect('logger' in det.answers).toBe(false);
+    assertWithinOptions(det.answers);
+  });
+
+  it('does not treat a cache-only redis dependency as the database', () => {
+    const pkg = JSON.stringify({ dependencies: { express: '4', ioredis: '5' } });
+    const det = inProject({ 'package.json': pkg }, (dir) => detectStack(dir));
+    expect(det.answers.projectType).toBe('backend');
+    expect('database' in det.answers).toBe(false);
+  });
+
+  it('does not infer apiArchitecture from a bare transitive graphql dependency', () => {
+    const pkg = JSON.stringify({ dependencies: { express: '4', graphql: '16' } });
+    const det = inProject({ 'package.json': pkg }, (dir) => detectStack(dir));
+    expect('apiArchitecture' in det.answers).toBe(false);
   });
 
   it('classifies a bin-declaring package as a CLI', () => {
@@ -231,6 +265,47 @@ describe('detectStack — Python', () => {
     });
     assertWithinOptions(det.answers);
   });
+
+  it('reads PEP 621 optional-dependencies and all Poetry groups', () => {
+    const pyproject = [
+      '[project]',
+      'name = "svc"',
+      'dependencies = ["fastapi>=0.110"]',
+      '',
+      '[project.optional-dependencies]',
+      'test = ["pytest>=8", "httpx"]',
+      'lint = ["ruff"]',
+    ].join('\n');
+    const det = inProject({ 'pyproject.toml': pyproject }, (dir) => detectStack(dir));
+    expect(det.answers.framework).toBe('fastapi');
+    expect(det.answers.testRunner).toBe('pytest');
+    expect(det.answers.linter).toBe('ruff');
+    assertWithinOptions(det.answers);
+  });
+
+  it('detects poetry from a non-dev group and no committed lockfile', () => {
+    const pyproject = [
+      '[tool.poetry]',
+      'name = "svc"',
+      '[tool.poetry.dependencies]',
+      'python = "^3.12"',
+      'flask = "^3.0"',
+      '[tool.poetry.group.test.dependencies]',
+      'pytest = "^8.0"',
+    ].join('\n');
+    const det = inProject({ 'pyproject.toml': pyproject }, (dir) => detectStack(dir));
+    expect(det.answers.framework).toBe('flask');
+    expect(det.answers.testRunner).toBe('pytest');
+    expect(det.answers.packageManager).toBe('poetry');
+    assertWithinOptions(det.answers);
+  });
+
+  it('falls back to pip-venv for a pyproject with no lockfile', () => {
+    const pyproject = ['[project]', 'name = "svc"', 'dependencies = ["flask"]'].join('\n');
+    const det = inProject({ 'pyproject.toml': pyproject }, (dir) => detectStack(dir));
+    expect(det.answers.packageManager).toBe('pip-venv');
+    assertWithinOptions(det.answers);
+  });
 });
 
 describe('detectStack — Go', () => {
@@ -271,6 +346,16 @@ describe('detectStack — Go', () => {
     expect(det.answers.orm).toBe('gorm');
     assertWithinOptions(det.answers);
   });
+
+  it('detects golangci-lint from a .golangci.yml config file', () => {
+    const gomod = ['module example.com/app', 'go 1.22'].join('\n');
+    const det = inProject(
+      { 'go.mod': gomod, '.golangci.yml': 'linters:\n  enable: [gofmt]' },
+      (dir) => detectStack(dir),
+    );
+    expect(det.answers.linter).toBe('golangci-lint');
+    assertWithinOptions(det.answers);
+  });
 });
 
 describe('detectStack — Rust', () => {
@@ -290,12 +375,41 @@ describe('detectStack — Rust', () => {
       projectType: 'backend',
       framework: 'axum',
       orm: 'sqlx-rust',
+      database: 'postgresql',
       validation: 'validator',
       logger: 'tracing',
       formatter: 'rustfmt',
       linter: 'clippy',
       testRunner: 'cargo-test',
     });
+    assertWithinOptions(det.answers);
+  });
+
+  it('reads the SQLx engine from its own feature list, ignoring unrelated mentions', () => {
+    const cargo = [
+      '[package]',
+      'name = "app"',
+      '# we migrated off sqlite long ago',
+      'sqlite-cache = "1.0"', // a crate that merely contains the word sqlite
+      '[dependencies]',
+      'axum = "0.7"',
+      'sqlx = { version = "0.7", features = ["runtime-tokio", "postgres"] }',
+    ].join('\n');
+    const det = inProject({ 'Cargo.toml': cargo }, (dir) => detectStack(dir));
+    expect(det.answers.database).toBe('postgresql');
+    assertWithinOptions(det.answers);
+  });
+
+  it('detects a plain driver crate without an ORM feature', () => {
+    const cargo = [
+      '[package]',
+      'name = "app"',
+      '[dependencies]',
+      'axum = "0.7"',
+      'tokio-postgres = "0.7"',
+    ].join('\n');
+    const det = inProject({ 'Cargo.toml': cargo }, (dir) => detectStack(dir));
+    expect(det.answers.database).toBe('postgresql');
     assertWithinOptions(det.answers);
   });
 });

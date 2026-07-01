@@ -90,7 +90,16 @@ export async function run(): Promise<void> {
           try {
             result = await llmDetect(detected, aiTool, depth, process.cwd());
           } finally {
-            s.stop('Analysis complete');
+            // Report what the pass actually produced, not a blanket "complete".
+            // Stage 2 tags each id it fills with source 'llm'; on any silent
+            // fallback (no result file, timeout, all off-vocab) that count is 0,
+            // so the message never claims a detection that did not happen.
+            const added = Object.values(result.sources).filter((src) => src === 'llm').length;
+            s.stop(
+              added > 0
+                ? `Analysis complete — ${added} more detail${added === 1 ? '' : 's'} detected`
+                : 'Analysis complete — no extra details found',
+            );
           }
         }
 

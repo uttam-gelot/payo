@@ -1,6 +1,6 @@
 /** Detect a Go stack from go.mod. */
 import type { DetectionResult, DetectionSource } from './types';
-import { readText, goModRequires } from './manifest';
+import { exists, readText, goModRequires } from './manifest';
 import {
   firstPrefixMatch,
   GO_FRAMEWORK,
@@ -10,6 +10,8 @@ import {
   GO_VALIDATION,
   GO_LOGGER,
 } from './signals';
+
+const GOLANGCI_CONFIGS = ['.golangci.yml', '.golangci.yaml', '.golangci.toml', '.golangci.json'];
 
 export function detectGo(cwd: string): DetectionResult | null {
   const gomod = readText(cwd, 'go.mod');
@@ -43,6 +45,8 @@ export function detectGo(cwd: string): DetectionResult | null {
   // Go's toolchain is fixed: gofmt + go test are universal.
   set('formatter', 'gofmt');
   set('testRunner', 'go-test');
+  // golangci-lint is the de-facto Go linter, driven by a .golangci.* config file.
+  if (GOLANGCI_CONFIGS.some((f) => exists(cwd, f))) set('linter', 'golangci-lint');
 
   return { answers, sources };
 }
