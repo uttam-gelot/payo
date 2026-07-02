@@ -4,6 +4,7 @@
  */
 import type { AiTool } from '../types/index';
 import type { Answers } from '../questions/types';
+import type { SkillSpec } from './skills';
 
 /** A single provider-agnostic block of generated guidance. */
 export interface RuleSection {
@@ -38,6 +39,13 @@ export interface AgentRunner {
   promptViaStdin?: boolean;
   /** This tool consumes one master file; skills are staged per-skill then merged into it. */
   singleFile?: boolean;
+  /**
+   * The YAML frontmatter block this provider requires at the top of each
+   * generated skill file (e.g. Claude needs `name`/`description` to discover the
+   * skill; Cursor needs `globs`/`alwaysApply` to auto-attach). Returns the full
+   * `---`-delimited block. Absent ⇒ the tool needs no frontmatter (plain markdown).
+   */
+  frontmatter?(skill: SkillSpec): string;
   /** Hard wall-clock cap; defaults to 120s. Guards CLI hang bugs. */
   timeoutMs?: number;
   /** Concrete project-relative path the skill is written to (prompt + verification). */

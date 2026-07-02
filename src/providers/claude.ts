@@ -1,5 +1,6 @@
 import type { AiProvider } from '../generator/types';
 import { renderMarkdown } from '../generator/rules';
+import { renderFrontmatter } from '../generator/frontmatter';
 
 export const claudeProvider: AiProvider = {
   id: 'claude',
@@ -24,5 +25,12 @@ export const claudeProvider: AiProvider = {
       'bypassPermissions',
     ],
     outputPath: (id) => `.claude/skills/${id}/SKILL.md`,
+    // Claude Code discovers a skill only when SKILL.md opens with YAML
+    // frontmatter carrying `name` and `description`. Without it the file is inert.
+    frontmatter: (skill) =>
+      renderFrontmatter([
+        ['name', skill.id],
+        ['description', skill.description],
+      ]),
   },
 };
