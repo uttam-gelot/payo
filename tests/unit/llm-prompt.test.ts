@@ -78,6 +78,31 @@ describe('buildPrompt', () => {
     );
   });
 
+  it('M3: sends the manifest matching Stage 1’s ecosystem, not always package.json', () => {
+    withProject(
+      {
+        'package.json': '{"name":"tooling-only","devDependencies":{"prettier":"3"}}',
+        'pyproject.toml': '[project]\nname = "svc"\ndependencies = ["fastapi"]',
+      },
+      (dir) => {
+        // Stage 1 chose Python; a stray package.json exists for tooling.
+        const base: DetectionResult = { answers: { language: 'python' }, sources: {} };
+        const prompt = buildPrompt(dir, ['framework'], base);
+        expect(prompt).toContain('Manifest (pyproject.toml)');
+        expect(prompt).toContain('fastapi'); // python manifest body sent
+        expect(prompt).not.toContain('tooling-only'); // node manifest NOT sent
+      },
+    );
+  });
+
+  it('M3: falls back to the priority list when Stage 1 found no language', () => {
+    withProject({ 'package.json': '{"name":"acme"}' }, (dir) => {
+      const prompt = buildPrompt(dir, ['framework'], { answers: {}, sources: {} });
+      expect(prompt).toContain('Manifest (package.json)');
+      expect(prompt).toContain('"acme"');
+    });
+  });
+
   it('never leaks source file contents — only the manifest body and paths', () => {
     const secret = 'SECRET_API_KEY_9f8e7d';
     withProject(

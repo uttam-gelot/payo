@@ -40,6 +40,20 @@ const MANIFESTS = [
   'Pipfile',
 ];
 
+/**
+ * Preferred manifest(s) per Stage-1 `language`, so Stage 2 sends the LLM the
+ * ecosystem's own manifest instead of always `package.json`. A polyglot repo
+ * (e.g. a Python project with a tooling `package.json`) would otherwise get
+ * contradictory context — `language: python` but a Node manifest.
+ */
+const LANG_MANIFEST: Record<string, string[]> = {
+  typescript: ['package.json'],
+  javascript: ['package.json'],
+  python: ['pyproject.toml', 'requirements.txt', 'Pipfile'],
+  go: ['go.mod'],
+  rust: ['Cargo.toml'],
+};
+
 const RESULT_FILE = 'detection-llm.json';
 
 /** Injectable seams so the pass can be unit-tested without a real subprocess. */
@@ -110,7 +124,11 @@ export function willLlmDetectRun(
 /** Build the schema-constrained prompt: manifest + tree + per-id allowed values. */
 export function buildPrompt(cwd: string, ids: string[], base: DetectionResult): string {
   const known = base.answers as Answers;
-  const manifestFile = MANIFESTS.find((f) => exists(cwd, f));
+  // Prefer the manifest matching Stage 1's chosen ecosystem; fall back to the
+  // priority list only when Stage 1 found no language.
+  const lang = known.language;
+  const order = [...(typeof lang === 'string' ? (LANG_MANIFEST[lang] ?? []) : []), ...MANIFESTS];
+  const manifestFile = order.find((f) => exists(cwd, f));
   const manifestBody = manifestFile ? readText(cwd, manifestFile) : undefined;
   const tree = dirTree(cwd).join('\n');
   const schema = ids
