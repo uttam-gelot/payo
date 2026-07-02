@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { setAgentOverride, resetAgentOverride } from '../helpers/agentMock';
 import {
   predictTargets,
   existingTargets,
+  predictedExisting,
   backupFiles,
   resolveContained,
 } from '../../src/generator/index';
@@ -115,6 +116,48 @@ describe('backupFiles', () => {
       writeFileSync(join(dir, 'CLAUDE.md.bak'), 'old backup', 'utf-8');
       backupFiles(['CLAUDE.md']);
       expect(readFileSync(join(dir, 'CLAUDE.md.bak'), 'utf-8')).toBe('new edits');
+    });
+  });
+
+  it('replaces a stale backup DIRECTORY without throwing ENOTEMPTY', async () => {
+    await inTempProject((dir) => {
+      // Current dir artifact + a leftover non-empty .bak dir from a prior run.
+      mkdirSync(join(dir, '.claude/skills/foo'), { recursive: true });
+      writeFileSync(join(dir, '.claude/skills/foo/SKILL.md'), 'current', 'utf-8');
+      mkdirSync(join(dir, '.claude/skills.bak/stale'), { recursive: true });
+      writeFileSync(join(dir, '.claude/skills.bak/stale/old.md'), 'stale', 'utf-8');
+
+      const backups = backupFiles(['.claude/skills']);
+      expect(backups).toEqual(['.claude/skills.bak']);
+      // Renamed over the stale dir; the new backup holds the current contents.
+      expect(existsSync(join(dir, '.claude/skills.bak/foo/SKILL.md'))).toBe(true);
+      expect(existsSync(join(dir, '.claude/skills.bak/stale'))).toBe(false);
+      expect(existsSync(join(dir, '.claude/skills'))).toBe(false);
+    });
+  });
+});
+
+describe('predictedExisting — only this run’s own targets', () => {
+  beforeEach(() => setAgentOverride({ isAvailable: false }));
+
+  it('excludes other tools’ configs so backup never moves them', async () => {
+    await inTempProject((dir) => {
+      // Repo already holds Claude config; the user picks Cursor.
+      writeFileSync(join(dir, 'CLAUDE.md'), 'hand-tuned', 'utf-8');
+      mkdirSync(join(dir, '.claude/skills'), { recursive: true });
+      writeFileSync(join(dir, '.cursorrules'), 'old cursor', 'utf-8');
+      const answers = fullStackAnswers('cursor');
+
+      const own = predictedExisting(answers);
+      expect(own).toEqual(['.cursorrules']); // only Cursor's own target
+      // The warning set still surfaces the Claude config…
+      expect(existingTargets(answers)).toContain('CLAUDE.md');
+
+      // …but backing up only `own` leaves Claude's config untouched.
+      backupFiles(own);
+      expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
+      expect(existsSync(join(dir, '.claude/skills'))).toBe(true);
+      expect(existsSync(join(dir, '.cursorrules.bak'))).toBe(true);
     });
   });
 });

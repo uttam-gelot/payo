@@ -24,7 +24,13 @@ import { llmDetect, willLlmDetectRun } from '../detect/llm';
 import { splitByTier } from '../detect/tiers';
 import { runFlow, reviewAndEdit, findQuestion, reconcile } from '../questions/engine';
 import { flow } from '../questions/flow';
-import { generate, generateBootstrap, existingTargets, backupFiles } from '../generator/index';
+import {
+  generate,
+  generateBootstrap,
+  existingTargets,
+  predictedExisting,
+  backupFiles,
+} from '../generator/index';
 import type { ResumeStore } from '../generator/types';
 import { printBanner } from './banner';
 
@@ -157,8 +163,18 @@ export async function run(): Promise<void> {
         return;
       }
       if (choice === 'backup') {
-        const backups = backupFiles(existing);
-        note(backups.map((b) => `• ${b}`).join('\n'), 'Existing files renamed');
+        // Back up only the files THIS run will overwrite. Other tools' configs
+        // (in `existing` but not our own targets) are left in place — moving them
+        // would silently disable a tool this run does not replace.
+        const own = predictedExisting(session.answers);
+        const others = existing.filter((f) => !own.includes(f));
+        const backups = backupFiles(own);
+        if (backups.length > 0) {
+          note(backups.map((b) => `• ${b}`).join('\n'), 'Existing files renamed');
+        }
+        if (others.length > 0) {
+          note(others.map((f) => `• ${f}`).join('\n'), "Left untouched (other tools' configs)");
+        }
       }
     }
   }

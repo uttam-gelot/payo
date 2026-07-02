@@ -331,17 +331,31 @@ export function predictTargets(answers: Answers): string[] {
  * because predictTargets only knows the selected tool's paths.
  */
 export function existingTargets(answers: Answers, cwd: string = process.cwd()): string[] {
-  const predicted = predictTargets(answers).filter((rel) => fs.existsSync(path.resolve(cwd, rel)));
-  return [...new Set([...predicted, ...scanExistingAiConfigs(cwd)])];
+  return [...new Set([...predictedExisting(answers, cwd), ...scanExistingAiConfigs(cwd)])];
 }
 
-/** Rename each existing file to `<path>.bak` (replacing a stale backup) and return the backups. */
+/**
+ * The subset of `existingTargets` that THIS run will actually write — its own
+ * predicted targets that already exist. Only these are safe to back up; other
+ * tools' configs (from `scanExistingAiConfigs`) are warned about but never
+ * moved, or we'd silently disable a tool this run does not replace.
+ */
+export function predictedExisting(answers: Answers, cwd: string = process.cwd()): string[] {
+  return predictTargets(answers).filter((rel) => fs.existsSync(path.resolve(cwd, rel)));
+}
+
+/** Rename each existing path to `<path>.bak` (replacing a stale backup) and return the backups. */
 export function backupFiles(relPaths: string[]): string[] {
   const backups: string[] = [];
   for (const rel of relPaths) {
     const src = path.resolve(process.cwd(), rel);
     if (!fs.existsSync(src)) continue;
-    fs.renameSync(src, src + '.bak');
+    const bak = src + '.bak';
+    // Clear any stale backup first. renameSync onto an existing non-empty
+    // directory throws ENOTEMPTY on POSIX, so a prior run's `<dir>.bak` would
+    // crash the backup mid-way; rmSync handles both files and directories.
+    fs.rmSync(bak, { recursive: true, force: true });
+    fs.renameSync(src, bak);
     backups.push(rel + '.bak');
   }
   return backups;
