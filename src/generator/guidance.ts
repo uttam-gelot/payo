@@ -10,9 +10,11 @@
 import type { Answers } from '../questions/types';
 import type { RuleSection } from './types';
 import { getModule } from '../stack/registry';
+import { dbFamily } from '../stack/predicates';
 
 /** The guidance sections contributed by the answers' selected modules. */
 export function resolveGuidance(a: Answers): RuleSection[] {
-  const selected = [a.framework, a.orm, a.database, a.stylingLibrary, a.authApproach];
+  // Alias engines (neon/supabase/…) resolve to their wire-compatible module.
+  const selected = [a.framework, a.orm, dbFamily(a), a.stylingLibrary, a.authApproach];
   return selected.flatMap((id) => getModule(id)?.guidance?.(a) ?? []);
 }

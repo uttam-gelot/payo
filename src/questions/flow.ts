@@ -3,11 +3,19 @@
  * one-question producers; expansion points inject the selected module's
  * follow-up questions. Importing this module registers all tech modules.
  */
-import type { FlowSection, Question } from './types';
+import type { Answers, FlowSection, Question } from './types';
 import * as opt from './options';
 import { getModule, modulesFor } from '../stack/registry';
-import { hasModeledDb } from '../stack/predicates';
+import { dbFamily, hasModeledDb } from '../stack/predicates';
 import '../stack/modules/index'; // side-effect: register modules
+
+/**
+ * The module backing the answer at `key`. `database` canonicalizes through
+ * `dbFamily` so alias engines (neon/supabase/cockroachdb/mariadb/turso) get
+ * their wire-compatible engine's follow-ups instead of a silent no-module miss.
+ */
+const selectedModule = (key: string, a: Answers): ReturnType<typeof getModule> =>
+  getModule(key === 'database' ? dbFamily(a) : a[key]);
 
 /**
  * A recommendable section for whichever tech module is stored at `key`. The
@@ -17,10 +25,10 @@ import '../stack/modules/index'; // side-effect: register modules
 const expandSelected = (key: string): FlowSection => ({
   recommendable: true,
   gate: (a): { id: string; title: string } | null => {
-    const m = getModule(a[key]);
+    const m = selectedModule(key, a);
     return m ? { id: `${m.id}.__recommended`, title: m.title ?? m.id } : null;
   },
-  questions: (a) => getModule(a[key])?.questions(a) ?? [],
+  questions: (a) => selectedModule(key, a)?.questions(a) ?? [],
 });
 
 const core: Record<string, Question> = {
