@@ -47,9 +47,20 @@ describe('dirTree', () => {
     expect(tree).toContain('src/main.ts');
   });
 
-  it('skips .git and other dotgit entries', () => {
-    const tree = inTree({ '.gitignore': 'node_modules', 'app.ts': '' }, (d) => dirTree(d));
-    expect(tree.some((p) => p.startsWith('.git'))).toBe(false);
+  it('skips only .git itself — .github and .gitignore are stack signal', () => {
+    const tree = inTree(
+      {
+        '.git/HEAD': 'ref: refs/heads/main',
+        '.github/workflows/ci.yml': '',
+        '.gitignore': 'node_modules',
+        'app.ts': '',
+      },
+      (d) => dirTree(d),
+    );
+    expect(tree.some((p) => p.startsWith('.git/'))).toBe(false);
+    expect(tree).toContain('.github/');
+    expect(tree).toContain('.github/workflows/ci.yml');
+    expect(tree).toContain('.gitignore');
     expect(tree).toContain('app.ts');
   });
 
