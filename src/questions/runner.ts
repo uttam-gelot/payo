@@ -77,17 +77,26 @@ export function mergeMultiselect(picked: string[], raw: string): string[] {
   return [...kept, ...parseCustom(raw, kept)];
 }
 
+/**
+ * What starts checked in a multiselect: a prior/seeded answer wins (filtered to
+ * valid options); otherwise the recommended options, so the "recommended" tag
+ * matches what actually starts selected.
+ */
+export function multiselectSeed(prior: unknown, options: Option<string>[]): string[] {
+  if (Array.isArray(prior)) {
+    const valid = new Set(options.map((o) => o.value));
+    return prior.filter((v): v is string => typeof v === 'string' && valid.has(v));
+  }
+  return options.filter((o) => o.hint === 'recommended').map((o) => o.value);
+}
+
 async function runMultiselect(q: Question, a: Answers): Promise<string[]> {
   const options = resolveOptions(q, a);
   const finalOptions = offersOther(q, options)
     ? [...options, { value: OTHER, label: 'Other (specify)' }]
     : options;
 
-  const prior = a[q.id];
-  const valid = new Set(finalOptions.map((o) => o.value));
-  const initialValues = Array.isArray(prior)
-    ? prior.filter((v): v is string => typeof v === 'string' && valid.has(v))
-    : undefined;
+  const initialValues = multiselectSeed(a[q.id], finalOptions);
 
   const picked = await multiselect({
     message: q.message,

@@ -63,6 +63,10 @@ const core: Record<string, Question> = {
     type: 'select',
     message: 'Primary language?',
     optionsFrom: opt.languageOptions,
+    // Closed set: every downstream option list (framework, formatter, linter,
+    // test runner…) is keyed by these languages; a free-text language would
+    // produce an empty, broken flow.
+    allowOther: false,
   },
   framework: {
     id: 'framework',
