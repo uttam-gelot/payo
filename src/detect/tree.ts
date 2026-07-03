@@ -54,7 +54,9 @@ export function dirTree(cwd: string, opts: DirTreeOptions = {}): string[] {
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
       if (out.length >= maxEntries) break;
-      if (entry.name.startsWith('.git')) continue;
+      // Skip only the object database itself — `.github/`, `.gitignore`, and
+      // `.gitattributes` are real stack signal (CI workflows, tooling).
+      if (entry.name === '.git') continue;
       const childRel = rel ? `${rel}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
         if (IGNORE.has(entry.name)) continue;

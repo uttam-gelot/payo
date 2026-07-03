@@ -10,6 +10,7 @@
  */
 import type { Answers } from '../questions/types';
 import { getModule } from '../stack/registry';
+import { dbFamily } from '../stack/predicates';
 
 export interface StackCommands {
   /** Official generator/init command, or undefined when the stack has none. */
@@ -28,7 +29,8 @@ export interface StackCommands {
 export function resolveCommands(a: Answers): StackCommands {
   const framework = getModule(a.framework);
   const orm = getModule(a.orm);
-  const db = getModule(a.database);
+  // Alias engines (neon/supabase/…) resolve to their wire-compatible module.
+  const db = getModule(dbFamily(a));
   return {
     scaffold: framework?.scaffold?.(a),
     dev: framework?.devCommand?.(a),

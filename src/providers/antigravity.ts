@@ -13,7 +13,9 @@ export const antigravityProvider: AiProvider = {
     binary: 'agy',
     // -p/--print runs one headless prompt; --dangerously-skip-permissions
     // auto-approves tool calls so file writes happen without interactive prompts.
-    buildArgs: (p) => ['-p', p, '--dangerously-skip-permissions'],
+    // --sandbox re-restricts the terminal, so the auto-approval cannot be
+    // steered into running shell commands by prompt-injected content.
+    buildArgs: (p) => ['-p', p, '--dangerously-skip-permissions', '--sandbox'],
     outputPath: (id) => `.agents/skills/${id}.md`,
     // Skill metadata frontmatter so the file is discoverable as a named skill.
     frontmatter: (skill) =>

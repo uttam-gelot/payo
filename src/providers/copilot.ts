@@ -15,7 +15,9 @@ export const copilotProvider: AiProvider = {
   agent: {
     binary: 'copilot',
     // -s silences session metadata; --no-ask-user keeps it non-interactive.
-    buildArgs: (p) => ['-p', p, '-s', '--no-ask-user', '--allow-all-tools'],
+    // --allow-tool write auto-approves file edits only — shell and other tools
+    // stay denied, so prompt-injected content cannot execute commands.
+    buildArgs: (p) => ['-p', p, '-s', '--no-ask-user', '--allow-tool', 'write'],
     outputPath: (id) => `.github/instructions/${id}.instructions.md`,
     // Copilot scopes an `.instructions.md` file via its `applyTo` glob; without
     // it the file's applicability is version-dependent. `**` = the whole repo.

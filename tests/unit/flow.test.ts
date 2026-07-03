@@ -42,6 +42,19 @@ describe('flow gating by project type', () => {
     expect(ids.has('logger')).toBe(true);
   });
 
+  it('alias databases expand their wire-compatible engine module (dbFamily)', () => {
+    const base = { projectType: 'backend', language: 'typescript' };
+    // Neon / Supabase / CockroachDB are Postgres under the hood; MariaDB is
+    // MySQL; Turso is SQLite. Each must surface its engine's follow-ups.
+    for (const database of ['neon', 'supabase', 'cockroachdb']) {
+      expect(reachable({ ...base, database }).has('postgresql.migrations')).toBe(true);
+    }
+    expect(reachable({ ...base, database: 'mariadb' }).has('mysql.migrations')).toBe(true);
+    expect(reachable({ ...base, database: 'turso' }).has('sqlite.migrations')).toBe(true);
+    // Identity path unchanged.
+    expect(reachable({ ...base, database: 'postgresql' }).has('postgresql.migrations')).toBe(true);
+  });
+
   it('existing shapes are unchanged: backend keeps API, frontend keeps styling', () => {
     const backend = reachable({ projectType: 'backend', language: 'go' });
     expect(backend.has('apiArchitecture')).toBe(true);

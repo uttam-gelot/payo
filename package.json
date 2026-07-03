@@ -25,14 +25,16 @@
 		"test:coverage": "bun test --coverage",
 		"lint": "eslint src tests --ext .ts",
 		"format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
-		"format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\""
+		"format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
+		"prepack": "bun run build"
 	},
 	"engines": {
-		"bun": ">=1.1.0"
+		"node": ">=18"
 	},
 	"files": [
 		"dist",
-		"assets"
+		"assets/logo.inline.png",
+		"assets/logo.ans"
 	],
 	"keywords": [
 		"cli",

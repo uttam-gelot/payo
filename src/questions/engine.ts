@@ -8,7 +8,13 @@
  */
 import { note } from '@clack/prompts';
 import type { Answers, FlowSection, Question } from './types';
-import { runQuestion, reviewAction, selectAnswerToEdit } from './runner';
+import {
+  runQuestion,
+  reviewAction,
+  selectAnswerToEdit,
+  offersOther,
+  resolveOptions,
+} from './runner';
 import { answerLabel, questionSummary, recommendedAnswer, recommendedLabel } from './recommend';
 import { recordAnswer, forgetAnswers, type Session } from '../state/index';
 
@@ -221,16 +227,37 @@ function reachableIds(flow: FlowSection[], answers: Answers): Set<string> {
 }
 
 /**
+ * Answered closed-set selects whose stored value fell out of the current option
+ * set (e.g. `language: 'rust'` after editing projectType to `frontend`, which
+ * narrows the language options). The question stays reachable, so reachability
+ * alone keeps the invalid value and downstream options compute off it. Open
+ * sets (Other allowed) are exempt — an off-list value there may be a legitimate
+ * custom entry.
+ */
+function outOfRangeIds(flow: FlowSection[], s: Session): string[] {
+  const out: string[] = [];
+  for (const id of s.answered) {
+    const q = findQuestion(flow, s.answers, id);
+    if (!q || q.type !== 'select') continue;
+    const options = resolveOptions(q, s.answers);
+    if (options.length === 0 || offersOther(q, options)) continue;
+    const v = s.answers[id];
+    if (typeof v === 'string' && !options.some((o) => o.value === v)) out.push(id);
+  }
+  return out;
+}
+
+/**
  * After an edit, drop any stored answer no longer reachable in the flow (question
- * removed or its `when` now false). Loops to a fixpoint since clearing one answer
- * can make a dependent one unreachable. runFlow then re-asks any newly-unlocked
- * question.
+ * removed or its `when` now false), or whose value is no longer a valid option.
+ * Loops to a fixpoint since clearing one answer can make a dependent one
+ * unreachable. runFlow then re-asks any newly-unlocked question.
  */
 export function reconcile(flow: FlowSection[], session: Session): Session {
   let s = session;
   for (;;) {
     const reachable = reachableIds(flow, s.answers);
-    const stale = s.answered.filter((id) => !reachable.has(id));
+    const stale = [...s.answered.filter((id) => !reachable.has(id)), ...outOfRangeIds(flow, s)];
     if (stale.length === 0) return s;
     s = forgetAnswers(s, stale);
   }
