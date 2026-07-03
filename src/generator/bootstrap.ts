@@ -14,7 +14,7 @@
 import path from 'node:path';
 import type { Answers } from '../questions/types';
 import { writeFileAtomic } from '../fsutil';
-import { buildBaseRules, renderMarkdown } from './rules';
+import { buildBaseRules, fenceProjectData, renderMarkdown } from './rules';
 import { resolveCommands, type StackCommands } from './commands';
 
 /** Read a string answer, treating empty / 'none' as unset (mirrors rules.ts). */
@@ -146,7 +146,7 @@ export function buildBootstrapMetaPrompt(
     'You are a senior software engineer writing a *bootstrap prompt* — a single ' +
       'markdown document the user will later paste into an LLM to scaffold this project ' +
       'from scratch. Write the best possible such prompt for the project below.',
-    spec,
+    fenceProjectData(spec),
     sourceOfTruth(files, providerName),
     cmds
       ? 'Use these exact, authoritative commands for this stack — do not invent or alter ' +
