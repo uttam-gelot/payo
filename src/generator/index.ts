@@ -79,12 +79,34 @@ function composePrompt(
   sections: RuleSection[],
   outPath: string,
 ): string {
-  return [
+  const fm = provider.agent?.frontmatter?.(skill);
+  const parts = [
     `You are configuring ${provider.displayName} for the software project described below.`,
     `Project context:\n\n${projectContext(sections)}`,
     `Task: ${skill.buildPrompt(answers)}`,
-    requirements(writeLineFor(outPath)),
-  ].join('\n\n');
+  ];
+  if (fm) {
+    parts.push(
+      'Begin the file with EXACTLY this YAML frontmatter (verbatim, including the --- ' +
+        `delimiters), then a blank line, then the content:\n\n${fm}`,
+    );
+  }
+  parts.push(requirements(writeLineFor(outPath)));
+  return parts.join('\n\n');
+}
+
+/**
+ * Guarantee the provider's required frontmatter is present. Agents sometimes
+ * omit it despite the prompt, which leaves the skill inert (undiscovered by the
+ * tool). If the written file does not already open with a `---` block, prepend
+ * the deterministic one — this is what makes the frontmatter non-negotiable.
+ */
+function ensureFrontmatter(runner: AgentRunner, skill: SkillSpec, rel: string): void {
+  if (!runner.frontmatter) return;
+  const abs = path.resolve(process.cwd(), rel);
+  const content = fs.readFileSync(abs, 'utf-8');
+  if (/^---\r?\n/.test(content)) return; // agent already emitted frontmatter
+  writeFileAtomic(abs, `${runner.frontmatter(skill)}\n\n${content.replace(/^\s+/, '')}`);
 }
 
 /** Per-skill prompt (single-file tools): one skill → a section body, staged for merge. */
@@ -218,8 +240,11 @@ async function runMultiFile(
   const skills: string[] = [];
   const failures: string[] = [];
   const files: string[] = [];
+  const generated: SkillRun[] = [];
   for (const r of runs) {
     if (r.wrote) {
+      ensureFrontmatter(runner, r.skill, r.path);
+      generated.push(r);
       skills.push(r.skill.title);
       if (!files.includes(r.path)) files.push(r.path);
     } else {
@@ -227,6 +252,13 @@ async function runMultiFile(
     }
   }
   if (skills.length === 0) return null;
+
+  // Always write the tool's canonical entrypoint (CLAUDE.md / AGENTS.md / …):
+  // the agent only authors skill files, so without this the file the tool reads
+  // by default is absent and the deterministic guidance never lands on disk.
+  const entrypoint = writeEntrypoint(provider, answers, sections, generated);
+  if (entrypoint && !files.includes(entrypoint)) files.unshift(entrypoint);
+
   return {
     mode: 'ai',
     providerName: provider.displayName,
@@ -234,6 +266,30 @@ async function runMultiFile(
     skills,
     failures: failures.length ? failures : undefined,
   };
+}
+
+/**
+ * Render the provider's static entrypoint (its `buildBaseRules` guidance) and
+ * append an index of the skills this run generated, so the tool's default-read
+ * file always exists in AI mode and static/AI output cannot silently diverge.
+ * Returns the written path, or undefined if the provider has no entrypoint.
+ */
+function writeEntrypoint(
+  provider: AiProvider,
+  answers: Answers,
+  sections: RuleSection[],
+  generated: SkillRun[],
+): string | undefined {
+  const [entry] = provider.generate({ answers, sections });
+  if (!entry) return undefined;
+  const index = generated
+    .map((r) => `- **${r.skill.title}** — \`${r.path}\`: ${r.skill.description}`)
+    .join('\n');
+  const body = index
+    ? `${entry.content.trimEnd()}\n\n## Generated Skills\n\n${index}\n`
+    : entry.content;
+  writeArtifact({ path: entry.path, content: body });
+  return entry.path;
 }
 
 /**
@@ -331,17 +387,31 @@ export function predictTargets(answers: Answers): string[] {
  * because predictTargets only knows the selected tool's paths.
  */
 export function existingTargets(answers: Answers, cwd: string = process.cwd()): string[] {
-  const predicted = predictTargets(answers).filter((rel) => fs.existsSync(path.resolve(cwd, rel)));
-  return [...new Set([...predicted, ...scanExistingAiConfigs(cwd)])];
+  return [...new Set([...predictedExisting(answers, cwd), ...scanExistingAiConfigs(cwd)])];
 }
 
-/** Rename each existing file to `<path>.bak` (replacing a stale backup) and return the backups. */
+/**
+ * The subset of `existingTargets` that THIS run will actually write — its own
+ * predicted targets that already exist. Only these are safe to back up; other
+ * tools' configs (from `scanExistingAiConfigs`) are warned about but never
+ * moved, or we'd silently disable a tool this run does not replace.
+ */
+export function predictedExisting(answers: Answers, cwd: string = process.cwd()): string[] {
+  return predictTargets(answers).filter((rel) => fs.existsSync(path.resolve(cwd, rel)));
+}
+
+/** Rename each existing path to `<path>.bak` (replacing a stale backup) and return the backups. */
 export function backupFiles(relPaths: string[]): string[] {
   const backups: string[] = [];
   for (const rel of relPaths) {
     const src = path.resolve(process.cwd(), rel);
     if (!fs.existsSync(src)) continue;
-    fs.renameSync(src, src + '.bak');
+    const bak = src + '.bak';
+    // Clear any stale backup first. renameSync onto an existing non-empty
+    // directory throws ENOTEMPTY on POSIX, so a prior run's `<dir>.bak` would
+    // crash the backup mid-way; rmSync handles both files and directories.
+    fs.rmSync(bak, { recursive: true, force: true });
+    fs.renameSync(src, bak);
     backups.push(rel + '.bak');
   }
   return backups;

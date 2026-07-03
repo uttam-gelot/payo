@@ -1,5 +1,6 @@
 import type { AiProvider } from '../generator/types';
 import { renderMarkdown } from '../generator/rules';
+import { renderFrontmatter } from '../generator/frontmatter';
 
 export const antigravityProvider: AiProvider = {
   id: 'antigravity',
@@ -14,5 +15,11 @@ export const antigravityProvider: AiProvider = {
     // auto-approves tool calls so file writes happen without interactive prompts.
     buildArgs: (p) => ['-p', p, '--dangerously-skip-permissions'],
     outputPath: (id) => `.agents/skills/${id}.md`,
+    // Skill metadata frontmatter so the file is discoverable as a named skill.
+    frontmatter: (skill) =>
+      renderFrontmatter([
+        ['name', skill.id],
+        ['description', skill.description],
+      ]),
   },
 };

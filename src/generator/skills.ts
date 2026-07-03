@@ -6,10 +6,16 @@
 import type { Answers } from '../questions/types';
 
 export interface SkillSpec {
-  /** Stable id; also used as the native filename stem. */
+  /** Stable id; also used as the native filename stem and frontmatter `name`. */
   id: string;
-  /** Human-friendly name, shown in the CLI report. */
+  /** Human-friendly name, shown in the CLI report and as the section heading. */
   title: string;
+  /**
+   * One-line "when to use this skill" summary. Emitted as the provider's
+   * frontmatter `description` — the field agents like Claude use to decide
+   * whether to load the skill, so it must read as a trigger, not a title.
+   */
+  description: string;
   /** Whether this skill applies to the current answers. */
   appliesTo(a: Answers): boolean;
   /** Task instruction for the agent (project context is added by the caller). */
@@ -33,6 +39,8 @@ const skills: SkillSpec[] = [
   {
     id: 'project-overview',
     title: 'Project Overview',
+    description:
+      "This project's purpose, scope, and high-level architecture, and how its stack fits together.",
     appliesTo: () => true,
     buildPrompt: () =>
       'Summarize this specific project for an AI coding assistant: its purpose and scope (from the ' +
@@ -42,6 +50,8 @@ const skills: SkillSpec[] = [
   {
     id: 'coding-standards',
     title: 'Coding Standards',
+    description:
+      'Naming, file organization, error handling, and environment/secret conventions for this codebase.',
     appliesTo: () => true,
     buildPrompt: (a): string => {
       const lang = val(a, 'language');
@@ -70,6 +80,8 @@ const skills: SkillSpec[] = [
   {
     id: 'framework-conventions',
     title: 'Framework Conventions',
+    description:
+      'Idiomatic patterns, project structure, and common pitfalls for the chosen framework.',
     appliesTo: (a) => has(a, 'framework'),
     buildPrompt: (a): string => {
       const fw = val(a, 'framework');
@@ -83,6 +95,8 @@ const skills: SkillSpec[] = [
   {
     id: 'data-layer',
     title: 'Data Layer',
+    description:
+      'Modeling schemas, writing queries/migrations, and naming, using the chosen database/ORM safely.',
     appliesTo: (a) => has(a, 'database'),
     buildPrompt: (a): string => {
       const orm = val(a, 'orm');
@@ -100,6 +114,8 @@ const skills: SkillSpec[] = [
   {
     id: 'api-conventions',
     title: 'API Conventions',
+    description:
+      'Endpoint structure, versioning, response envelope, pagination, validation, and status/error semantics.',
     appliesTo: (a) => has(a, 'apiArchitecture'),
     buildPrompt: (a): string => {
       const api = val(a, 'apiArchitecture');
@@ -115,6 +131,8 @@ const skills: SkillSpec[] = [
   {
     id: 'auth',
     title: 'Authentication & Authorization',
+    description:
+      'Modeling identity/sessions, protecting routes, verifying credentials, and handling secrets.',
     appliesTo: (a) => has(a, 'authApproach'),
     buildPrompt: (a): string => {
       const approach = val(a, 'authApproach');
@@ -142,6 +160,8 @@ const skills: SkillSpec[] = [
   {
     id: 'error-handling-logging',
     title: 'Error Handling & Logging',
+    description:
+      'Consistent error strategy and structured logging conventions with appropriate levels.',
     appliesTo: (a) => has(a, 'logger'),
     buildPrompt: (a): string => {
       const logger = val(a, 'logger');
@@ -163,6 +183,8 @@ const skills: SkillSpec[] = [
   {
     id: 'state-management',
     title: 'State Management',
+    description:
+      'Separating server and client/UI state and defining store, async, and loading/error patterns.',
     appliesTo: (a) => has(a, 'stateManagement') && a.projectType !== 'backend',
     buildPrompt: (a): string => {
       const lib = val(a, 'stateManagement');
@@ -178,6 +200,8 @@ const skills: SkillSpec[] = [
   {
     id: 'testing',
     title: 'Testing',
+    description:
+      'Test setup, what to test, and naming/organization conventions for the chosen runners and types.',
     appliesTo: (a) => Array.isArray(a.testTypes) && a.testTypes.length > 0,
     buildPrompt: (a): string => {
       const types = Array.isArray(a.testTypes) ? a.testTypes.join(', ') : undefined;
@@ -197,6 +221,8 @@ const skills: SkillSpec[] = [
   {
     id: 'tooling',
     title: 'Tooling',
+    description:
+      'Respecting the selected formatter, linter, package manager, and runtime, and keeping code passing them.',
     appliesTo: (a) =>
       has(a, 'formatter') || has(a, 'linter') || has(a, 'packageManager') || has(a, 'runtime'),
     buildPrompt: (a): string => {
@@ -220,6 +246,8 @@ const skills: SkillSpec[] = [
   {
     id: 'documentation',
     title: 'Documentation',
+    description:
+      'What each selected documentation artifact should contain and how to keep it current.',
     appliesTo: (a) => Array.isArray(a.documentation) && a.documentation.length > 0,
     buildPrompt: (a): string => {
       const picks = (a.documentation as string[]).join(', ');
@@ -234,6 +262,8 @@ const skills: SkillSpec[] = [
   {
     id: 'git-workflow',
     title: 'Git Workflow',
+    description:
+      'Branching, commit message conventions, PR practices, and .gitignore hygiene for this workflow.',
     appliesTo: (a) => has(a, 'gitWorkflow'),
     buildPrompt: (a): string => {
       const wf = val(a, 'gitWorkflow');

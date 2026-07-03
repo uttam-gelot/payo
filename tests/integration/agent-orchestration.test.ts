@@ -272,6 +272,77 @@ describe('generate() — AI agent orchestration (mocked agent)', () => {
     });
   });
 
+  it('C1: prepends provider frontmatter when the agent omits it (claude)', async () => {
+    await inTempProject((dir) => {
+      // simulate('success') writes bare "# generated" — no frontmatter.
+      setAgentOverride({ isAvailable: true, runAgent: simulate('success') });
+      return generate(answers()).then(() => {
+        const file = readFileSync(join(dir, '.claude/skills/project-overview/SKILL.md'), 'utf-8');
+        expect(file.startsWith('---\n')).toBe(true);
+        expect(file).toContain('name: "project-overview"');
+        expect(file).toContain('description:');
+        expect(file).toContain('# generated'); // original body preserved after the block
+      });
+    });
+  });
+
+  it('C1: emits cursor-specific frontmatter keys (globs/alwaysApply)', async () => {
+    await inTempProject((dir) => {
+      setAgentOverride({ isAvailable: true, runAgent: simulate('success') });
+      return generate(fullStackAnswers('cursor')).then(() => {
+        const file = readFileSync(join(dir, '.cursor/rules/project-overview.mdc'), 'utf-8');
+        expect(file.startsWith('---\n')).toBe(true);
+        expect(file).toContain('globs: "**/*"');
+        expect(file).toContain('alwaysApply: false');
+      });
+    });
+  });
+
+  it('C1: does not double-wrap frontmatter the agent already wrote', async () => {
+    await inTempProject((dir) => {
+      const runAgent = (_r: AgentRunner, prompt: string): AgentResult => {
+        const target = /\.\/(\S+)/.exec(prompt)?.[1];
+        if (target) {
+          mkdirSync(dirname(target), { recursive: true });
+          writeFileSync(target, `---\nname: "custom"\n---\n\nbody\n`, 'utf-8');
+        }
+        return { ok: true };
+      };
+      setAgentOverride({ isAvailable: true, runAgent });
+      return generate(answers()).then(() => {
+        const file = readFileSync(join(dir, '.claude/skills/project-overview/SKILL.md'), 'utf-8');
+        expect(file.match(/^---/gm)?.length).toBe(2); // one block only (open + close)
+        expect(file).toContain('name: "custom"'); // agent's own block kept
+      });
+    });
+  });
+
+  it('H2: writes the canonical entrypoint (CLAUDE.md) with a skills index in AI mode', async () => {
+    await inTempProject((dir) => {
+      setAgentOverride({ isAvailable: true, runAgent: simulate('success') });
+      return generate(answers()).then((res) => {
+        const entry = join(dir, 'CLAUDE.md');
+        expect(existsSync(entry)).toBe(true);
+        expect(res.files).toContain('CLAUDE.md');
+        const content = readFileSync(entry, 'utf-8');
+        expect(content).toContain('## Tech Stack'); // deterministic buildBaseRules guidance
+        expect(content).toContain('## Generated Skills'); // index of what was generated
+        expect(content).toContain('.claude/skills/project-overview/SKILL.md');
+      });
+    });
+  });
+
+  it('H2: entrypoint lists only skills that succeeded', async () => {
+    await inTempProject((dir) => {
+      setAgentOverride({ isAvailable: true, runAgent: simulate('success', 'tooling') });
+      return generate(answers()).then(() => {
+        const content = readFileSync(join(dir, 'CLAUDE.md'), 'utf-8');
+        expect(content).toContain('## Generated Skills');
+        expect(content).not.toContain('.claude/skills/tooling/SKILL.md'); // failed skill omitted
+      });
+    });
+  });
+
   it('resume (single-file): staged sections are reused and merged', async () => {
     await inTempProject(async (dir) => {
       const codexAnswers = fullStackAnswers('codex');
