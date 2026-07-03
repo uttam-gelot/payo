@@ -90,10 +90,19 @@ export function detectNode(cwd: string): DetectionResult | null {
   const framework = firstMatch(deps, NODE_FRAMEWORK);
   set('framework', framework, 'package.json');
 
+  // A UI framework can coexist with a standalone server framework in one
+  // manifest (react + express). The table alone would report only the UI hit
+  // and misclassify the repo as frontend, so probe the server set separately.
+  const serverFramework = firstMatch(
+    deps,
+    NODE_FRAMEWORK.filter(([, v]) => NODE_SERVER_FRAMEWORKS.has(v)),
+  );
+
   const isCli = typeof pkg.bin !== 'undefined' || [...deps].some((d) => NODE_CLI.has(d));
   let projectType: string | undefined;
   if (framework && NODE_FULLSTACK_FRAMEWORKS.has(framework)) projectType = 'full-stack';
-  else if (framework && NODE_UI_FRAMEWORKS.has(framework)) projectType = 'frontend';
+  else if (framework && NODE_UI_FRAMEWORKS.has(framework))
+    projectType = serverFramework ? 'full-stack' : 'frontend';
   else if (framework && NODE_SERVER_FRAMEWORKS.has(framework)) projectType = 'backend';
   else if (isCli) projectType = 'cli';
   set('projectType', projectType, 'package.json');

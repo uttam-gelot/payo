@@ -113,6 +113,15 @@ describe('detectStack — Node', () => {
     expect('database' in det.answers).toBe(false);
   });
 
+  it('classifies React + Express in one manifest as full-stack', () => {
+    const pkg = JSON.stringify({
+      dependencies: { react: '18', 'react-dom': '18', express: '4' },
+    });
+    const det = inProject({ 'package.json': pkg }, (dir) => detectStack(dir));
+    expect(det.answers.framework).toBe('react');
+    expect(det.answers.projectType).toBe('full-stack');
+  });
+
   it('classifies an Express API as backend', () => {
     const pkg = JSON.stringify({ dependencies: { express: '4', mysql2: '3', sequelize: '6' } });
     const det = inProject({ 'package.json': pkg, 'package-lock.json': '' }, (dir) =>
