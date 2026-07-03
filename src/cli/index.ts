@@ -111,20 +111,23 @@ export async function run(): Promise<void> {
 
         summarizeDetection(result);
 
-        // Apply by tier. Tier-1 stack facts are always recorded (and so skipped).
-        // In "everything" mode, detected Tier-2 conventions are recorded too, so
-        // the interview asks only what detection could NOT find — the user still
-        // reviews/edits every recorded answer before generating. In "partial"
-        // mode conventions are left entirely to the interview.
+        // Apply by tier. Deterministic Tier-1 stack facts (manifest/lockfile/
+        // config evidence) are recorded — and so skipped. Stage-2 LLM fills are
+        // only guesses, so they are seeded instead: pre-selected in the prompt
+        // but still asked, giving the least-trustworthy source an explicit
+        // confirmation. In "everything" mode, detected Tier-2 conventions get
+        // the same treatment; in "partial" mode they are left to the interview.
         const { tier1, tier2 } = splitByTier(result.answers as Record<string, unknown>);
-        for (const [id, value] of Object.entries(tier1)) {
-          session = recordAnswer(session, id, value);
-        }
-        if (depth === 'everything') {
-          for (const [id, value] of Object.entries(tier2)) {
-            session = recordAnswer(session, id, value);
+        const apply = (entries: Record<string, unknown>): void => {
+          for (const [id, value] of Object.entries(entries)) {
+            session =
+              result.sources[id] === 'llm'
+                ? seedDetected(session, { [id]: value })
+                : recordAnswer(session, id, value);
           }
-        }
+        };
+        apply(tier1);
+        if (depth === 'everything') apply(tier2);
 
         // Detectors seed facts independent of project shape (e.g. a styling lib
         // on a backend project). Drop any recorded answer whose question is

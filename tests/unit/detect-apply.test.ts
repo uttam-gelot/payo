@@ -5,7 +5,7 @@ import { join } from 'path';
 import { inTempProject } from '../helpers/tmpProject';
 import { detectStack } from '../../src/detect/index';
 import { splitByTier } from '../../src/detect/tiers';
-import { createSession, recordAnswer, loadSession } from '../../src/state/index';
+import { createSession, recordAnswer, seedDetected, loadSession } from '../../src/state/index';
 import { reconcile } from '../../src/questions/engine';
 import { flow } from '../../src/questions/flow';
 
@@ -57,6 +57,23 @@ describe('detection apply policy', () => {
       const loaded = loadSession();
       expect(loaded?.answered).toContain('structure');
       expect(loaded?.answers.structure).toBe('monorepo');
+    }));
+
+  it('LLM-sourced fills are seeded (still asked), not recorded as facts', () =>
+    inTempProject(() => {
+      // Mirrors the CLI apply policy: a Stage-2 fill (source 'llm') is only a
+      // guess — it pre-selects the question but must not skip it.
+      const sources: Record<string, string> = { framework: 'package.json', database: 'llm' };
+      const answers: Record<string, unknown> = { framework: 'nextjs', database: 'postgresql' };
+
+      let s = createSession();
+      for (const [id, value] of Object.entries(answers)) {
+        s = sources[id] === 'llm' ? seedDetected(s, { [id]: value }) : recordAnswer(s, id, value);
+      }
+
+      expect(s.answered).toContain('framework'); // hard fact: skipped
+      expect(s.answered).not.toContain('database'); // guess: still asked
+      expect(s.answers.database).toBe('postgresql'); // …but pre-selected
     }));
 
   it('does not even pre-fill conventions in partial mode', () =>

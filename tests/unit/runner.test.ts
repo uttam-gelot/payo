@@ -4,6 +4,7 @@ import {
   offersOther,
   parseCustom,
   mergeMultiselect,
+  multiselectSeed,
   hoistRecommended,
   resolveOptions,
   reviewAction,
@@ -140,6 +141,26 @@ describe('detectionSummaryLines', () => {
 
   it('returns no lines when nothing was detected', () => {
     expect(detectionSummaryLines({ answers: {} })).toEqual([]);
+  });
+});
+
+describe('multiselectSeed', () => {
+  const options: Option<string>[] = [
+    { value: 'unit', label: 'Unit', hint: 'recommended' },
+    { value: 'integration', label: 'Integration', hint: 'recommended' },
+    { value: 'e2e', label: 'E2E' },
+  ];
+
+  it('pre-checks the recommended options when there is no prior answer', () => {
+    expect(multiselectSeed(undefined, options)).toEqual(['unit', 'integration']);
+  });
+
+  it('a prior answer wins over the recommendation, filtered to valid options', () => {
+    expect(multiselectSeed(['e2e', 'gone'], options)).toEqual(['e2e']);
+  });
+
+  it('an explicitly empty prior selection stays empty', () => {
+    expect(multiselectSeed([], options)).toEqual([]);
   });
 });
 

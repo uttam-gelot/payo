@@ -26,6 +26,62 @@ export function readJson(dir: string, file: string): Record<string, unknown> | u
 }
 
 /**
+ * Strip `//` and `/* *\/` comments and trailing commas from JSONC, tracking
+ * string state so `//` or `,]` sequences inside string values survive intact
+ * (a regex approach corrupts e.g. `"outDir": "dist//x"` and then silently
+ * loses the whole file to the JSON.parse catch).
+ */
+function stripJsonc(raw: string): string {
+  let out = '';
+  let inStr = false;
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i];
+    const next = raw[i + 1];
+    if (inStr) {
+      out += c;
+      if (c === '\\' && next !== undefined) {
+        out += next;
+        i++;
+      } else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') {
+      inStr = true;
+      out += c;
+      continue;
+    }
+    if (c === '/' && next === '/') {
+      while (i < raw.length && raw[i] !== '\n') i++;
+      i--; // keep the newline
+      continue;
+    }
+    if (c === '/' && next === '*') {
+      i += 2;
+      while (i < raw.length && !(raw[i] === '*' && raw[i + 1] === '/')) i++;
+      i++; // skip the closing '/'
+      continue;
+    }
+    if (c === ',') {
+      let j = i + 1;
+      while (j < raw.length) {
+        // A comma is trailing when only whitespace/comments sit before `}` / `]`.
+        if (/\s/.test(raw[j])) j++;
+        else if (raw[j] === '/' && raw[j + 1] === '/') {
+          while (j < raw.length && raw[j] !== '\n') j++;
+        } else if (raw[j] === '/' && raw[j + 1] === '*') {
+          j += 2;
+          while (j < raw.length && !(raw[j] === '*' && raw[j + 1] === '/')) j++;
+          j += 2;
+        } else break;
+      }
+      if (raw[j] === '}' || raw[j] === ']') continue; // drop the trailing comma
+    }
+    out += c;
+  }
+  return out;
+}
+
+/**
  * Read + parse a JSONC file (tsconfig.json routinely has `//` / block comments
  * and trailing commas, which JSON.parse rejects). Strips both before parsing;
  * returns undefined when missing or still unparseable.
@@ -33,12 +89,8 @@ export function readJson(dir: string, file: string): Record<string, unknown> | u
 export function readJsonc(dir: string, file: string): Record<string, unknown> | undefined {
   const raw = readText(dir, file);
   if (raw === undefined) return undefined;
-  const stripped = raw
-    .replace(/\/\*[\s\S]*?\*\//g, '') // block comments
-    .replace(/(^|[^:])\/\/.*$/gm, '$1') // line comments (leave `://` in strings mostly intact)
-    .replace(/,(\s*[}\]])/g, '$1'); // trailing commas
   try {
-    const parsed = JSON.parse(stripped) as unknown;
+    const parsed = JSON.parse(stripJsonc(raw)) as unknown;
     return typeof parsed === 'object' && parsed !== null
       ? (parsed as Record<string, unknown>)
       : undefined;
@@ -92,15 +144,16 @@ export function packageJsonDeps(pkg: Record<string, unknown>): Set<string> {
 }
 
 /**
- * Distribution names from a PEP 508 dependency line, lower-cased. Strips the
- * version/marker tail and any `[extras]`, so `Django>=5.0`, `fastapi[all]`, and
- * `psycopg2-binary==2.9 ; sys_platform=='linux'` yield `django`, `fastapi`,
- * `psycopg2-binary`.
+ * Distribution names from a PEP 508 dependency line, PEP 503-normalized
+ * (lower-cased, `-_.` runs collapsed to `-`). Strips the version/marker tail
+ * and any `[extras]`, so `Django>=5.0`, `fastapi[all]`, and
+ * `psycopg2_binary==2.9 ; sys_platform=='linux'` yield `django`, `fastapi`,
+ * `psycopg2-binary` — matching the normalized names the signal tables use.
  */
 function pep508Name(line: string): string | undefined {
   const cleaned = line.trim().replace(/^["']|["'],?$/g, '');
   const m = cleaned.match(/^([A-Za-z0-9._-]+)/);
-  return m ? m[1].toLowerCase() : undefined;
+  return m ? m[1].toLowerCase().replace(/[-_.]+/g, '-') : undefined;
 }
 
 /** Dependency names from a requirements.txt body. */
@@ -208,17 +261,28 @@ export function goModRequires(body: string): string[] {
   return out;
 }
 
-/** Crate names from a Cargo.toml `[dependencies]` / `[dev-dependencies]` table. */
+/** A table header that IS a deps table: `[dependencies]`, `[workspace.dependencies]`, `[target.….dev-dependencies]`. */
+const CARGO_DEPS_TABLE = /(?:^|\.)(?:dependencies|dev-dependencies|build-dependencies)$/;
+/** A deps *sub-table* declaring one crate: `[dependencies.tokio]` → `tokio`. */
+const CARGO_DEPS_SUBTABLE =
+  /(?:^|\.)(?:dependencies|dev-dependencies|build-dependencies)\.([A-Za-z0-9_-]+)$/;
+
+/**
+ * Crate names from Cargo.toml dependency tables. Covers inline entries under
+ * `[dependencies]` / `[dev-dependencies]` / `[build-dependencies]`, the
+ * `[workspace.dependencies]` and target-scoped variants, and per-crate
+ * sub-tables (`[dependencies.tokio]`), which declare the crate in the header.
+ */
 export function cargoDeps(body: string): Set<string> {
   const deps = new Set<string>();
   let inDeps = false;
   for (const raw of body.split('\n')) {
     const line = raw.trim();
     if (line.startsWith('[')) {
-      inDeps =
-        line === '[dependencies]' ||
-        line === '[dev-dependencies]' ||
-        line === '[build-dependencies]';
+      const header = line.replace(/^\[+/, '').replace(/\]+$/, '');
+      const sub = header.match(CARGO_DEPS_SUBTABLE);
+      if (sub) deps.add(sub[1]);
+      inDeps = !sub && CARGO_DEPS_TABLE.test(header);
       continue;
     }
     if (!inDeps || !line || line.startsWith('#')) continue;

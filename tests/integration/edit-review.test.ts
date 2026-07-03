@@ -64,6 +64,29 @@ describe('reconcile — drops answers no longer reachable', () => {
     expect(out.answers['auth.__recommended']).toBe('recommended');
     expect(out.answered).toContain('auth.__recommended');
   });
+
+  it('drops a closed-set answer whose value fell out of the narrowed option set', () => {
+    // Editing projectType full-stack → frontend narrows language to ts/js;
+    // the stored `rust` is still "reachable" but no longer a valid option.
+    const edited = freshSession({
+      aiTool: 'claude',
+      projectType: 'frontend',
+      projectDefinition: 'x',
+      language: 'rust',
+    });
+    const out = reconcile(flow, edited);
+    expect(out.answers.language).toBeUndefined();
+    expect(out.answered).not.toContain('language');
+    expect(out.answers.projectType).toBe('frontend'); // the edit itself is kept
+  });
+
+  it('keeps a custom "Other" value on an open-set select', () => {
+    // `framework` offers Other, so an off-list value is a legitimate custom entry.
+    const session = freshSession({ ...BASE, framework: 'qwik' });
+    const out = reconcile(flow, session);
+    expect(out.answers.framework).toBe('qwik');
+    expect(out.answered).toContain('framework');
+  });
 });
 
 describe('findQuestion', () => {
