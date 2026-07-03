@@ -14,7 +14,31 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.12
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun run lint
+      - run: bun run format:check
       - run: bun test
+
+      # The published artifact must build and run under the minimum supported Node.
+      - run: bun run build
+      - name: Smoke-test the built CLI under Node
+        run: |
+          node dist/index.js --version
+          node dist/index.js --help > /dev/null
+
+      # The tarball must stay lean — a stray asset (e.g. a demo GIF) once pushed
+      # it to 8 MB. Fail fast if it regresses past 1 MB.
+      - name: Assert package size
+        run: |
+          # --ignore-scripts: dist/ was already built above, and prepack's build
+          # output would otherwise pollute the JSON on stdout.
+          SIZE="$(npm pack --dry-run --json --ignore-scripts | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8"))[0].size')"
+          echo "packed size: ${SIZE} bytes"
+          if [ "$SIZE" -gt 1048576 ]; then
+            echo "::error::npm tarball is ${SIZE} bytes (> 1 MB) — check the files field"
+            exit 1
+          fi
