@@ -152,9 +152,48 @@ function runStatic(
   };
 }
 
-/** True once the file actually landed — exit 0 alone is not proof of a write. */
+/** True once a regular, non-empty file sits at `rel` — exit 0 alone is not proof of a write. */
 function wroteFile(rel: string): boolean {
-  return fs.existsSync(path.resolve(process.cwd(), rel));
+  try {
+    const st = fs.lstatSync(path.resolve(process.cwd(), rel));
+    return st.isFile() && st.size > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** The target's identity before an agent run, to prove the run itself wrote it. */
+interface TargetSnapshot {
+  exists: boolean;
+  size: number;
+  mtimeMs: number;
+}
+
+function snapshotTarget(rel: string): TargetSnapshot {
+  try {
+    const st = fs.lstatSync(path.resolve(process.cwd(), rel));
+    return { exists: st.isFile(), size: st.size, mtimeMs: st.mtimeMs };
+  } catch {
+    return { exists: false, size: 0, mtimeMs: 0 };
+  }
+}
+
+/**
+ * True when the target is now a regular, non-empty file that the run verifiably
+ * produced: newly created, or changed against the pre-run snapshot. A stale
+ * pre-existing file untouched by a no-op agent run must not count as success.
+ */
+function verifiedWrite(rel: string, before: TargetSnapshot): boolean {
+  if (!wroteFile(rel)) return false;
+  if (!before.exists) return true;
+  const now = snapshotTarget(rel);
+  return now.mtimeMs !== before.mtimeMs || now.size !== before.size;
+}
+
+/** Drop a failed attempt's partial output so retries and later runs never consume it. */
+function cleanupFailedAttempt(rel: string, before: TargetSnapshot): void {
+  if (before.exists) return; // pre-existing content is not ours to delete
+  fs.rmSync(path.resolve(process.cwd(), rel), { recursive: true, force: true });
 }
 
 /** Configured concurrency, clamped to [1, n] for this batch. */
@@ -212,12 +251,17 @@ function runParallel(
     }
     hooks.onSkill?.(skill.title, i + 1, specs.length);
     const prompt = promptFor(skill, rel);
-    // Retry transient agent failures; success = exit 0 AND the file landed.
+    // Retry transient agent failures; success = exit 0 AND a verified write —
+    // a pre-existing file left untouched by a no-op run must not pass.
+    const before = snapshotTarget(rel);
     let wrote = false;
     for (let attempt = 1; attempt <= attempts && !wrote; attempt++) {
       const result = await runAgent(runner, prompt);
-      wrote = result.ok && wroteFile(rel);
-      if (!wrote && attempt < attempts) hooks.onSkillRetry?.(skill.title, attempt);
+      wrote = result.ok && verifiedWrite(rel, before);
+      if (!wrote) {
+        cleanupFailedAttempt(rel, before);
+        if (attempt < attempts) hooks.onSkillRetry?.(skill.title, attempt);
+      }
     }
     if (wrote) resume?.mark(skill.id);
     hooks.onSkillResult?.(skill.title, wrote);
@@ -470,9 +514,11 @@ export async function generateBootstrap(
     const commands = resolveCommands(answers);
     const prompt = buildBootstrapMetaPrompt(answers, files, provider.displayName, commands);
     const attempts = config.generation.retries() + 1;
+    const before = snapshotTarget(rel);
     for (let attempt = 1; attempt <= attempts; attempt++) {
       const result = await runAgent(runner, prompt);
-      if (result.ok && wroteFile(rel)) return { mode: 'ai', path: rel };
+      if (result.ok && verifiedWrite(rel, before)) return { mode: 'ai', path: rel };
+      cleanupFailedAttempt(rel, before);
     }
   }
 
