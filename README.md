@@ -270,7 +270,7 @@ Have a stack you want supported or an idea to make the flow better?
 
 ## Requirements
 
-**To run Payo:** [Node.js](https://nodejs.org) **>= 18**. That's it — `npx @uge/payo`
+**To run Payo:** [Node.js](https://nodejs.org) **>= 20.12**. That's it — `npx @uge/payo`
 runs the published, Node-targeted binary, so **you do not need Bun to use Payo.**
 If you prefer Bun, `bunx @uge/payo` works too.
 
