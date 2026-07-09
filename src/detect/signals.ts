@@ -53,6 +53,7 @@ export const NODE_FRAMEWORK: readonly (readonly [string, string])[] = [
   ['fastify', 'fastify'],
   ['express', 'express'],
   ['hono', 'hono'],
+  ['koa', 'koa'],
 ];
 
 /** UI-bearing frameworks → project has a frontend. */
@@ -70,7 +71,7 @@ export const NODE_UI_FRAMEWORKS = new Set([
 ]);
 
 /** Server-only frameworks → project has a backend (no UI). */
-export const NODE_SERVER_FRAMEWORKS = new Set(['nestjs', 'fastify', 'express', 'hono']);
+export const NODE_SERVER_FRAMEWORKS = new Set(['nestjs', 'fastify', 'express', 'hono', 'koa']);
 
 /** Meta-frameworks that ship their own server → treat as full-stack. */
 export const NODE_FULLSTACK_FRAMEWORKS = new Set(['nextjs', 'nuxtjs', 'sveltekit', 'remix']);

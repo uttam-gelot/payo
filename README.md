@@ -191,7 +191,7 @@ Each tool gets files in its own native format and location:
 
 ## What it asks about
 
-Payo understands **27 frameworks, 27 ORMs, and 17 databases** across
+Payo understands **28 frameworks, 27 ORMs, and 17 databases** across
 **TypeScript/JavaScript, Python, Go, Rust, PHP, and C#** — and tailors its follow-up
 questions to whatever you pick. Dimensions covered:
 

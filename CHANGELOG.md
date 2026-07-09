@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Koa support on both paths: the questionnaire offers Koa (framework) with
+  follow-ups for routing (`@koa/router`), body parsing, and security middleware,
+  and detection reads `package.json` to recognize the `koa` dependency.
 - PHP / Laravel support on both paths: the questionnaire offers Laravel
   (framework), Eloquent (ORM), Laravel Sanctum / Breeze / Passport (auth), and
   PHP-ecosystem tooling (Pint, PHPStan/Psalm, Monolog, PHPUnit/Pest, Symfony

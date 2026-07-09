@@ -136,6 +136,19 @@ describe('detectStack — Node', () => {
     });
   });
 
+  it('classifies a Koa API as backend', () => {
+    const pkg = JSON.stringify({ dependencies: { koa: '2', '@koa/router': '12' } });
+    const det = inProject({ 'package.json': pkg, 'package-lock.json': '' }, (dir) =>
+      detectStack(dir),
+    );
+    expect(det.answers).toMatchObject({
+      framework: 'koa',
+      projectType: 'backend',
+      packageManager: 'npm',
+    });
+    assertWithinOptions(det.answers);
+  });
+
   it('does not record UI-only facts (styling/state) on a backend project', () => {
     const pkg = JSON.stringify({
       dependencies: { express: '4', tailwindcss: '3', '@tanstack/react-query': '5' },
