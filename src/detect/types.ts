@@ -8,6 +8,7 @@ export type DetectionSource =
   | 'go.mod'
   | 'Cargo.toml'
   | 'composer.json'
+  | 'csproj'
   | 'lockfile'
   | 'config'
   | 'llm';

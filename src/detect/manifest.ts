@@ -126,6 +126,62 @@ export function readText(dir: string, file: string): string | undefined {
   }
 }
 
+/**
+ * NuGet package ids and project SDKs from .NET project files. A .NET repo has no
+ * fixed-name manifest — dependencies live in one or more `*.csproj` files (often
+ * under `src/<Project>/`), so we scan `dir` and up to two directory levels below
+ * it, plus a root `Directory.Packages.props` (central package management). Ids are
+ * lower-cased (NuGet ids are case-insensitive) to match the signal tables.
+ * Returns undefined when no project file exists.
+ */
+export function dotnetDeps(dir: string): { deps: Set<string>; sdks: string[] } | undefined {
+  const IGNORE = new Set(['bin', 'obj', 'node_modules', '.git', '.vs']);
+  const projFiles: string[] = [];
+  const scan = (d: string, depth: number): void => {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.isFile() && e.name.endsWith('.csproj')) projFiles.push(path.join(d, e.name));
+      else if (e.isDirectory() && depth > 0 && !IGNORE.has(e.name))
+        scan(path.join(d, e.name), depth - 1);
+    }
+  };
+  scan(dir, 2);
+  const propsPath = path.join(dir, 'Directory.Packages.props');
+  const hasProps = fs.existsSync(propsPath);
+  if (projFiles.length === 0 && !hasProps) return undefined;
+
+  const deps = new Set<string>();
+  const sdks: string[] = [];
+  const readXml = (p: string): string | undefined => {
+    try {
+      return fs.readFileSync(p, 'utf-8');
+    } catch {
+      return undefined;
+    }
+  };
+  for (const f of projFiles) {
+    const xml = readXml(f);
+    if (xml === undefined) continue;
+    for (const m of xml.matchAll(/<Project[^>]*\bSdk\s*=\s*"([^"]+)"/gi)) sdks.push(m[1]);
+    for (const m of xml.matchAll(/<PackageReference[^>]*\bInclude\s*=\s*"([^"]+)"/gi))
+      deps.add(m[1].toLowerCase());
+    for (const m of xml.matchAll(/<FrameworkReference[^>]*\bInclude\s*=\s*"([^"]+)"/gi))
+      deps.add(m[1].toLowerCase());
+  }
+  if (hasProps) {
+    const xml = readXml(propsPath);
+    if (xml !== undefined)
+      for (const m of xml.matchAll(/<PackageVersion[^>]*\bInclude\s*=\s*"([^"]+)"/gi))
+        deps.add(m[1].toLowerCase());
+  }
+  return { deps, sdks };
+}
+
 /** All package names declared across composer.json's `require` / `require-dev`. */
 export function composerDeps(pkg: Record<string, unknown>): Set<string> {
   const deps = new Set<string>();
