@@ -472,6 +472,70 @@ describe('detectStack — PHP', () => {
   });
 });
 
+describe('detectStack — C# / .NET', () => {
+  it('detects an ASP.NET Core + EF Core (SQL Server) app from a .csproj', () => {
+    const csproj = `<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
+    <PackageReference Include="FluentValidation" Version="11.9.0" />
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.0" />
+    <PackageReference Include="xunit" Version="2.9.0" />
+  </ItemGroup>
+</Project>`;
+    const det = inProject({ 'Api.csproj': csproj }, (dir) => detectStack(dir));
+    expect(det.answers).toMatchObject({
+      language: 'csharp',
+      projectType: 'backend',
+      framework: 'aspnet-core',
+      orm: 'ef-core',
+      database: 'sqlserver',
+      authApproach: 'jwt-bearer',
+      validation: 'fluentvalidation',
+      logger: 'serilog',
+      formatter: 'dotnet-format',
+      testRunner: 'xunit',
+    });
+    assertWithinOptions(det.answers);
+  });
+
+  it('detects a Dapper + Postgres app and CSharpier formatter from a nested .csproj', () => {
+    const csproj = `<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.0" />
+    <PackageReference Include="Npgsql" Version="8.0.0" />
+    <PackageReference Include="CSharpier" Version="0.28.0" />
+  </ItemGroup>
+</Project>`;
+    const det = inProject({ 'src/Api/Api.csproj': csproj }, (dir) => detectStack(dir));
+    expect(det.answers).toMatchObject({
+      language: 'csharp',
+      projectType: 'backend',
+      framework: 'aspnet-core',
+      orm: 'dapper',
+      database: 'postgresql',
+      formatter: 'csharpier',
+    });
+    assertWithinOptions(det.answers);
+  });
+
+  it('detects a standalone System.CommandLine CLI', () => {
+    const csproj = `<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4" />
+  </ItemGroup>
+</Project>`;
+    const det = inProject({ 'Tool.csproj': csproj }, (dir) => detectStack(dir));
+    expect(det.answers).toMatchObject({
+      language: 'csharp',
+      projectType: 'cli',
+      framework: 'system-commandline',
+    });
+    assertWithinOptions(det.answers);
+  });
+});
+
 describe('detectStack — greenfield / tie-break', () => {
   it('returns an empty result when no manifest exists', () => {
     const det = inProject({ 'README.md': '# hi' }, (dir) => detectStack(dir));

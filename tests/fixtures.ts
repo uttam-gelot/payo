@@ -55,6 +55,13 @@ export const contexts: Record<string, Answers> = {
     database: 'mysql',
     orm: 'eloquent',
   },
+  csharpBackend: {
+    language: 'csharp',
+    projectType: 'backend',
+    framework: 'aspnet-core',
+    database: 'sqlserver',
+    orm: 'ef-core',
+  },
 };
 
 export const allContexts: Answers[] = Object.values(contexts);
