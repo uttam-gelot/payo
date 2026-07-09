@@ -33,6 +33,8 @@ import { chi } from './framework/chi';
 import { axum } from './framework/axum';
 import { actix } from './framework/actix';
 import { rocket } from './framework/rocket';
+// Frameworks — PHP
+import { laravel } from './framework/laravel';
 
 // ORMs / data-access — JS/TS
 import { prisma } from './orm/prisma';
@@ -62,6 +64,8 @@ import { seaorm } from './orm/seaorm';
 import { sqlxRust } from './orm/sqlx-rust';
 import { diesel } from './orm/diesel';
 import { mongodbRust } from './orm/mongodb-rust';
+// ORMs — PHP
+import { eloquent } from './orm/eloquent';
 
 // Databases (follow-up questions)
 import { postgres } from './db/postgres';
@@ -105,6 +109,9 @@ import { sessions } from './auth/sessions';
 import { jsonwebtoken } from './auth/jsonwebtoken';
 import { towerSessions } from './auth/tower-sessions';
 import { oauth2 } from './auth/oauth2';
+import { laravelSanctum } from './auth/laravel-sanctum';
+import { laravelBreeze } from './auth/laravel-breeze';
+import { laravelPassport } from './auth/laravel-passport';
 
 // Compiler / tooling config
 import { tsconfig } from './config/tsconfig';
@@ -139,6 +146,8 @@ for (const m of [
   axum,
   actix,
   rocket,
+  // frameworks — PHP
+  laravel,
   // orms — JS/TS
   prisma,
   drizzle,
@@ -167,6 +176,8 @@ for (const m of [
   sqlxRust,
   diesel,
   mongodbRust,
+  // orms — PHP
+  eloquent,
   // databases
   postgres,
   mysql,
@@ -207,6 +218,9 @@ for (const m of [
   jsonwebtoken,
   towerSessions,
   oauth2,
+  laravelSanctum,
+  laravelBreeze,
+  laravelPassport,
   // config
   tsconfig,
 ]) {

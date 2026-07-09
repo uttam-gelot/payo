@@ -48,3 +48,6 @@ export const isTsJs = (a: Answers): boolean =>
 
 /** TypeScript only — gates compiler-config questions (tsconfig). */
 export const isTs = (a: Answers): boolean => a.language === 'typescript';
+
+/** PHP — gates Laravel and other PHP-ecosystem modules. */
+export const isPhp = (a: Answers): boolean => a.language === 'php';

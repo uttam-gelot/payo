@@ -423,6 +423,55 @@ describe('detectStack — Rust', () => {
   });
 });
 
+describe('detectStack — PHP', () => {
+  it('detects a Laravel + Sanctum app from composer.json', () => {
+    const composer = JSON.stringify({
+      name: 'acme/app',
+      require: {
+        php: '^8.3',
+        'laravel/framework': '^11.0',
+        'laravel/sanctum': '^4.0',
+        'ext-pdo_mysql': '*',
+        'monolog/monolog': '^3.0',
+      },
+      'require-dev': {
+        'laravel/pint': '^1.0',
+        'larastan/larastan': '^2.0',
+        'pestphp/pest': '^3.0',
+        'phpunit/phpunit': '^11.0',
+      },
+    });
+    const det = inProject({ 'composer.json': composer }, (dir) => detectStack(dir));
+    expect(det.answers).toMatchObject({
+      language: 'php',
+      projectType: 'backend',
+      framework: 'laravel',
+      orm: 'eloquent',
+      database: 'mysql',
+      authApproach: 'laravel-sanctum',
+      logger: 'monolog',
+      formatter: 'pint',
+      linter: 'phpstan',
+      testRunner: 'pest',
+    });
+    assertWithinOptions(det.answers);
+  });
+
+  it('detects a standalone Symfony Console CLI', () => {
+    const composer = JSON.stringify({
+      name: 'acme/cli',
+      require: { php: '^8.3', 'symfony/console': '^7.0' },
+    });
+    const det = inProject({ 'composer.json': composer }, (dir) => detectStack(dir));
+    expect(det.answers).toMatchObject({
+      language: 'php',
+      projectType: 'cli',
+      framework: 'symfony-console',
+    });
+    assertWithinOptions(det.answers);
+  });
+});
+
 describe('detectStack — greenfield / tie-break', () => {
   it('returns an empty result when no manifest exists', () => {
     const det = inProject({ 'README.md': '# hi' }, (dir) => detectStack(dir));

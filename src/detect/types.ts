@@ -7,6 +7,7 @@ export type DetectionSource =
   | 'requirements.txt'
   | 'go.mod'
   | 'Cargo.toml'
+  | 'composer.json'
   | 'lockfile'
   | 'config'
   | 'llm';

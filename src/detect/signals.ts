@@ -349,3 +349,70 @@ export const RUST_LOGGER: readonly (readonly [string, string])[] = [
   ['tracing', 'tracing'],
   ['log', 'log'],
 ];
+
+// --- PHP (Composer package names from composer.json require/require-dev) ------
+
+export const PHP_FRAMEWORK: readonly (readonly [string, string])[] = [
+  ['laravel/framework', 'laravel'],
+];
+
+/** CLI-oriented PHP packages → project is a CLI tool (when no web framework). */
+export const PHP_CLI = new Set(['symfony/console', 'laravel-zero/framework']);
+
+/**
+ * CLI package → framework answer value (the cliFrameworkOptions ids). Laravel Zero
+ * is built on symfony/console, so match it first.
+ */
+export const PHP_CLI_FRAMEWORK: readonly (readonly [string, string])[] = [
+  ['laravel-zero/framework', 'laravel-zero'],
+  ['symfony/console', 'symfony-console'],
+];
+
+// PHP talks to databases through PDO/mysqli — the engine shows up as a platform
+// `ext-*` requirement (or a driver package) rather than a userland library.
+export const PHP_DATABASE: readonly (readonly [string, string])[] = [
+  ['ext-pgsql', 'postgresql'],
+  ['ext-pdo_pgsql', 'postgresql'],
+  ['ext-mysqli', 'mysql'],
+  ['ext-pdo_mysql', 'mysql'],
+  ['ext-pdo_sqlite', 'sqlite'],
+  ['ext-sqlite3', 'sqlite'],
+  ['mongodb/laravel-mongodb', 'mongodb'],
+  ['ext-mongodb', 'mongodb'],
+];
+
+// Eloquent ships inside laravel/framework (illuminate/database), so a Laravel
+// app is handled in the detector; this catches a standalone Eloquent install.
+export const PHP_ORM: readonly (readonly [string, string])[] = [
+  ['illuminate/database', 'eloquent'],
+];
+
+export const PHP_VALIDATION: readonly (readonly [string, string])[] = [
+  ['respect/validation', 'respect'],
+];
+
+export const PHP_LOGGER: readonly (readonly [string, string])[] = [['monolog/monolog', 'monolog']];
+
+export const PHP_FORMATTER: readonly (readonly [string, string])[] = [
+  ['laravel/pint', 'pint'],
+  ['friendsofphp/php-cs-fixer', 'php-cs-fixer'],
+];
+
+// larastan/larastan is PHPStan packaged for Laravel — both map to phpstan.
+export const PHP_LINTER: readonly (readonly [string, string])[] = [
+  ['phpstan/phpstan', 'phpstan'],
+  ['larastan/larastan', 'phpstan'],
+  ['vimeo/psalm', 'psalm'],
+];
+
+// Pest is built on PHPUnit, so match the more specific signal first.
+export const PHP_TEST_RUNNER: readonly (readonly [string, string])[] = [
+  ['pestphp/pest', 'pest'],
+  ['phpunit/phpunit', 'phpunit'],
+];
+
+export const PHP_AUTH: readonly (readonly [string, string])[] = [
+  ['laravel/sanctum', 'laravel-sanctum'],
+  ['laravel/passport', 'laravel-passport'],
+  ['laravel/breeze', 'laravel-breeze'],
+];
