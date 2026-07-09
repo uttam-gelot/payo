@@ -48,6 +48,13 @@ export const contexts: Record<string, Answers> = {
     database: 'postgresql',
     orm: 'seaorm',
   },
+  phpBackend: {
+    language: 'php',
+    projectType: 'backend',
+    framework: 'laravel',
+    database: 'mysql',
+    orm: 'eloquent',
+  },
 };
 
 export const allContexts: Answers[] = Object.values(contexts);
