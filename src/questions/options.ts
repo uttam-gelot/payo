@@ -53,6 +53,7 @@ export const languageOptions = (a: Answers): Option<string>[] =>
         { value: 'python', label: 'Python' },
         { value: 'go', label: 'Go' },
         { value: 'rust', label: 'Rust' },
+        { value: 'php', label: 'PHP' },
         { value: 'javascript', label: 'JavaScript' },
       ];
 
@@ -88,6 +89,11 @@ export const cliFrameworkOptions = (a: Answers): Option<string>[] => {
       return [
         { value: 'clap', label: 'clap', hint: 'recommended' },
         { value: 'argh', label: 'argh' },
+      ];
+    case 'php':
+      return [
+        { value: 'symfony-console', label: 'Symfony Console', hint: 'recommended' },
+        { value: 'laravel-zero', label: 'Laravel Zero' },
       ];
     default:
       return [{ value: 'commander', label: 'Commander.js', hint: 'recommended' }];
@@ -215,6 +221,12 @@ export const formatterOptions = (a: Answers): Option<string>[] => {
         { value: 'rustfmt', label: 'rustfmt', hint: 'recommended' },
         { value: 'none', label: 'None' },
       ];
+    case 'php':
+      return [
+        { value: 'pint', label: 'Laravel Pint', hint: 'recommended' },
+        { value: 'php-cs-fixer', label: 'PHP-CS-Fixer' },
+        { value: 'none', label: 'None' },
+      ];
     default:
       return [
         { value: 'prettier', label: 'Prettier' },
@@ -249,6 +261,12 @@ export const linterOptions = (a: Answers): Option<string>[] => {
     case 'rust':
       return [
         { value: 'clippy', label: 'Clippy', hint: 'recommended' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'php':
+      return [
+        { value: 'phpstan', label: 'PHPStan / Larastan', hint: 'recommended' },
+        { value: 'psalm', label: 'Psalm' },
         { value: 'none', label: 'None' },
       ];
     default:
@@ -338,6 +356,16 @@ export const loggerOptions = (a: Answers): Option<string>[] => {
         },
         { value: 'none', label: 'None' },
       ];
+    case 'php':
+      return [
+        { value: 'monolog', label: 'Monolog', hint: 'recommended' },
+        {
+          value: 'centralized',
+          label:
+            'Custom centralized logger — one in-house module wrapping stdlib/console, reused everywhere (no third-party)',
+        },
+        { value: 'none', label: 'None' },
+      ];
     default:
       return [
         { value: 'pino', label: 'Pino', hint: 'recommended' },
@@ -388,6 +416,12 @@ export const testRunnerOptions = (a: Answers): Option<string>[] => {
     case 'rust':
       return [
         { value: 'cargo-test', label: 'cargo test', hint: 'recommended' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'php':
+      return [
+        { value: 'pest', label: 'Pest', hint: 'recommended' },
+        { value: 'phpunit', label: 'PHPUnit' },
         { value: 'none', label: 'None' },
       ];
     default:
@@ -457,6 +491,15 @@ export const authApproachOptions = (a: Answers): Option<string>[] => {
         { value: 'jsonwebtoken', label: 'jsonwebtoken (JWT)', hint: 'recommended' },
         { value: 'tower-sessions', label: 'tower-sessions' },
         { value: 'oauth2', label: 'oauth2 crate' },
+        ...HOSTED_AUTH,
+        none,
+      ];
+    case 'php':
+      return [
+        { value: 'laravel-sanctum', label: 'Laravel Sanctum', hint: 'recommended' },
+        { value: 'laravel-breeze', label: 'Laravel Breeze' },
+        { value: 'laravel-passport', label: 'Laravel Passport (OAuth2)' },
+        { value: 'custom-jwt', label: 'Custom JWT' },
         ...HOSTED_AUTH,
         none,
       ];
@@ -560,6 +603,16 @@ export const validationOptions = (a: Answers): Option<string>[] => {
       return [
         { value: 'validator', label: 'validator', hint: 'recommended' },
         { value: 'garde', label: 'garde' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'php':
+      return [
+        {
+          value: 'laravel-validation',
+          label: 'Laravel Validation (built-in)',
+          hint: 'recommended',
+        },
+        { value: 'respect', label: 'Respect\\Validation' },
         { value: 'none', label: 'None' },
       ];
     default:
