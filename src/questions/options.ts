@@ -54,6 +54,7 @@ export const languageOptions = (a: Answers): Option<string>[] =>
         { value: 'go', label: 'Go' },
         { value: 'rust', label: 'Rust' },
         { value: 'php', label: 'PHP' },
+        { value: 'csharp', label: 'C#' },
         { value: 'javascript', label: 'JavaScript' },
       ];
 
@@ -94,6 +95,11 @@ export const cliFrameworkOptions = (a: Answers): Option<string>[] => {
       return [
         { value: 'symfony-console', label: 'Symfony Console', hint: 'recommended' },
         { value: 'laravel-zero', label: 'Laravel Zero' },
+      ];
+    case 'csharp':
+      return [
+        { value: 'system-commandline', label: 'System.CommandLine', hint: 'recommended' },
+        { value: 'spectre-console', label: 'Spectre.Console.Cli' },
       ];
     default:
       return [{ value: 'commander', label: 'Commander.js', hint: 'recommended' }];
@@ -141,6 +147,7 @@ export const databaseOptions: Option<string>[] = [
   { value: 'mysql', label: 'MySQL' },
   { value: 'mariadb', label: 'MariaDB' },
   { value: 'sqlite', label: 'SQLite' },
+  { value: 'sqlserver', label: 'SQL Server' },
   { value: 'turso', label: 'Turso / libSQL' },
   { value: 'cockroachdb', label: 'CockroachDB' },
   { value: 'neon', label: 'Neon (serverless Postgres)' },
@@ -227,6 +234,12 @@ export const formatterOptions = (a: Answers): Option<string>[] => {
         { value: 'php-cs-fixer', label: 'PHP-CS-Fixer' },
         { value: 'none', label: 'None' },
       ];
+    case 'csharp':
+      return [
+        { value: 'dotnet-format', label: 'dotnet format (built-in)', hint: 'recommended' },
+        { value: 'csharpier', label: 'CSharpier' },
+        { value: 'none', label: 'None' },
+      ];
     default:
       return [
         { value: 'prettier', label: 'Prettier' },
@@ -267,6 +280,13 @@ export const linterOptions = (a: Answers): Option<string>[] => {
       return [
         { value: 'phpstan', label: 'PHPStan / Larastan', hint: 'recommended' },
         { value: 'psalm', label: 'Psalm' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'csharp':
+      return [
+        { value: 'roslyn-analyzers', label: '.NET analyzers (built-in)', hint: 'recommended' },
+        { value: 'roslynator', label: 'Roslynator' },
+        { value: 'stylecop', label: 'StyleCop Analyzers' },
         { value: 'none', label: 'None' },
       ];
     default:
@@ -366,6 +386,18 @@ export const loggerOptions = (a: Answers): Option<string>[] => {
         },
         { value: 'none', label: 'None' },
       ];
+    case 'csharp':
+      return [
+        { value: 'serilog', label: 'Serilog', hint: 'recommended' },
+        { value: 'nlog', label: 'NLog' },
+        { value: 'ms-logging', label: 'Microsoft.Extensions.Logging (built-in)' },
+        {
+          value: 'centralized',
+          label:
+            'Custom centralized logger — one in-house module wrapping stdlib/console, reused everywhere (no third-party)',
+        },
+        { value: 'none', label: 'None' },
+      ];
     default:
       return [
         { value: 'pino', label: 'Pino', hint: 'recommended' },
@@ -422,6 +454,13 @@ export const testRunnerOptions = (a: Answers): Option<string>[] => {
       return [
         { value: 'pest', label: 'Pest', hint: 'recommended' },
         { value: 'phpunit', label: 'PHPUnit' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'csharp':
+      return [
+        { value: 'xunit', label: 'xUnit', hint: 'recommended' },
+        { value: 'nunit', label: 'NUnit' },
+        { value: 'mstest', label: 'MSTest' },
         { value: 'none', label: 'None' },
       ];
     default:
@@ -499,6 +538,14 @@ export const authApproachOptions = (a: Answers): Option<string>[] => {
         { value: 'laravel-sanctum', label: 'Laravel Sanctum', hint: 'recommended' },
         { value: 'laravel-breeze', label: 'Laravel Breeze' },
         { value: 'laravel-passport', label: 'Laravel Passport (OAuth2)' },
+        { value: 'custom-jwt', label: 'Custom JWT' },
+        ...HOSTED_AUTH,
+        none,
+      ];
+    case 'csharp':
+      return [
+        { value: 'aspnet-identity', label: 'ASP.NET Core Identity', hint: 'recommended' },
+        { value: 'jwt-bearer', label: 'JWT Bearer' },
         { value: 'custom-jwt', label: 'Custom JWT' },
         ...HOSTED_AUTH,
         none,
@@ -613,6 +660,12 @@ export const validationOptions = (a: Answers): Option<string>[] => {
           hint: 'recommended',
         },
         { value: 'respect', label: 'Respect\\Validation' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'csharp':
+      return [
+        { value: 'fluentvalidation', label: 'FluentValidation', hint: 'recommended' },
+        { value: 'data-annotations', label: 'DataAnnotations (built-in)' },
         { value: 'none', label: 'None' },
       ];
     default:

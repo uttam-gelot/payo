@@ -35,6 +35,8 @@ import { actix } from './framework/actix';
 import { rocket } from './framework/rocket';
 // Frameworks — PHP
 import { laravel } from './framework/laravel';
+// Frameworks — C# / .NET
+import { aspnetCore } from './framework/aspnet-core';
 
 // ORMs / data-access — JS/TS
 import { prisma } from './orm/prisma';
@@ -66,6 +68,9 @@ import { diesel } from './orm/diesel';
 import { mongodbRust } from './orm/mongodb-rust';
 // ORMs — PHP
 import { eloquent } from './orm/eloquent';
+// ORMs — C# / .NET
+import { efCore } from './orm/ef-core';
+import { dapper } from './orm/dapper';
 
 // Databases (follow-up questions)
 import { postgres } from './db/postgres';
@@ -148,6 +153,8 @@ for (const m of [
   rocket,
   // frameworks — PHP
   laravel,
+  // frameworks — C# / .NET
+  aspnetCore,
   // orms — JS/TS
   prisma,
   drizzle,
@@ -178,6 +185,9 @@ for (const m of [
   mongodbRust,
   // orms — PHP
   eloquent,
+  // orms — C# / .NET
+  efCore,
+  dapper,
   // databases
   postgres,
   mysql,
