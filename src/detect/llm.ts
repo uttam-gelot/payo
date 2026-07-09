@@ -38,6 +38,7 @@ const MANIFESTS = [
   'go.mod',
   'Cargo.toml',
   'composer.json',
+  'global.json',
   'Pipfile',
 ];
 
@@ -54,6 +55,7 @@ const LANG_MANIFEST: Record<string, string[]> = {
   go: ['go.mod'],
   rust: ['Cargo.toml'],
   php: ['composer.json'],
+  csharp: ['global.json', 'Directory.Packages.props'],
 };
 
 const RESULT_FILE = 'detection-llm.json';

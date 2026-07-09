@@ -416,3 +416,76 @@ export const PHP_AUTH: readonly (readonly [string, string])[] = [
   ['laravel/passport', 'laravel-passport'],
   ['laravel/breeze', 'laravel-breeze'],
 ];
+
+// --- C# / .NET (NuGet PackageReference ids from *.csproj, lower-cased) --------
+// The framework (ASP.NET Core) is inferred from the project SDK attribute in the
+// detector; these tables cover the dependency-driven answers.
+
+/** CLI-oriented .NET packages → project is a CLI tool (when no web SDK). */
+export const DOTNET_CLI = new Set(['system.commandline', 'spectre.console.cli', 'spectre.console']);
+
+/** CLI package → framework answer value (cliFrameworkOptions ids). */
+export const DOTNET_CLI_FRAMEWORK: readonly (readonly [string, string])[] = [
+  ['system.commandline', 'system-commandline'],
+  ['spectre.console.cli', 'spectre-console'],
+  ['spectre.console', 'spectre-console'],
+];
+
+// EF Core provider packages name the engine; raw ADO.NET drivers do too.
+export const DOTNET_DATABASE: readonly (readonly [string, string])[] = [
+  ['npgsql.entityframeworkcore.postgresql', 'postgresql'],
+  ['npgsql', 'postgresql'],
+  ['pomelo.entityframeworkcore.mysql', 'mysql'],
+  ['mysqlconnector', 'mysql'],
+  ['mysql.data', 'mysql'],
+  ['microsoft.entityframeworkcore.sqlserver', 'sqlserver'],
+  ['microsoft.data.sqlclient', 'sqlserver'],
+  ['system.data.sqlclient', 'sqlserver'],
+  ['microsoft.entityframeworkcore.sqlite', 'sqlite'],
+  ['microsoft.data.sqlite', 'sqlite'],
+  ['mongodb.entityframeworkcore', 'mongodb'],
+  ['mongodb.driver', 'mongodb'],
+];
+
+// EF Core is detected via a prefix scan in the detector (many provider packages
+// share the microsoft.entityframeworkcore.* prefix); this catches Dapper.
+export const DOTNET_ORM: readonly (readonly [string, string])[] = [['dapper', 'dapper']];
+
+export const DOTNET_VALIDATION: readonly (readonly [string, string])[] = [
+  ['fluentvalidation', 'fluentvalidation'],
+];
+
+// microsoft.extensions.logging is the built-in facade; only counted when directly
+// referenced (Serilog/NLog take precedence and are matched first).
+export const DOTNET_LOGGER: readonly (readonly [string, string])[] = [
+  ['serilog.aspnetcore', 'serilog'],
+  ['serilog', 'serilog'],
+  ['nlog.web.aspnetcore', 'nlog'],
+  ['nlog', 'nlog'],
+  ['microsoft.extensions.logging', 'ms-logging'],
+];
+
+// dotnet format is the built-in default (set unconditionally in the detector);
+// CSharpier is the only opt-in formatter that ships as a package.
+export const DOTNET_FORMATTER: readonly (readonly [string, string])[] = [
+  ['csharpier', 'csharpier'],
+];
+
+// Built-in Roslyn analyzers are always on and undetectable; only the opt-in
+// analyzer packages leave a signal.
+export const DOTNET_LINTER: readonly (readonly [string, string])[] = [
+  ['roslynator.analyzers', 'roslynator'],
+  ['stylecop.analyzers', 'stylecop'],
+];
+
+export const DOTNET_TEST_RUNNER: readonly (readonly [string, string])[] = [
+  ['xunit', 'xunit'],
+  ['nunit', 'nunit'],
+  ['mstest.testframework', 'mstest'],
+];
+
+export const DOTNET_AUTH: readonly (readonly [string, string])[] = [
+  ['microsoft.aspnetcore.identity.entityframeworkcore', 'aspnet-identity'],
+  ['microsoft.aspnetcore.identity', 'aspnet-identity'],
+  ['microsoft.aspnetcore.authentication.jwtbearer', 'jwt-bearer'],
+];

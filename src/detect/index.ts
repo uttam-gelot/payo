@@ -12,11 +12,12 @@ import { detectPython } from './python';
 import { detectGo } from './go';
 import { detectRust } from './rust';
 import { detectPhp } from './php';
+import { detectDotnet } from './dotnet';
 
 export type { DetectionResult, DetectionSource } from './types';
 
 /** Detectors in priority order — used to break ties when several manifests coexist. */
-const DETECTORS = [detectNode, detectPython, detectGo, detectRust, detectPhp];
+const DETECTORS = [detectNode, detectPython, detectGo, detectRust, detectPhp, detectDotnet];
 
 /**
  * Detect the stack rooted at `cwd`. When more than one ecosystem's manifest is

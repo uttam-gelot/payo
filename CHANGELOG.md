@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (framework), Eloquent (ORM), Laravel Sanctum / Breeze / Passport (auth), and
   PHP-ecosystem tooling (Pint, PHPStan/Psalm, Monolog, PHPUnit/Pest, Symfony
   Console), and detection reads `composer.json` to pre-fill them.
+- C# / .NET support on both paths: the questionnaire offers ASP.NET Core
+  (framework), Entity Framework Core and Dapper (ORMs), SQL Server (database),
+  and .NET-ecosystem tooling (dotnet format / CSharpier, Roslynator / StyleCop,
+  Serilog / NLog, xUnit / NUnit / MSTest, FluentValidation, ASP.NET Core
+  Identity / JWT Bearer, System.CommandLine / Spectre.Console), and detection
+  reads `*.csproj` package references to pre-fill them.
 
 ## [1.2.0] - 2026-07-03
 
