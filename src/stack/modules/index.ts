@@ -19,6 +19,7 @@ import { astro } from './framework/astro';
 import { express } from './framework/express';
 import { fastify } from './framework/fastify';
 import { hono } from './framework/hono';
+import { koa } from './framework/koa';
 // Frameworks — Python
 import { fastapi } from './framework/fastapi';
 import { django } from './framework/django';
@@ -137,6 +138,7 @@ for (const m of [
   express,
   fastify,
   hono,
+  koa,
   // frameworks — Python
   fastapi,
   django,
