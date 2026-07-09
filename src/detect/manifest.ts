@@ -126,6 +126,18 @@ export function readText(dir: string, file: string): string | undefined {
   }
 }
 
+/** All package names declared across composer.json's `require` / `require-dev`. */
+export function composerDeps(pkg: Record<string, unknown>): Set<string> {
+  const deps = new Set<string>();
+  for (const key of ['require', 'require-dev']) {
+    const map = pkg[key];
+    if (map && typeof map === 'object') {
+      for (const name of Object.keys(map)) deps.add(name.toLowerCase());
+    }
+  }
+  return deps;
+}
+
 /** All dependency names declared across package.json's dep maps. */
 export function packageJsonDeps(pkg: Record<string, unknown>): Set<string> {
   const deps = new Set<string>();

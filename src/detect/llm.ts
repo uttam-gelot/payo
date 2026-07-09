@@ -37,6 +37,7 @@ const MANIFESTS = [
   'requirements.txt',
   'go.mod',
   'Cargo.toml',
+  'composer.json',
   'Pipfile',
 ];
 
@@ -52,6 +53,7 @@ const LANG_MANIFEST: Record<string, string[]> = {
   python: ['pyproject.toml', 'requirements.txt', 'Pipfile'],
   go: ['go.mod'],
   rust: ['Cargo.toml'],
+  php: ['composer.json'],
 };
 
 const RESULT_FILE = 'detection-llm.json';
