@@ -182,6 +182,71 @@ export function dotnetDeps(dir: string): { deps: Set<string>; sdks: string[] } |
   return { deps, sdks };
 }
 
+/**
+ * Dependency + plugin identifiers from a JVM build, plus which build tool
+ * declared them. A Java repo has no fixed-name manifest — a Maven build uses
+ * `pom.xml`, a Gradle build uses `build.gradle` / `build.gradle.kts` — and
+ * multi-module projects keep dependencies in per-module build files, so we scan
+ * `dir` and up to two directory levels below it. The signal tables key on
+ * artifact ids / plugin-id segments (all lower-cased), so we collect:
+ *  - Maven `<artifactId>` values (covers dependencies, plugins, and the parent),
+ *  - Gradle dependency coordinates `group:artifact:version` (the artifact), and
+ *  - Gradle / Maven plugin ids (both the full id and its last dotted segment).
+ * Returns undefined when no build file exists. `tool` reflects the file found
+ * first in scan order (Maven wins a polyglot Maven+Gradle root).
+ */
+export function javaDeps(dir: string): { deps: Set<string>; tool: 'maven' | 'gradle' } | undefined {
+  const IGNORE = new Set(['build', 'target', 'out', 'node_modules', '.git', '.gradle', '.idea']);
+  const mavenFiles: string[] = [];
+  const gradleFiles: string[] = [];
+  const scan = (d: string, depth: number): void => {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.isFile()) {
+        if (e.name === 'pom.xml') mavenFiles.push(path.join(d, e.name));
+        else if (e.name === 'build.gradle' || e.name === 'build.gradle.kts')
+          gradleFiles.push(path.join(d, e.name));
+      } else if (e.isDirectory() && depth > 0 && !IGNORE.has(e.name)) {
+        scan(path.join(d, e.name), depth - 1);
+      }
+    }
+  };
+  scan(dir, 2);
+  if (mavenFiles.length === 0 && gradleFiles.length === 0) return undefined;
+
+  const deps = new Set<string>();
+  /** Add a plugin id and its last dotted segment (`com.diffplug.spotless` → `spotless`). */
+  const addPlugin = (id: string): void => {
+    const p = id.toLowerCase();
+    deps.add(p);
+    const seg = p.split('.').pop();
+    if (seg) deps.add(seg);
+  };
+
+  for (const f of mavenFiles) {
+    const xml = readText(dir, path.relative(dir, f));
+    if (xml === undefined) continue;
+    for (const m of xml.matchAll(/<artifactId>\s*([^<\s]+)\s*<\/artifactId>/gi))
+      deps.add(m[1].toLowerCase());
+  }
+  for (const f of gradleFiles) {
+    const src = readText(dir, path.relative(dir, f));
+    if (src === undefined) continue;
+    // Dependency coordinates: 'group:artifact:version' (quoted, Groovy or Kotlin DSL).
+    for (const m of src.matchAll(/["']([\w.-]+):([\w.-]+)(?::[^"']*)?["']/g))
+      deps.add(m[2].toLowerCase());
+    // Plugin ids: `id 'x'` / `id("x")` and legacy `apply plugin: 'x'`.
+    for (const m of src.matchAll(/\bid\s*[("']+\s*([\w.-]+)/g)) addPlugin(m[1]);
+    for (const m of src.matchAll(/apply\s+plugin:\s*["']([\w.-]+)["']/g)) addPlugin(m[1]);
+  }
+  return { deps, tool: mavenFiles.length > 0 ? 'maven' : 'gradle' };
+}
+
 /** All package names declared across composer.json's `require` / `require-dev`. */
 export function composerDeps(pkg: Record<string, unknown>): Set<string> {
   const deps = new Set<string>();

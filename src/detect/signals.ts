@@ -490,3 +490,96 @@ export const DOTNET_AUTH: readonly (readonly [string, string])[] = [
   ['microsoft.aspnetcore.identity', 'aspnet-identity'],
   ['microsoft.aspnetcore.authentication.jwtbearer', 'jwt-bearer'],
 ];
+
+// --- Java / JVM (artifact ids + plugin-id segments from pom.xml / build.gradle) ---
+// The manifest reader lower-cases every token and adds both a plugin's full id
+// and its last dotted segment, so these tables key on artifact ids (`postgresql`,
+// `spring-boot-starter-web`) and plugin segments (`spotless`, `checkstyle`).
+
+export const JAVA_FRAMEWORK: readonly (readonly [string, string])[] = [
+  ['spring-boot-starter-webflux', 'spring-boot'],
+  ['spring-boot-starter-web', 'spring-boot'],
+  ['spring-boot-starter', 'spring-boot'],
+  ['spring-boot-starter-parent', 'spring-boot'],
+  ['spring-boot-maven-plugin', 'spring-boot'],
+  ['org.springframework.boot', 'spring-boot'],
+];
+
+/** CLI-oriented Java libraries → project is a CLI tool (when no web framework). */
+export const JAVA_CLI = new Set(['picocli', 'spring-shell-starter', 'spring-shell']);
+
+/** CLI dependency → framework answer value (cliFrameworkOptions ids). */
+export const JAVA_CLI_FRAMEWORK: readonly (readonly [string, string])[] = [
+  ['picocli', 'picocli'],
+  ['spring-shell-starter', 'spring-shell'],
+  ['spring-shell', 'spring-shell'],
+];
+
+// JDBC driver / Spring Data starter artifact ids name the engine directly.
+export const JAVA_DATABASE: readonly (readonly [string, string])[] = [
+  ['postgresql', 'postgresql'],
+  ['mysql-connector-j', 'mysql'],
+  ['mysql-connector-java', 'mysql'],
+  ['mariadb-java-client', 'mariadb'],
+  ['sqlite-jdbc', 'sqlite'],
+  ['mssql-jdbc', 'sqlserver'],
+  ['spring-boot-starter-data-mongodb', 'mongodb'],
+  ['mongodb-driver-sync', 'mongodb'],
+  ['mongodb-driver-reactivestreams', 'mongodb'],
+];
+
+// Spring Data JPA and Hibernate both resolve to the JPA/Hibernate data layer.
+export const JAVA_ORM: readonly (readonly [string, string])[] = [
+  ['spring-boot-starter-data-jpa', 'spring-data-jpa'],
+  ['spring-data-jpa', 'spring-data-jpa'],
+  ['hibernate-core', 'spring-data-jpa'],
+];
+
+export const JAVA_VALIDATION: readonly (readonly [string, string])[] = [
+  ['hibernate-validator', 'hibernate-validator'],
+  ['spring-boot-starter-validation', 'hibernate-validator'],
+];
+
+// Logback ships transitively with Spring Boot, so it only appears here when
+// declared explicitly; Log4j2 (the opt-in swap) is the stronger signal, matched first.
+export const JAVA_LOGGER: readonly (readonly [string, string])[] = [
+  ['spring-boot-starter-log4j2', 'log4j2'],
+  ['log4j-core', 'log4j2'],
+  ['logback-classic', 'logback'],
+];
+
+// Formatters run as build plugins; both the Maven plugin artifact id and the
+// Gradle plugin-id segment (`spotless`) are collected by the reader.
+export const JAVA_FORMATTER: readonly (readonly [string, string])[] = [
+  ['spotless-maven-plugin', 'spotless'],
+  ['com.diffplug.spotless', 'spotless'],
+  ['spotless', 'spotless'],
+  ['google-java-format', 'google-java-format'],
+];
+
+export const JAVA_LINTER: readonly (readonly [string, string])[] = [
+  ['maven-checkstyle-plugin', 'checkstyle'],
+  ['checkstyle', 'checkstyle'],
+  ['maven-pmd-plugin', 'pmd'],
+  ['pmd', 'pmd'],
+  ['spotbugs-maven-plugin', 'spotbugs'],
+  ['com.github.spotbugs', 'spotbugs'],
+  ['spotbugs', 'spotbugs'],
+];
+
+// TestNG is the opt-in swap; JUnit 5 (junit-jupiter / the Spring Boot test
+// starter) is the default, so match the more specific TestNG signal first.
+export const JAVA_TEST_RUNNER: readonly (readonly [string, string])[] = [
+  ['testng', 'testng'],
+  ['junit-jupiter', 'junit5'],
+  ['spring-boot-starter-test', 'junit5'],
+];
+
+// OAuth2/OIDC starters are the more specific signal → matched before plain security.
+export const JAVA_AUTH: readonly (readonly [string, string])[] = [
+  ['spring-boot-starter-oauth2-resource-server', 'spring-security-oauth2'],
+  ['spring-boot-starter-oauth2-client', 'spring-security-oauth2'],
+  ['spring-security-oauth2-client', 'spring-security-oauth2'],
+  ['spring-boot-starter-security', 'spring-security'],
+  ['spring-security-core', 'spring-security'],
+];
