@@ -549,6 +549,101 @@ describe('detectStack — C# / .NET', () => {
   });
 });
 
+describe('detectStack — Java / JVM', () => {
+  it('detects a Spring Boot + JPA (Postgres) app from a Maven pom.xml', () => {
+    const pom = `<project>
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.3.0</version>
+  </parent>
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+    </dependency>
+  </dependencies>
+</project>`;
+    const det = inProject({ 'pom.xml': pom }, (dir) => detectStack(dir));
+    expect(det.answers).toMatchObject({
+      language: 'java',
+      projectType: 'backend',
+      framework: 'spring-boot',
+      orm: 'spring-data-jpa',
+      database: 'postgresql',
+      authApproach: 'spring-security',
+      validation: 'hibernate-validator',
+      testRunner: 'junit5',
+      packageManager: 'maven',
+    });
+    assertWithinOptions(det.answers);
+  });
+
+  it('detects a Spring Boot + MySQL app and log4j2 from a Gradle build (Kotlin DSL)', () => {
+    const gradle = `plugins {
+  id("org.springframework.boot") version "3.3.0"
+  id("com.diffplug.spotless") version "6.25.0"
+}
+dependencies {
+  implementation("org.springframework.boot:spring-boot-starter-webflux")
+  implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+  implementation("org.springframework.boot:spring-boot-starter-log4j2")
+  runtimeOnly("com.mysql:mysql-connector-j")
+}`;
+    const det = inProject({ 'build.gradle.kts': gradle }, (dir) => detectStack(dir));
+    expect(det.answers).toMatchObject({
+      language: 'java',
+      projectType: 'backend',
+      framework: 'spring-boot',
+      orm: 'spring-data-jpa',
+      database: 'mysql',
+      logger: 'log4j2',
+      formatter: 'spotless',
+      packageManager: 'gradle',
+    });
+    assertWithinOptions(det.answers);
+  });
+
+  it('detects a standalone Picocli CLI from a Gradle build', () => {
+    const gradle = `plugins {
+  id 'java'
+}
+dependencies {
+  implementation 'info.picocli:picocli:4.7.6'
+  testImplementation 'org.testng:testng:7.10.2'
+}`;
+    const det = inProject({ 'build.gradle': gradle }, (dir) => detectStack(dir));
+    expect(det.answers).toMatchObject({
+      language: 'java',
+      projectType: 'cli',
+      framework: 'picocli',
+      testRunner: 'testng',
+      packageManager: 'gradle',
+    });
+    assertWithinOptions(det.answers);
+  });
+});
+
 describe('detectStack — greenfield / tie-break', () => {
   it('returns an empty result when no manifest exists', () => {
     const det = inProject({ 'README.md': '# hi' }, (dir) => detectStack(dir));
