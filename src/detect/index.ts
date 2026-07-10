@@ -14,6 +14,7 @@ import { detectRust } from './rust';
 import { detectPhp } from './php';
 import { detectDotnet } from './dotnet';
 import { detectJava } from './java';
+import { detectRuby } from './ruby';
 
 export type { DetectionResult, DetectionSource } from './types';
 
@@ -26,6 +27,7 @@ const DETECTORS = [
   detectPhp,
   detectDotnet,
   detectJava,
+  detectRuby,
 ];
 
 /**

@@ -11,6 +11,7 @@ export type DetectionSource =
   | 'csproj'
   | 'pom.xml'
   | 'build.gradle'
+  | 'Gemfile'
   | 'lockfile'
   | 'config'
   | 'llm';

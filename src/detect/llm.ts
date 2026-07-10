@@ -42,6 +42,7 @@ const MANIFESTS = [
   'pom.xml',
   'build.gradle',
   'build.gradle.kts',
+  'Gemfile',
   'Pipfile',
 ];
 
@@ -60,6 +61,7 @@ const LANG_MANIFEST: Record<string, string[]> = {
   php: ['composer.json'],
   csharp: ['global.json', 'Directory.Packages.props'],
   java: ['pom.xml', 'build.gradle', 'build.gradle.kts'],
+  ruby: ['Gemfile'],
 };
 
 const RESULT_FILE = 'detection-llm.json';
