@@ -40,6 +40,8 @@ import { laravel } from './framework/laravel';
 import { aspnetCore } from './framework/aspnet-core';
 // Frameworks — Java
 import { springBoot } from './framework/spring-boot';
+// Frameworks — Ruby
+import { rails } from './framework/rails';
 
 // ORMs / data-access — JS/TS
 import { prisma } from './orm/prisma';
@@ -76,6 +78,8 @@ import { efCore } from './orm/ef-core';
 import { dapper } from './orm/dapper';
 // ORMs — Java
 import { springDataJpa } from './orm/spring-data-jpa';
+// ORMs — Ruby
+import { activeRecord } from './orm/active-record';
 
 // Databases (follow-up questions)
 import { postgres } from './db/postgres';
@@ -122,6 +126,8 @@ import { oauth2 } from './auth/oauth2';
 import { laravelSanctum } from './auth/laravel-sanctum';
 import { laravelBreeze } from './auth/laravel-breeze';
 import { laravelPassport } from './auth/laravel-passport';
+import { devise } from './auth/devise';
+import { omniauth } from './auth/omniauth';
 
 // Compiler / tooling config
 import { tsconfig } from './config/tsconfig';
@@ -163,6 +169,8 @@ for (const m of [
   aspnetCore,
   // frameworks — Java
   springBoot,
+  // frameworks — Ruby
+  rails,
   // orms — JS/TS
   prisma,
   drizzle,
@@ -198,6 +206,8 @@ for (const m of [
   dapper,
   // orms — Java
   springDataJpa,
+  // orms — Ruby
+  activeRecord,
   // databases
   postgres,
   mysql,
@@ -241,6 +251,8 @@ for (const m of [
   laravelSanctum,
   laravelBreeze,
   laravelPassport,
+  devise,
+  omniauth,
   // config
   tsconfig,
 ]) {

@@ -58,3 +58,6 @@ export const isCsharp = (a: Answers): boolean => a.language === 'csharp';
 
 /** Java — gates Spring Boot, Spring Data JPA, and other JVM-ecosystem modules. */
 export const isJava = (a: Answers): boolean => a.language === 'java';
+
+/** Ruby — gates Rails, Active Record, and other Ruby-ecosystem modules. */
+export const isRuby = (a: Answers): boolean => a.language === 'ruby';

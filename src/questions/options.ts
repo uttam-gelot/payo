@@ -56,6 +56,7 @@ export const languageOptions = (a: Answers): Option<string>[] =>
         { value: 'php', label: 'PHP' },
         { value: 'csharp', label: 'C#' },
         { value: 'java', label: 'Java' },
+        { value: 'ruby', label: 'Ruby' },
         { value: 'javascript', label: 'JavaScript' },
       ];
 
@@ -106,6 +107,11 @@ export const cliFrameworkOptions = (a: Answers): Option<string>[] => {
       return [
         { value: 'picocli', label: 'Picocli', hint: 'recommended' },
         { value: 'spring-shell', label: 'Spring Shell' },
+      ];
+    case 'ruby':
+      return [
+        { value: 'thor', label: 'Thor', hint: 'recommended' },
+        { value: 'gli', label: 'GLI' },
       ];
     default:
       return [{ value: 'commander', label: 'Commander.js', hint: 'recommended' }];
@@ -252,6 +258,12 @@ export const formatterOptions = (a: Answers): Option<string>[] => {
         { value: 'google-java-format', label: 'google-java-format' },
         { value: 'none', label: 'None' },
       ];
+    case 'ruby':
+      return [
+        { value: 'rubocop', label: 'RuboCop (autocorrect)', hint: 'recommended' },
+        { value: 'standard', label: 'StandardRB' },
+        { value: 'none', label: 'None' },
+      ];
     default:
       return [
         { value: 'prettier', label: 'Prettier' },
@@ -306,6 +318,12 @@ export const linterOptions = (a: Answers): Option<string>[] => {
         { value: 'checkstyle', label: 'Checkstyle', hint: 'recommended' },
         { value: 'pmd', label: 'PMD' },
         { value: 'spotbugs', label: 'SpotBugs' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'ruby':
+      return [
+        { value: 'rubocop', label: 'RuboCop', hint: 'recommended' },
+        { value: 'standard', label: 'StandardRB' },
         { value: 'none', label: 'None' },
       ];
     default:
@@ -428,6 +446,17 @@ export const loggerOptions = (a: Answers): Option<string>[] => {
         },
         { value: 'none', label: 'None' },
       ];
+    case 'ruby':
+      return [
+        { value: 'lograge', label: 'Lograge (structured Rails logs)', hint: 'recommended' },
+        { value: 'semantic-logger', label: 'Semantic Logger' },
+        {
+          value: 'centralized',
+          label:
+            'Custom centralized logger — one in-house module wrapping stdlib/console, reused everywhere (no third-party)',
+        },
+        { value: 'none', label: 'None' },
+      ];
     default:
       return [
         { value: 'pino', label: 'Pino', hint: 'recommended' },
@@ -497,6 +526,12 @@ export const testRunnerOptions = (a: Answers): Option<string>[] => {
       return [
         { value: 'junit5', label: 'JUnit 5', hint: 'recommended' },
         { value: 'testng', label: 'TestNG' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'ruby':
+      return [
+        { value: 'rspec', label: 'RSpec', hint: 'recommended' },
+        { value: 'minitest', label: 'Minitest' },
         { value: 'none', label: 'None' },
       ];
     default:
@@ -590,6 +625,14 @@ export const authApproachOptions = (a: Answers): Option<string>[] => {
       return [
         { value: 'spring-security', label: 'Spring Security', hint: 'recommended' },
         { value: 'spring-security-oauth2', label: 'Spring Security OAuth2 / OIDC' },
+        { value: 'custom-jwt', label: 'Custom JWT' },
+        ...HOSTED_AUTH,
+        none,
+      ];
+    case 'ruby':
+      return [
+        { value: 'devise', label: 'Devise', hint: 'recommended' },
+        { value: 'omniauth', label: 'OmniAuth (OAuth)' },
         { value: 'custom-jwt', label: 'Custom JWT' },
         ...HOSTED_AUTH,
         none,
@@ -725,6 +768,16 @@ export const validationOptions = (a: Answers): Option<string>[] => {
           label: 'Bean Validation (Hibernate Validator)',
           hint: 'recommended',
         },
+        { value: 'none', label: 'None' },
+      ];
+    case 'ruby':
+      return [
+        {
+          value: 'active-record-validations',
+          label: 'Active Record validations (built-in)',
+          hint: 'recommended',
+        },
+        { value: 'dry-validation', label: 'dry-validation' },
         { value: 'none', label: 'None' },
       ];
     default:
