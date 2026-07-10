@@ -69,6 +69,13 @@ export const contexts: Record<string, Answers> = {
     database: 'postgresql',
     orm: 'spring-data-jpa',
   },
+  rubyBackend: {
+    language: 'ruby',
+    projectType: 'backend',
+    framework: 'rails',
+    database: 'postgresql',
+    orm: 'active-record',
+  },
 };
 
 export const allContexts: Answers[] = Object.values(contexts);

@@ -583,3 +583,70 @@ export const JAVA_AUTH: readonly (readonly [string, string])[] = [
   ['spring-boot-starter-security', 'spring-security'],
   ['spring-security-core', 'spring-security'],
 ];
+
+// --- Ruby (gem names from a Gemfile) -----------------------------------------
+
+// railties is the Rails core gem, present in every Rails app even when the
+// meta-gem `rails` isn't pinned directly.
+export const RUBY_FRAMEWORK: readonly (readonly [string, string])[] = [
+  ['rails', 'rails'],
+  ['railties', 'rails'],
+];
+
+/** CLI-oriented gems → project is a CLI tool (when no web framework). */
+export const RUBY_CLI = new Set(['thor', 'gli']);
+
+export const RUBY_CLI_FRAMEWORK: readonly (readonly [string, string])[] = [
+  ['thor', 'thor'],
+  ['gli', 'gli'],
+];
+
+// The database engine shows up as its Ruby adapter gem. `redis` is omitted on
+// purpose (cache/queue, not a modeled DB — same call as the Node table).
+export const RUBY_DATABASE: readonly (readonly [string, string])[] = [
+  ['pg', 'postgresql'],
+  ['mysql2', 'mysql'],
+  ['trilogy', 'mysql'],
+  ['sqlite3', 'sqlite'],
+  ['mongoid', 'mongodb'],
+];
+
+// Active Record ships inside the `rails` gem (activerecord), so a Rails app is
+// handled in the detector; this catches a standalone Active Record install.
+export const RUBY_ORM: readonly (readonly [string, string])[] = [['activerecord', 'active-record']];
+
+export const RUBY_VALIDATION: readonly (readonly [string, string])[] = [
+  ['dry-validation', 'dry-validation'],
+];
+
+// rails_semantic_logger is Semantic Logger wired into Rails — both map to it.
+export const RUBY_LOGGER: readonly (readonly [string, string])[] = [
+  ['lograge', 'lograge'],
+  ['rails_semantic_logger', 'semantic-logger'],
+  ['semantic_logger', 'semantic-logger'],
+];
+
+// RuboCop and StandardRB each lint *and* format, so they appear in both tables.
+export const RUBY_FORMATTER: readonly (readonly [string, string])[] = [
+  ['rubocop', 'rubocop'],
+  ['standard', 'standard'],
+];
+
+export const RUBY_LINTER: readonly (readonly [string, string])[] = [
+  ['rubocop', 'rubocop'],
+  ['standard', 'standard'],
+];
+
+// rspec-rails is the Rails integration of RSpec — match it before plain rspec.
+export const RUBY_TEST_RUNNER: readonly (readonly [string, string])[] = [
+  ['rspec-rails', 'rspec'],
+  ['rspec', 'rspec'],
+  ['minitest', 'minitest'],
+];
+
+// Devise is the primary auth solution; OmniAuth is often layered on top, so a
+// project with both is classified by its primary (Devise wins, listed first).
+export const RUBY_AUTH: readonly (readonly [string, string])[] = [
+  ['devise', 'devise'],
+  ['omniauth', 'omniauth'],
+];

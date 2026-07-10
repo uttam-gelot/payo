@@ -247,6 +247,21 @@ export function javaDeps(dir: string): { deps: Set<string>; tool: 'maven' | 'gra
   return { deps, tool: mavenFiles.length > 0 ? 'maven' : 'gradle' };
 }
 
+/**
+ * Gem names declared in a Gemfile. Scans `gem 'name', …` lines (Bundler DSL),
+ * ignoring comments; group blocks and version constraints are irrelevant since
+ * we only need the names. Lower-cased to match the signal tables.
+ */
+export function gemfileDeps(body: string): Set<string> {
+  const deps = new Set<string>();
+  for (const raw of body.split('\n')) {
+    const line = raw.replace(/#.*$/, '').trim();
+    const m = line.match(/^gem\s+["']([^"']+)["']/);
+    if (m) deps.add(m[1].toLowerCase());
+  }
+  return deps;
+}
+
 /** All package names declared across composer.json's `require` / `require-dev`. */
 export function composerDeps(pkg: Record<string, unknown>): Set<string> {
   const deps = new Set<string>();

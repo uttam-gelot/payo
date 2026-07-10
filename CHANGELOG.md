@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Checkstyle / PMD / SpotBugs, SLF4J+Logback / Log4j2, JUnit 5 / TestNG,
   Hibernate Validator, Spring Security / OAuth2, Picocli / Spring Shell), and
   detection reads `pom.xml` and `build.gradle(.kts)` to pre-fill them.
+- Ruby / Rails support on both paths: the questionnaire offers Ruby on Rails
+  (framework, Hotwire / jsbundling / API-only), Active Record (ORM), Devise /
+  OmniAuth (auth), and Ruby-ecosystem tooling (RuboCop / StandardRB, Lograge /
+  Semantic Logger, RSpec / Minitest, dry-validation, Thor / GLI), and detection
+  reads the `Gemfile` to pre-fill them.
 
 ## [1.2.0] - 2026-07-03
 
