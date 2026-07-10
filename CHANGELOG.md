@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Serilog / NLog, xUnit / NUnit / MSTest, FluentValidation, ASP.NET Core
   Identity / JWT Bearer, System.CommandLine / Spectre.Console), and detection
   reads `*.csproj` package references to pre-fill them.
+- Java / Spring Boot support on both paths: the questionnaire offers Spring Boot
+  (framework, Spring MVC / WebFlux), Spring Data JPA / Hibernate (ORM), Maven /
+  Gradle build tools, and JVM-ecosystem tooling (Spotless / google-java-format,
+  Checkstyle / PMD / SpotBugs, SLF4J+Logback / Log4j2, JUnit 5 / TestNG,
+  Hibernate Validator, Spring Security / OAuth2, Picocli / Spring Shell), and
+  detection reads `pom.xml` and `build.gradle(.kts)` to pre-fill them.
 
 ## [1.2.0] - 2026-07-03
 
