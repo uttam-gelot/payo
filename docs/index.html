@@ -86,7 +86,7 @@
       {
         "@type": "Question",
         "name": "Does Payo work on an existing project?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Payo detects your stack from what's already in the repo — manifests like package.json, pyproject.toml, go.mod, Cargo.toml, composer.json, *.csproj, pom.xml and build.gradle, plus lockfiles, tool configs, and folder layout — across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, and Java, then pre-fills the questionnaire. Stack facts it can read for certain are filled and skipped; inferred conventions are surfaced as defaults you confirm." }
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Payo detects your stack from what's already in the repo — manifests like package.json, pyproject.toml, go.mod, Cargo.toml, composer.json, *.csproj, pom.xml, build.gradle and Gemfile, plus lockfiles, tool configs, and folder layout — across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby, then pre-fills the questionnaire. Stack facts it can read for certain are filled and skipped; inferred conventions are surfaced as defaults you confirm." }
       }
     ]
   }
@@ -331,8 +331,8 @@
       <div class="sec-head">
         <h2>Knows your stack, not just generic advice</h2>
         <p>
-          Payo understands <strong>29 frameworks</strong>, <strong>28 ORMs</strong>, and
-          <strong>17 databases</strong> across seven languages — and tailors its questions and the
+          Payo understands <strong>30 frameworks</strong>, <strong>29 ORMs</strong>, and
+          <strong>17 databases</strong> across eight languages — and tailors its questions and the
           generated rules to whatever you pick. Choose Next.js and you get Next.js follow-ups;
           choose Postgres and you're asked about migrations and naming; pick Tailwind or Clerk
           and you get provider-specific conventions in the generated rules.
@@ -428,6 +428,17 @@
             <span class="chip">Spring Data JPA</span>
           </div>
         </div>
+        <div class="stack">
+          <div class="lang"><em>Ruby</em></div>
+          <div class="kicker">Frameworks</div>
+          <div class="chips">
+            <span class="chip">Ruby on Rails</span>
+          </div>
+          <div class="kicker">ORMs / data</div>
+          <div class="chips">
+            <span class="chip">Active Record</span>
+          </div>
+        </div>
       </div>
       <div class="db-row">
         <span class="kicker">Databases</span>
@@ -445,8 +456,8 @@
         <p>
           Payo isn't just for empty repos. Run it in an established codebase and it
           <strong>reads what's already there</strong> — <code>package.json</code>, <code>pyproject.toml</code>,
-          <code>go.mod</code>, <code>Cargo.toml</code>, <code>composer.json</code>, <code>*.csproj</code>, <code>pom.xml</code>, <code>build.gradle</code>, lockfiles, tool configs, and your folder layout — to detect
-          your stack across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, and Java, then pre-fills the questionnaire.
+          <code>go.mod</code>, <code>Cargo.toml</code>, <code>composer.json</code>, <code>*.csproj</code>, <code>pom.xml</code>, <code>build.gradle</code>, <code>Gemfile</code>, lockfiles, tool configs, and your folder layout — to detect
+          your stack across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby, then pre-fills the questionnaire.
           Stack facts it can read for certain are filled in and skipped; conventions it infers are surfaced as
           defaults you still confirm. You review a summary and tweak — no typing it all out.
         </p>
@@ -476,7 +487,7 @@
             <li><b>Get tailored guidance files.</b> <span>Rich AI-written docs when the tool's CLI is present, solid templates otherwise.</span></li>
             <li><b>Optional bootstrap prompt.</b> <span>A paste-ready prompt to scaffold a runnable project honoring the rules.</span></li>
           </ol>
-          <p class="stat">Understands <b>29 frameworks</b>, <b>28 ORMs</b>, and <b>17 databases</b> across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, and Java.</p>
+          <p class="stat">Understands <b>30 frameworks</b>, <b>29 ORMs</b>, and <b>17 databases</b> across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby.</p>
         </div>
       </div>
     </section>
@@ -502,7 +513,7 @@
         </details>
         <details>
           <summary>Does Payo work on an existing project?</summary>
-          <p>Yes. Payo detects your stack from what's already in the repo — manifests (<code>package.json</code>, <code>pyproject.toml</code>, <code>go.mod</code>, <code>Cargo.toml</code>, <code>composer.json</code>, <code>*.csproj</code>, <code>pom.xml</code>, <code>build.gradle</code>), lockfiles, tool configs, and folder layout — across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, and Java, then pre-fills the questionnaire. Stack facts it reads for certain are filled and skipped; inferred conventions become defaults you confirm.</p>
+          <p>Yes. Payo detects your stack from what's already in the repo — manifests (<code>package.json</code>, <code>pyproject.toml</code>, <code>go.mod</code>, <code>Cargo.toml</code>, <code>composer.json</code>, <code>*.csproj</code>, <code>pom.xml</code>, <code>build.gradle</code>, <code>Gemfile</code>), lockfiles, tool configs, and folder layout — across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby, then pre-fills the questionnaire. Stack facts it reads for certain are filled and skipped; inferred conventions become defaults you confirm.</p>
         </details>
         <details>
           <summary>Is Payo free and open source?</summary>

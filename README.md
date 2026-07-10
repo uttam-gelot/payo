@@ -144,8 +144,8 @@ guidance files straight into your repo.
 
 Payo isn't just for empty repos. Run it in an established project and it **reads
 what's already there** — `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`,
-`composer.json`, `*.csproj`, `pom.xml`, `build.gradle`, lockfiles, tool configs, and the folder layout — to figure out
-your stack across **TypeScript/JavaScript, Python, Go, Rust, PHP, C#, and Java**, then pre-fills the questionnaire
+`composer.json`, `*.csproj`, `pom.xml`, `build.gradle`, `Gemfile`, lockfiles, tool configs, and the folder layout — to figure out
+your stack across **TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby**, then pre-fills the questionnaire
 from that evidence. You confirm or tweak instead of typing it all out.
 
 When detection finds a manifest, you get two quick choices:
@@ -191,8 +191,8 @@ Each tool gets files in its own native format and location:
 
 ## What it asks about
 
-Payo understands **29 frameworks, 28 ORMs, and 17 databases** across
-**TypeScript/JavaScript, Python, Go, Rust, PHP, C#, and Java** — and tailors its follow-up
+Payo understands **30 frameworks, 29 ORMs, and 17 databases** across
+**TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby** — and tailors its follow-up
 questions to whatever you pick. Dimensions covered:
 
 - **Project** — type (frontend / backend / full-stack / CLI / script) and a short description
