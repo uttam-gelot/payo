@@ -267,7 +267,10 @@ const core: Record<string, Question> = {
     message: 'Package manager?',
     optionsFrom: opt.packageManagerOptions,
     when: (a) =>
-      a.language === 'typescript' || a.language === 'javascript' || a.language === 'python',
+      a.language === 'typescript' ||
+      a.language === 'javascript' ||
+      a.language === 'python' ||
+      a.language === 'java',
   },
   runtime: {
     id: 'runtime',
