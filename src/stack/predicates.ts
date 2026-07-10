@@ -55,3 +55,6 @@ export const isPhp = (a: Answers): boolean => a.language === 'php';
 
 /** C# / .NET — gates ASP.NET Core, EF Core, and other .NET-ecosystem modules. */
 export const isCsharp = (a: Answers): boolean => a.language === 'csharp';
+
+/** Java — gates Spring Boot, Spring Data JPA, and other JVM-ecosystem modules. */
+export const isJava = (a: Answers): boolean => a.language === 'java';

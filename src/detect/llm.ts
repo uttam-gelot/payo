@@ -39,6 +39,9 @@ const MANIFESTS = [
   'Cargo.toml',
   'composer.json',
   'global.json',
+  'pom.xml',
+  'build.gradle',
+  'build.gradle.kts',
   'Pipfile',
 ];
 
@@ -56,6 +59,7 @@ const LANG_MANIFEST: Record<string, string[]> = {
   rust: ['Cargo.toml'],
   php: ['composer.json'],
   csharp: ['global.json', 'Directory.Packages.props'],
+  java: ['pom.xml', 'build.gradle', 'build.gradle.kts'],
 };
 
 const RESULT_FILE = 'detection-llm.json';

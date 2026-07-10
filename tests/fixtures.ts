@@ -62,6 +62,13 @@ export const contexts: Record<string, Answers> = {
     database: 'sqlserver',
     orm: 'ef-core',
   },
+  javaBackend: {
+    language: 'java',
+    projectType: 'backend',
+    framework: 'spring-boot',
+    database: 'postgresql',
+    orm: 'spring-data-jpa',
+  },
 };
 
 export const allContexts: Answers[] = Object.values(contexts);

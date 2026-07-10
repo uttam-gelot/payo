@@ -9,6 +9,8 @@ export type DetectionSource =
   | 'Cargo.toml'
   | 'composer.json'
   | 'csproj'
+  | 'pom.xml'
+  | 'build.gradle'
   | 'lockfile'
   | 'config'
   | 'llm';

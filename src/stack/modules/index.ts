@@ -38,6 +38,8 @@ import { rocket } from './framework/rocket';
 import { laravel } from './framework/laravel';
 // Frameworks — C# / .NET
 import { aspnetCore } from './framework/aspnet-core';
+// Frameworks — Java
+import { springBoot } from './framework/spring-boot';
 
 // ORMs / data-access — JS/TS
 import { prisma } from './orm/prisma';
@@ -72,6 +74,8 @@ import { eloquent } from './orm/eloquent';
 // ORMs — C# / .NET
 import { efCore } from './orm/ef-core';
 import { dapper } from './orm/dapper';
+// ORMs — Java
+import { springDataJpa } from './orm/spring-data-jpa';
 
 // Databases (follow-up questions)
 import { postgres } from './db/postgres';
@@ -157,6 +161,8 @@ for (const m of [
   laravel,
   // frameworks — C# / .NET
   aspnetCore,
+  // frameworks — Java
+  springBoot,
   // orms — JS/TS
   prisma,
   drizzle,
@@ -190,6 +196,8 @@ for (const m of [
   // orms — C# / .NET
   efCore,
   dapper,
+  // orms — Java
+  springDataJpa,
   // databases
   postgres,
   mysql,

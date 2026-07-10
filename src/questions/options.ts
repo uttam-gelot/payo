@@ -55,6 +55,7 @@ export const languageOptions = (a: Answers): Option<string>[] =>
         { value: 'rust', label: 'Rust' },
         { value: 'php', label: 'PHP' },
         { value: 'csharp', label: 'C#' },
+        { value: 'java', label: 'Java' },
         { value: 'javascript', label: 'JavaScript' },
       ];
 
@@ -100,6 +101,11 @@ export const cliFrameworkOptions = (a: Answers): Option<string>[] => {
       return [
         { value: 'system-commandline', label: 'System.CommandLine', hint: 'recommended' },
         { value: 'spectre-console', label: 'Spectre.Console.Cli' },
+      ];
+    case 'java':
+      return [
+        { value: 'picocli', label: 'Picocli', hint: 'recommended' },
+        { value: 'spring-shell', label: 'Spring Shell' },
       ];
     default:
       return [{ value: 'commander', label: 'Commander.js', hint: 'recommended' }];
@@ -240,6 +246,12 @@ export const formatterOptions = (a: Answers): Option<string>[] => {
         { value: 'csharpier', label: 'CSharpier' },
         { value: 'none', label: 'None' },
       ];
+    case 'java':
+      return [
+        { value: 'spotless', label: 'Spotless', hint: 'recommended' },
+        { value: 'google-java-format', label: 'google-java-format' },
+        { value: 'none', label: 'None' },
+      ];
     default:
       return [
         { value: 'prettier', label: 'Prettier' },
@@ -287,6 +299,13 @@ export const linterOptions = (a: Answers): Option<string>[] => {
         { value: 'roslyn-analyzers', label: '.NET analyzers (built-in)', hint: 'recommended' },
         { value: 'roslynator', label: 'Roslynator' },
         { value: 'stylecop', label: 'StyleCop Analyzers' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'java':
+      return [
+        { value: 'checkstyle', label: 'Checkstyle', hint: 'recommended' },
+        { value: 'pmd', label: 'PMD' },
+        { value: 'spotbugs', label: 'SpotBugs' },
         { value: 'none', label: 'None' },
       ];
     default:
@@ -398,6 +417,17 @@ export const loggerOptions = (a: Answers): Option<string>[] => {
         },
         { value: 'none', label: 'None' },
       ];
+    case 'java':
+      return [
+        { value: 'logback', label: 'SLF4J + Logback', hint: 'recommended' },
+        { value: 'log4j2', label: 'Log4j 2' },
+        {
+          value: 'centralized',
+          label:
+            'Custom centralized logger — one in-house module wrapping stdlib/console, reused everywhere (no third-party)',
+        },
+        { value: 'none', label: 'None' },
+      ];
     default:
       return [
         { value: 'pino', label: 'Pino', hint: 'recommended' },
@@ -461,6 +491,12 @@ export const testRunnerOptions = (a: Answers): Option<string>[] => {
         { value: 'xunit', label: 'xUnit', hint: 'recommended' },
         { value: 'nunit', label: 'NUnit' },
         { value: 'mstest', label: 'MSTest' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'java':
+      return [
+        { value: 'junit5', label: 'JUnit 5', hint: 'recommended' },
+        { value: 'testng', label: 'TestNG' },
         { value: 'none', label: 'None' },
       ];
     default:
@@ -550,6 +586,14 @@ export const authApproachOptions = (a: Answers): Option<string>[] => {
         ...HOSTED_AUTH,
         none,
       ];
+    case 'java':
+      return [
+        { value: 'spring-security', label: 'Spring Security', hint: 'recommended' },
+        { value: 'spring-security-oauth2', label: 'Spring Security OAuth2 / OIDC' },
+        { value: 'custom-jwt', label: 'Custom JWT' },
+        ...HOSTED_AUTH,
+        none,
+      ];
     default:
       // TS / JS
       return a.framework === 'nextjs'
@@ -600,6 +644,12 @@ export const packageManagerOptions = (a: Answers): Option<string>[] => {
         { value: 'poetry', label: 'Poetry' },
         { value: 'pip-venv', label: 'pip + venv' },
         { value: 'pipenv', label: 'Pipenv' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'java':
+      return [
+        { value: 'maven', label: 'Maven', hint: 'recommended' },
+        { value: 'gradle', label: 'Gradle' },
         { value: 'none', label: 'None' },
       ];
     default:
@@ -666,6 +716,15 @@ export const validationOptions = (a: Answers): Option<string>[] => {
       return [
         { value: 'fluentvalidation', label: 'FluentValidation', hint: 'recommended' },
         { value: 'data-annotations', label: 'DataAnnotations (built-in)' },
+        { value: 'none', label: 'None' },
+      ];
+    case 'java':
+      return [
+        {
+          value: 'hibernate-validator',
+          label: 'Bean Validation (Hibernate Validator)',
+          hint: 'recommended',
+        },
         { value: 'none', label: 'None' },
       ];
     default:
