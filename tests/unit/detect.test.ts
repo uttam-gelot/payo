@@ -644,6 +644,48 @@ dependencies {
   });
 });
 
+describe('detectStack — Ruby', () => {
+  it('detects a Rails + Devise app from a Gemfile', () => {
+    const gemfile = [
+      "source 'https://rubygems.org'",
+      "gem 'rails', '~> 7.1'",
+      "gem 'pg'",
+      "gem 'devise'",
+      "gem 'lograge'",
+      '',
+      'group :development, :test do',
+      "  gem 'rspec-rails'",
+      "  gem 'rubocop', require: false",
+      'end',
+    ].join('\n');
+    const det = inProject({ Gemfile: gemfile }, (dir) => detectStack(dir));
+    expect(det.answers).toMatchObject({
+      language: 'ruby',
+      projectType: 'backend',
+      framework: 'rails',
+      orm: 'active-record',
+      database: 'postgresql',
+      authApproach: 'devise',
+      logger: 'lograge',
+      formatter: 'rubocop',
+      linter: 'rubocop',
+      testRunner: 'rspec',
+    });
+    assertWithinOptions(det.answers);
+  });
+
+  it('detects a standalone Thor CLI from a Gemfile', () => {
+    const gemfile = ["source 'https://rubygems.org'", "gem 'thor'"].join('\n');
+    const det = inProject({ Gemfile: gemfile }, (dir) => detectStack(dir));
+    expect(det.answers).toMatchObject({
+      language: 'ruby',
+      projectType: 'cli',
+      framework: 'thor',
+    });
+    assertWithinOptions(det.answers);
+  });
+});
+
 describe('detectStack — greenfield / tie-break', () => {
   it('returns an empty result when no manifest exists', () => {
     const det = inProject({ 'README.md': '# hi' }, (dir) => detectStack(dir));
