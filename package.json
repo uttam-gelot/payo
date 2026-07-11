@@ -1,6 +1,6 @@
 {
 	"name": "@uge/payo",
-	"version": "1.3.0",
+	"version": "1.4.0",
 	"description": "CLI tool to generate AI rules and skills for your project",
 	"repository": {
 		"type": "git",
