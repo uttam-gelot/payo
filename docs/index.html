@@ -70,8 +70,8 @@
       },
       {
         "@type": "Question",
-        "name": "How do I generate a .cursorrules file?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Run npx @uge/payo in your project, answer a short questionnaire about your stack, and Payo writes a .cursorrules file (plus Cursor's .cursor/rules/) tailored to your framework, database, testing, and git conventions." }
+        "name": "How do I generate Cursor rules?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Run npx @uge/payo in your project, answer a short questionnaire about your stack, and Payo writes universal Agent Skills in .agents/skills/ plus an AGENTS.md entrypoint — which Cursor reads natively — tailored to your framework, database, testing, and git conventions." }
       },
       {
         "@type": "Question",
@@ -81,7 +81,7 @@
       {
         "@type": "Question",
         "name": "Which AI coding tools does Payo support?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Claude, Cursor, GitHub Copilot, Codex CLI, Windsurf, and Antigravity. Payo writes each tool's guidance files in its own native format and location." }
+        "acceptedAnswer": { "@type": "Answer", "text": "Claude Code, Cursor, GitHub Copilot, Codex CLI, Windsurf, Antigravity, and Gemini. Payo writes one universal layout — an AGENTS.md entrypoint plus Agent Skills in .agents/skills/ — that every skills-compatible tool reads, with thin shims for Claude Code and Windsurf." }
       },
       {
         "@type": "Question",
@@ -310,20 +310,22 @@
 
     <section id="what">
       <div class="sec-head">
-        <h2>One questionnaire, every tool's config</h2>
+        <h2>One questionnaire, one universal skill set</h2>
         <p>
           AI assistants are only as good as the context they're given. Payo interviews you about your
-          stack, then writes the files each assistant actually reads — a CLAUDE.md generator, cursor
-          rules generator, Copilot instructions generator, and AGENTS.md generator in one command.
+          stack, then writes one universal layout — an <strong>AGENTS.md</strong> entrypoint plus
+          <strong>Agent Skills</strong> in <strong>.agents/skills/</strong> — that every
+          skills-compatible tool reads. Claude Code and Windsurf get thin shims; nothing is
+          duplicated.
         </p>
       </div>
       <div class="tools">
-        <div class="tool"><div class="name"><span class="dot"></span>Claude</div><div class="files">CLAUDE.md<br />.claude/skills/</div></div>
-        <div class="tool"><div class="name"><span class="dot"></span>Cursor</div><div class="files">.cursorrules<br />.cursor/rules/</div></div>
-        <div class="tool"><div class="name"><span class="dot"></span>GitHub Copilot</div><div class="files">.github/copilot-instructions.md</div></div>
-        <div class="tool"><div class="name"><span class="dot"></span>Codex</div><div class="files">AGENTS.md</div></div>
+        <div class="tool"><div class="name"><span class="dot"></span>Claude Code</div><div class="files">CLAUDE.md<br />.claude/skills/</div></div>
+        <div class="tool"><div class="name"><span class="dot"></span>Codex</div><div class="files">AGENTS.md<br />.agents/skills/</div></div>
+        <div class="tool"><div class="name"><span class="dot"></span>Cursor</div><div class="files">AGENTS.md<br />.agents/skills/</div></div>
+        <div class="tool"><div class="name"><span class="dot"></span>GitHub Copilot</div><div class="files">AGENTS.md<br />.agents/skills/</div></div>
         <div class="tool"><div class="name"><span class="dot"></span>Antigravity</div><div class="files">AGENTS.md<br />.agents/skills/</div></div>
-        <div class="tool"><div class="name"><span class="dot"></span>Windsurf</div><div class="files">.windsurfrules</div></div>
+        <div class="tool"><div class="name"><span class="dot"></span>Windsurf</div><div class="files">AGENTS.md<br />.windsurf/skills/</div></div>
       </div>
     </section>
 
@@ -474,8 +476,8 @@
             you re-explain it chat after chat, and still get code that ignores half of it.
           </p>
           <p>
-            Writing the guidance by hand is tedious and different for every tool, so most people never
-            do it. Payo writes it in minutes, in each tool's native format — so your assistant
+            Writing the guidance by hand is tedious, so most people never do it. Payo writes it in
+            minutes, in one universal layout every skills-compatible tool reads — so your assistant
             follows <em>your</em> conventions from the first prompt.
           </p>
         </div>
@@ -500,8 +502,8 @@
           <p>A guidance file Claude and Claude Code read to learn your project's stack, conventions, and rules — so the assistant follows them instead of guessing. Payo generates one tailored to your project automatically.</p>
         </details>
         <details>
-          <summary>How do I generate a .cursorrules file?</summary>
-          <p>Run <code>npx @uge/payo</code>, answer a short questionnaire, and Payo writes <code>.cursorrules</code> (plus <code>.cursor/rules/</code>) tailored to your framework, database, testing, and git conventions.</p>
+          <summary>How do I generate Cursor rules?</summary>
+          <p>Run <code>npx @uge/payo</code>, answer a short questionnaire, and Payo writes universal Agent Skills in <code>.agents/skills/</code> plus an <code>AGENTS.md</code> — which Cursor reads natively — tailored to your framework, database, testing, and git conventions.</p>
         </details>
         <details>
           <summary>Do I need Bun to run Payo?</summary>
@@ -509,7 +511,7 @@
         </details>
         <details>
           <summary>Which AI coding tools does Payo support?</summary>
-          <p>Claude, Cursor, GitHub Copilot, Codex, Windsurf, and Antigravity — each in its own native format and location.</p>
+          <p>Claude Code, Cursor, GitHub Copilot, Codex, Windsurf, Antigravity, and Gemini — all from one universal layout (AGENTS.md + <code>.agents/skills/</code>), with thin shims for Claude Code and Windsurf.</p>
         </details>
         <details>
           <summary>Does Payo work on an existing project?</summary>
