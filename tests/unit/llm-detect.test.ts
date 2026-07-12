@@ -7,7 +7,6 @@ import type { AgentRunner } from '../../src/generator/types';
 const fakeRunner = {
   binary: 'fake',
   buildArgs: () => [],
-  outputPath: () => 'out',
 } as AgentRunner;
 
 /** Base: a TS/Next full-stack project with a few Tier-1 ids already found. */

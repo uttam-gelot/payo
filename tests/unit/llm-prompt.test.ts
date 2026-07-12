@@ -7,7 +7,7 @@ import { buildPrompt, targetIds, llmDetect, type LlmDeps } from '../../src/detec
 import type { DetectionResult } from '../../src/detect/types';
 import type { AgentRunner } from '../../src/generator/types';
 
-const fakeRunner = { binary: 'fake', buildArgs: () => [], outputPath: () => 'out' } as AgentRunner;
+const fakeRunner = { binary: 'fake', buildArgs: () => [] } as AgentRunner;
 
 function deps(raw: Record<string, unknown> | undefined): LlmDeps {
   return {

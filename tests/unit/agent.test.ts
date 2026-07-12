@@ -9,7 +9,6 @@ import { inTempProject } from '../helpers/tmpProject';
 const shRunner = (cmd: string, timeoutMs?: number): AgentRunner => ({
   binary: 'sh',
   buildArgs: () => ['-c', cmd],
-  outputPath: (id) => `${id}.md`,
   ...(timeoutMs ? { timeoutMs } : {}),
 });
 
@@ -33,7 +32,6 @@ describe('isAvailable', () => {
     const missing: AgentRunner = {
       binary: 'definitely-missing-bin-xyz',
       buildArgs: () => [],
-      outputPath: (id) => id,
     };
     expect(isAvailable(missing)).toBe(false);
   });
