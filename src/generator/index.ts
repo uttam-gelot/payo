@@ -15,7 +15,6 @@ import type { Answers } from '../questions/types';
 import type {
   AgentRunner,
   AiProvider,
-  GeneratedArtifact,
   GenerateHooks,
   GenerationResult,
   ResumeStore,
@@ -31,24 +30,9 @@ import { getProvider } from '../providers/index';
 import { scanExistingAiConfigs } from '../detect/aiconfig';
 import { config } from '../config';
 import { writeFileAtomic } from '../fsutil';
+import { resolveContained, writeArtifact } from './paths';
 
-/**
- * Resolve an artifact path against cwd, rejecting anything that escapes the
- * project directory. Every built-in provider uses fixed relative paths; this
- * enforces that invariant for contributed providers too.
- */
-export function resolveContained(rel: string): string {
-  const dest = path.resolve(process.cwd(), rel);
-  const relative = path.relative(process.cwd(), dest);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
-    throw new Error(`Refusing to write outside the project directory: ${rel}`);
-  }
-  return dest;
-}
-
-function writeArtifact(artifact: GeneratedArtifact): void {
-  writeFileAtomic(resolveContained(artifact.path), artifact.content);
-}
+export { resolveContained };
 
 /**
  * Provider-agnostic rule sections rendered as the prompt's project context.
