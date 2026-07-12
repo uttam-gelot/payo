@@ -306,6 +306,21 @@ export async function confirmOverwrite(existing: string[]): Promise<OverwriteCho
   return value;
 }
 
+/**
+ * Offer to delete legacy per-tool config the universal layout supersedes.
+ * Default off — deletion is destructive, so the user opts in explicitly.
+ */
+export async function confirmLegacyCleanup(files: string[]): Promise<boolean> {
+  const shown = files.slice(0, 3).join(', ');
+  const more = files.length > 3 ? ` and ${files.length - 3} more` : '';
+  const value = await confirm({
+    message: `Remove legacy config now replaced by the universal layout (${shown}${more})?`,
+    initialValue: false,
+  });
+  guardCancel(value);
+  return value;
+}
+
 /** Offer the post-generation bootstrap prompt once generation is done. */
 export async function confirmBootstrapPrompt(): Promise<boolean> {
   const value = await confirm({
