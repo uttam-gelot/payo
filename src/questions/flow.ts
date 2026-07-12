@@ -35,9 +35,10 @@ const core: Record<string, Question> = {
   aiTool: {
     id: 'aiTool',
     type: 'select',
-    message: 'Which AI coding tool are you using?',
+    message:
+      'Which agent CLI should Payo use to generate content? (Output works with every skills-compatible tool: Claude Code, Codex, Cursor, Copilot, Gemini, Windsurf, …)',
     optionsFrom: opt.aiToolOptions,
-    // Closed set: only natively-supported tools, no free-text Other.
+    // Closed set: only providers with a CLI runner, no free-text Other.
     allowOther: false,
   },
   projectType: {

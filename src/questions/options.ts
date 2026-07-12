@@ -4,19 +4,28 @@
  */
 import type { Answers, Option } from './types';
 import { listProviders } from '../providers/index';
+import { isAvailable } from '../generator/agent';
 import { modulesFor } from '../stack/registry';
 import { isMongo } from '../stack/predicates';
 
-// Only the tools we natively support are offered — the generic 'other'
-// provider is an internal fallback, not a user-selectable choice.
-export const aiToolOptions = (): Option<string>[] =>
-  listProviders()
-    .filter((p) => p.id !== 'other')
-    .map((p) => ({
-      value: p.id,
-      label: p.displayName,
-      ...(p.hint ? { hint: p.hint } : {}),
-    }));
+// The question now picks which installed agent CLI authors the content — the
+// output layout is universal and works with every skills-compatible tool. So we
+// offer only providers that expose a CLI runner (static-only tools like Windsurf
+// and the generic fallback are not generators), and mark the first one actually
+// installed on PATH as recommended so it becomes the default selection.
+export const aiToolOptions = (): Option<string>[] => {
+  const providers = listProviders().filter((p) => p.agent);
+  const installed = providers.find((p) => p.agent && isAvailable(p.agent));
+  return providers.map((p) => ({
+    value: p.id,
+    label: p.displayName,
+    ...(installed && p.id === installed.id
+      ? { hint: 'recommended' }
+      : p.hint
+        ? { hint: p.hint }
+        : {}),
+  }));
+};
 
 export const projectTypeOptions: Option<string>[] = [
   { value: 'full-stack', label: 'Full-stack' },

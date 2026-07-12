@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'bun:test';
 import '../../src/stack/modules/index'; // populate the module registry
 import {
+  aiToolOptions,
   ormOptions,
   loggerOptions,
   frameworkOptions,
@@ -15,6 +16,7 @@ import {
   hasServer,
   isStandalone,
 } from '../../src/questions/options';
+import '../../src/providers/index'; // populate the provider registry
 import type { Option } from '../../src/questions/types';
 
 const vals = (opts: Option<string>[]): string[] => opts.map((o) => o.value);
@@ -22,6 +24,21 @@ const recCount = (opts: Option<string>[]): number =>
   opts.filter((o) => o.hint === 'recommended').length;
 const hintOf = (opts: Option<string>[], value: string): string | undefined =>
   opts.find((o) => o.value === value)?.hint;
+
+describe('aiToolOptions', () => {
+  it('offers only providers with a CLI runner (static-only tools excluded)', () => {
+    const ids = vals(aiToolOptions());
+    // Universal output means the question picks the generator CLI, not the target.
+    expect(ids).toEqual(['claude', 'codex', 'antigravity', 'cursor', 'copilot']);
+    expect(ids).not.toContain('windsurf'); // static-only
+    expect(ids).not.toContain('other'); // internal fallback
+  });
+
+  it('marks at most one option recommended (the installed CLI, if any)', () => {
+    // Depends on what's on PATH in the test env, so assert the invariant, not which.
+    expect(recCount(aiToolOptions())).toBeLessThanOrEqual(1);
+  });
+});
 
 describe('loggerOptions', () => {
   it('frontend: only a recommended centralized wrapper and none', () => {
