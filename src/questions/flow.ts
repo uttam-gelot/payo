@@ -35,10 +35,21 @@ const core: Record<string, Question> = {
   aiTool: {
     id: 'aiTool',
     type: 'select',
-    message:
-      'Which agent CLI should Payo use to generate content? (Output works with every skills-compatible tool: Claude Code, Codex, Cursor, Copilot, Gemini, Windsurf, …)',
+    summary: 'Generator CLI',
+    message: 'Which AI CLI should Payo use to write your skills?',
     optionsFrom: opt.aiToolOptions,
     // Closed set: only providers with a CLI runner, no free-text Other.
+    allowOther: false,
+  },
+  supportTools: {
+    id: 'supportTools',
+    type: 'multiselect',
+    summary: 'Supported tools',
+    message: 'Which AI tools should the generated skills support?',
+    optionsFrom: opt.supportToolOptions,
+    // Preselect the generator CLI's own tool; the user adds any others.
+    initialFrom: opt.defaultSupportTools,
+    required: true,
     allowOther: false,
   },
   projectType: {
@@ -303,6 +314,7 @@ const single = (...qs: Question[]): FlowSection => ({ questions: () => qs });
 
 export const flow: FlowSection[] = [
   single(core.aiTool),
+  single(core.supportTools),
   single(core.projectType),
   single(core.projectDefinition),
   single(core.language),

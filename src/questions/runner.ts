@@ -96,7 +96,11 @@ async function runMultiselect(q: Question, a: Answers): Promise<string[]> {
     ? [...options, { value: OTHER, label: 'Other (specify)' }]
     : options;
 
-  const initialValues = multiselectSeed(a[q.id], finalOptions);
+  // A stored answer wins; otherwise a question-supplied dynamic default seeds the
+  // checks (no "recommended" tag); otherwise fall back to the recommended options.
+  const prior = a[q.id];
+  const seed = prior ?? (q.initialFrom ? q.initialFrom(a) : undefined);
+  const initialValues = multiselectSeed(seed, finalOptions);
 
   const picked = await multiselect({
     message: q.message,

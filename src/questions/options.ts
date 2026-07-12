@@ -4,27 +4,34 @@
  */
 import type { Answers, Option } from './types';
 import { listProviders } from '../providers/index';
-import { isAvailable } from '../generator/agent';
 import { modulesFor } from '../stack/registry';
 import { isMongo } from '../stack/predicates';
 
-// The question now picks which installed agent CLI authors the content — the
-// output layout is universal and works with every skills-compatible tool. So we
-// offer only providers that expose a CLI runner (static-only tools like Windsurf
-// and the generic fallback are not generators), and mark the first one actually
-// installed on PATH as recommended so it becomes the default selection.
-export const aiToolOptions = (): Option<string>[] => {
-  const providers = listProviders().filter((p) => p.agent);
-  const installed = providers.find((p) => p.agent && isAvailable(p.agent));
-  return providers.map((p) => ({
-    value: p.id,
-    label: p.displayName,
-    ...(installed && p.id === installed.id
-      ? { hint: 'recommended' }
-      : p.hint
-        ? { hint: p.hint }
-        : {}),
-  }));
+// Q1 picks which agent CLI authors the content — the output layout is universal
+// and works with every skills-compatible tool. Offer only providers that expose
+// a CLI runner (static-only tools like Windsurf and the generic fallback are not
+// generators). No recommended tag — the first option is the plain default.
+export const aiToolOptions = (): Option<string>[] =>
+  listProviders()
+    .filter((p) => p.agent)
+    .map((p) => ({
+      value: p.id,
+      label: p.displayName,
+      ...(p.hint ? { hint: p.hint } : {}),
+    }));
+
+// Q2 picks which tools the generated skills should support (drives which
+// discovery shims are written). Every Payo-supported tool is offered; the
+// generic fallback is internal-only, so it is excluded.
+export const supportToolOptions = (): Option<string>[] =>
+  listProviders()
+    .filter((p) => p.id !== 'other')
+    .map((p) => ({ value: p.id, label: p.displayName }));
+
+/** Default support selection: the generator CLI's own tool (from Q1), if valid. */
+export const defaultSupportTools = (a: Answers): string[] => {
+  const valid = new Set(supportToolOptions().map((o) => o.value));
+  return typeof a.aiTool === 'string' && valid.has(a.aiTool) ? [a.aiTool] : [];
 };
 
 export const projectTypeOptions: Option<string>[] = [

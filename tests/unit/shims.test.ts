@@ -4,11 +4,14 @@
  */
 import { describe, test, expect, spyOn } from 'bun:test';
 import fs from 'fs';
-import { readFileSync, mkdirSync, writeFileSync, lstatSync, realpathSync } from 'fs';
+import { readFileSync, mkdirSync, writeFileSync, lstatSync, realpathSync, existsSync } from 'fs';
 import { join } from 'path';
-import { createSkillShims, SHIM_ROOTS } from '../../src/generator/shims';
+import { createSkillShims, shimRootsForTools, SHIM_TOOLS } from '../../src/generator/shims';
 import { SKILLS_ROOT } from '../../src/generator/universal';
 import { inTempProject } from '../helpers/tmpProject';
+
+/** All shim roots, when no tool scoping is applied. */
+const SHIM_ROOTS = shimRootsForTools();
 
 /** Seed a canonical skill dir with a SKILL.md so shims have a real target. */
 function seedSkill(dir: string, id: string, marker: string): void {
@@ -76,5 +79,34 @@ describe('createSkillShims', () => {
       expect(lstatSync(link).isSymbolicLink()).toBe(true);
       expect(readFileSync(join(link, 'SKILL.md'), 'utf-8')).toBe('FIRST');
     });
+  });
+
+  test('scopes shims to the selected tools', async () => {
+    await inTempProject((dir) => {
+      seedSkill(dir, 'testing', 'X');
+      const results = createSkillShims(['testing'], ['claude']);
+      expect(results.map((r) => r.path)).toEqual([`${SHIM_TOOLS.claude}/testing`]);
+      expect(existsSync(join(dir, SHIM_TOOLS.claude, 'testing'))).toBe(true);
+      expect(existsSync(join(dir, SHIM_TOOLS.windsurf, 'testing'))).toBe(false);
+    });
+  });
+
+  test('native-only or empty selections create no shims', async () => {
+    await inTempProject((dir) => {
+      seedSkill(dir, 'testing', 'X');
+      // Codex reads .agents/skills natively → no shim tool matches.
+      expect(createSkillShims(['testing'], ['codex'])).toHaveLength(0);
+      expect(createSkillShims(['testing'], [])).toHaveLength(0);
+      expect(existsSync(join(dir, SHIM_TOOLS.claude, 'testing'))).toBe(false);
+    });
+  });
+});
+
+describe('shimRootsForTools', () => {
+  test('undefined ⇒ all roots; explicit list ⇒ only matching shim tools', () => {
+    expect(shimRootsForTools()).toEqual([SHIM_TOOLS.claude, SHIM_TOOLS.windsurf]);
+    expect(shimRootsForTools(['claude'])).toEqual([SHIM_TOOLS.claude]);
+    expect(shimRootsForTools(['windsurf'])).toEqual([SHIM_TOOLS.windsurf]);
+    expect(shimRootsForTools(['codex', 'cursor'])).toEqual([]); // native tools need no shim
   });
 });

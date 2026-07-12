@@ -98,6 +98,32 @@ describe('generate() — AI agent orchestration (mocked agent)', () => {
     });
   });
 
+  it('scopes shims and CLAUDE.md to the supported tools', async () => {
+    await inTempProject(async (dir) => {
+      setAgentOverride({ isAvailable: true, runAgent: simulate('success') });
+
+      // Claude only → .claude/skills + CLAUDE.md, no .windsurf/skills.
+      await generate({ ...answers(), supportTools: ['claude'] });
+      expect(existsSync(join(dir, '.claude/skills/project-overview'))).toBe(true);
+      expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
+      expect(existsSync(join(dir, '.windsurf/skills/project-overview'))).toBe(false);
+    });
+  });
+
+  it('a native-only selection (Codex) writes no CLAUDE.md or shim dirs', async () => {
+    await inTempProject(async (dir) => {
+      setAgentOverride({ isAvailable: true, runAgent: simulate('success') });
+      const res = await generate({ ...fullStackAnswers('codex'), supportTools: ['codex'] });
+      expect(res.mode).toBe('ai');
+      expect(existsSync(join(dir, skillFile('project-overview')))).toBe(true); // universal core
+      expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
+      expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(false);
+      expect(existsSync(join(dir, '.claude/skills'))).toBe(false);
+      expect(existsSync(join(dir, '.windsurf/skills'))).toBe(false);
+      expect(res.files).not.toContain('CLAUDE.md');
+    });
+  });
+
   it('every skill fails → falls back to the static layout', async () => {
     await inTempProject(async (dir) => {
       setAgentOverride({ isAvailable: true, runAgent: simulate('fail') });

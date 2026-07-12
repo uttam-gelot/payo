@@ -43,6 +43,27 @@ describe('generate() — static output on disk', () => {
     });
   }
 
+  it('scopes the static layout to the supported tools', async () => {
+    await inTempProject(async (dir) => {
+      // Support only Claude → CLAUDE.md + .claude/skills, no .windsurf/skills.
+      await generate({ ...fullStackAnswers('claude'), supportTools: ['claude'] });
+      expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
+      expect(existsSync(join(dir, '.claude/skills'))).toBe(true);
+      expect(existsSync(join(dir, '.windsurf/skills'))).toBe(false);
+    });
+  });
+
+  it('a native-only static run writes no CLAUDE.md or shim dirs', async () => {
+    await inTempProject(async (dir) => {
+      await generate({ ...fullStackAnswers('codex'), supportTools: ['codex'] });
+      expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
+      expect(existsSync(join(dir, '.agents/skills'))).toBe(true);
+      expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(false);
+      expect(existsSync(join(dir, '.claude/skills'))).toBe(false);
+      expect(existsSync(join(dir, '.windsurf/skills'))).toBe(false);
+    });
+  });
+
   it('is idempotent across re-runs', async () => {
     await inTempProject(async (dir) => {
       await generate(fullStackAnswers('claude'));

@@ -11,23 +11,24 @@ import {
 } from '../../src/generator/index';
 import { selectSkills } from '../../src/generator/skills';
 import { skillPath } from '../../src/generator/universal';
-import { SHIM_ROOTS } from '../../src/generator/shims';
+import { shimRootsForTools } from '../../src/generator/shims';
 import { inTempProject } from '../helpers/tmpProject';
 import { fullStackAnswers } from '../fixtures';
 
 afterEach(() => resetAgentOverride());
 
-/** The full universal target set for a given answer set, in write order. */
+/** The full universal target set for a given answer set (no tool scoping). */
 function universalTargets(aiTool: string): string[] {
   const specs = selectSkills(fullStackAnswers(aiTool));
   const skillFiles = specs.map((s) => skillPath(s.id));
-  const shimPaths = SHIM_ROOTS.flatMap((root) => specs.map((s) => `${root}/${s.id}`));
+  const shimPaths = shimRootsForTools().flatMap((root) => specs.map((s) => `${root}/${s.id}`));
   return ['AGENTS.md', 'CLAUDE.md', ...skillFiles, ...shimPaths];
 }
 
 describe('predictTargets — universal layout', () => {
-  it('predicts the same universal targets regardless of the selected CLI', () => {
-    // Layout no longer depends on the provider; only content does.
+  it('predicts the full universal targets when no support scoping is set', () => {
+    // Layout no longer depends on the provider; only content does. With no
+    // supportTools answer, all shims are predicted (back-compat default).
     for (const tool of ['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'windsurf']) {
       expect(predictTargets(fullStackAnswers(tool))).toEqual(universalTargets(tool));
     }
@@ -47,6 +48,20 @@ describe('predictTargets — universal layout', () => {
       expect(targets).toContain(`.claude/skills/${s.id}`);
       expect(targets).toContain(`.windsurf/skills/${s.id}`);
     }
+  });
+
+  it('scopes predicted shims + CLAUDE.md to the supported tools', () => {
+    const claudeOnly = predictTargets({ ...fullStackAnswers('claude'), supportTools: ['claude'] });
+    expect(claudeOnly).toContain('CLAUDE.md');
+    expect(claudeOnly.some((t) => t.startsWith('.claude/skills/'))).toBe(true);
+    expect(claudeOnly.some((t) => t.startsWith('.windsurf/skills/'))).toBe(false);
+
+    const codexOnly = predictTargets({ ...fullStackAnswers('codex'), supportTools: ['codex'] });
+    expect(codexOnly).not.toContain('CLAUDE.md'); // Claude not supported
+    expect(codexOnly.some((t) => t.startsWith('.claude/skills/'))).toBe(false);
+    expect(codexOnly.some((t) => t.startsWith('.windsurf/skills/'))).toBe(false);
+    expect(codexOnly).toContain('AGENTS.md'); // entrypoint + .agents/skills still written
+    expect(codexOnly).toContain(skillPath(selectSkills(fullStackAnswers('codex'))[0].id));
   });
 });
 
