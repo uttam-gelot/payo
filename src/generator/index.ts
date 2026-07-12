@@ -1,12 +1,12 @@
 /**
- * Generator entry point. Resolves the provider Strategy for the chosen AI tool.
- * If that provider exposes a headless CLI agent and it is installed, the agent
- * generates a fixed set of skill docs in the tool's native format — every
- * applicable skill runs as its own subprocess in a bounded parallel pool.
- * Multi-file tools keep each skill's native file; single-file tools stage each
- * skill to a temp file and concatenate the survivors into their one master doc.
- * Otherwise (no agent, not installed, or every run failed) it falls back to the
- * provider's static template — so the user is never left empty-handed.
+ * Generator entry point. Whichever agent CLI the user selected, Payo always
+ * emits ONE universal layout: an `AGENTS.md` entrypoint, a `CLAUDE.md` import
+ * shim, and one `.agents/skills/<id>/SKILL.md` per applicable skill (see
+ * ./universal), plus discovery shims for the two tools that don't read
+ * `.agents/skills/` natively (see ./shims). If the selected provider exposes a
+ * headless CLI agent and it is installed, the agent authors each skill file in a
+ * bounded parallel pool; otherwise a static floor writes the same layout with
+ * deterministic content — so the user is never left empty-handed.
  */
 import fs from 'fs';
 import path from 'path';
@@ -30,7 +30,17 @@ import { getProvider } from '../providers/index';
 import { scanExistingAiConfigs } from '../detect/aiconfig';
 import { config } from '../config';
 import { writeFileAtomic } from '../fsutil';
-import { resolveContained, writeArtifact } from './paths';
+import { resolveContained } from './paths';
+import {
+  AGENTS_ENTRYPOINT,
+  CLAUDE_SHIM,
+  skillPath,
+  universalFrontmatter,
+  writeAgentsEntrypoint,
+  writeClaudeShim,
+  writeStaticSkill,
+} from './universal';
+import { createSkillShims, SHIM_ROOTS } from './shims';
 
 export { resolveContained };
 
@@ -63,76 +73,75 @@ function requirements(writeLine: string): string {
   ].join('\n');
 }
 
-/** Per-skill prompt (multi-file tools): one skill → its native file. */
+/** Per-skill prompt: one skill → its universal `.agents/skills/<id>/SKILL.md`. */
 function composePrompt(
-  provider: AiProvider,
-  skill: SkillSpec,
-  answers: Answers,
-  sections: RuleSection[],
-  outPath: string,
-): string {
-  const fm = provider.agent?.frontmatter?.(skill);
-  const parts = [
-    `You are configuring ${provider.displayName} for the software project described below.`,
-    projectContext(sections),
-    `Task: ${skill.buildPrompt(answers)}`,
-  ];
-  if (fm) {
-    parts.push(
-      'Begin the file with EXACTLY this YAML frontmatter (verbatim, including the --- ' +
-        `delimiters), then a blank line, then the content:\n\n${fm}`,
-    );
-  }
-  parts.push(requirements(writeLineFor(outPath)));
-  return parts.join('\n\n');
-}
-
-/**
- * Guarantee the provider's required frontmatter is present. Agents sometimes
- * omit it despite the prompt, which leaves the skill inert (undiscovered by the
- * tool). If the written file does not already open with a `---` block, prepend
- * the deterministic one — this is what makes the frontmatter non-negotiable.
- */
-function ensureFrontmatter(runner: AgentRunner, skill: SkillSpec, rel: string): void {
-  if (!runner.frontmatter) return;
-  const abs = path.resolve(process.cwd(), rel);
-  const content = fs.readFileSync(abs, 'utf-8');
-  if (/^---\r?\n/.test(content)) return; // agent already emitted frontmatter
-  writeFileAtomic(abs, `${runner.frontmatter(skill)}\n\n${content.replace(/^\s+/, '')}`);
-}
-
-/** Per-skill prompt (single-file tools): one skill → a section body, staged for merge. */
-function composeSectionPrompt(
-  provider: AiProvider,
   skill: SkillSpec,
   answers: Answers,
   sections: RuleSection[],
   outPath: string,
 ): string {
   return [
-    `You are configuring ${provider.displayName} for the software project described below.`,
+    'You are configuring AI coding-agent guidance for the software project described below.',
     projectContext(sections),
-    `Task: ${skill.buildPrompt(answers)}\n\n` +
-      `Write ONLY the body for the "${skill.title}" section as markdown — no top-level ` +
-      `heading and no restatement of the project context. It will be embedded under a ` +
-      `"## ${skill.title}" heading in a combined guide.`,
+    `Task: ${skill.buildPrompt(answers)}`,
+    'Begin the file with EXACTLY this YAML frontmatter (verbatim, including the --- ' +
+      `delimiters), then a blank line, then the content:\n\n${universalFrontmatter(skill)}`,
     requirements(writeLineFor(outPath)),
   ].join('\n\n');
 }
 
+/**
+ * Guarantee the skill's spec frontmatter is present. Agents sometimes omit it
+ * despite the prompt, which leaves the skill inert (undiscovered by every tool).
+ * If the written file does not already open with a `---` block, prepend the
+ * deterministic one — this is what makes the frontmatter non-negotiable.
+ */
+function ensureFrontmatter(skill: SkillSpec, rel: string): void {
+  const abs = path.resolve(process.cwd(), rel);
+  const content = fs.readFileSync(abs, 'utf-8');
+  if (/^---\r?\n/.test(content)) return; // agent already emitted frontmatter
+  writeFileAtomic(abs, `${universalFrontmatter(skill)}\n\n${content.replace(/^\s+/, '')}`);
+}
+
+/**
+ * Deterministic body for a static (no-CLI) SKILL.md: point at the full rules in
+ * AGENTS.md and restate when this skill applies. Keeps `.agents/skills/`
+ * populated (so shims and cross-tool discovery work) without a CLI to author it.
+ */
+function staticSkillBody(skill: SkillSpec): string {
+  return [
+    `This project's full rules live in [AGENTS.md](../../../${AGENTS_ENTRYPOINT}).`,
+    '',
+    `Apply this skill when: ${skill.description}`,
+  ].join('\n');
+}
+
+/**
+ * The no-CLI floor. Emits the same universal layout as the agent path, with
+ * deterministic content: AGENTS.md carries the complete base rules, and each
+ * applicable skill gets a pointer SKILL.md plus its discovery shims.
+ */
 function runStatic(
   provider: AiProvider,
   answers: Answers,
   sections: RuleSection[],
   hooks: GenerateHooks,
 ): GenerationResult {
-  const artifacts = provider.generate({ answers, sections });
-  hooks.onStart?.('static', provider.displayName, artifacts.length);
-  for (const artifact of artifacts) writeArtifact(artifact);
+  const specs = selectSkills(answers);
+  hooks.onStart?.('static', provider.displayName, specs.length + 1);
+  const index = specs.map((s) => ({
+    title: s.title,
+    description: s.description,
+    path: skillPath(s.id),
+  }));
+  const files = [writeAgentsEntrypoint(sections, index), writeClaudeShim()];
+  for (const s of specs) files.push(writeStaticSkill(s, staticSkillBody(s)));
+  for (const shim of createSkillShims(specs.map((s) => s.id))) files.push(shim.path);
   return {
     mode: 'static',
     providerName: provider.displayName,
-    files: artifacts.map((a) => a.path),
+    files,
+    skills: specs.map((s) => s.title),
   };
 }
 
@@ -253,8 +262,14 @@ function runParallel(
   });
 }
 
-/** AI mode for multi-file tools: each skill's native file is a deliverable. */
-async function runMultiFile(
+/**
+ * AI mode: the agent authors each skill's `.agents/skills/<id>/SKILL.md` in a
+ * bounded parallel pool. After the survivors are on disk (frontmatter
+ * guaranteed), write the universal entrypoint + shim and the discovery shims.
+ * Returns null if the agent wrote nothing usable, so the caller falls through to
+ * the static floor.
+ */
+async function runUniversal(
   provider: AiProvider,
   runner: AgentRunner,
   specs: SkillSpec[],
@@ -268,119 +283,45 @@ async function runMultiFile(
     runner,
     specs,
     hooks,
-    (skill) => runner.outputPath(skill.id),
-    (skill, outPath) => composePrompt(provider, skill, answers, sections, outPath),
+    (skill) => skillPath(skill.id),
+    (skill, outPath) => composePrompt(skill, answers, sections, outPath),
     resume,
   );
 
-  const skills: string[] = [];
-  const failures: string[] = [];
-  const files: string[] = [];
   const generated: SkillRun[] = [];
+  const failures: string[] = [];
   for (const r of runs) {
     if (r.wrote) {
-      ensureFrontmatter(runner, r.skill, r.path);
+      ensureFrontmatter(r.skill, r.path);
       generated.push(r);
-      skills.push(r.skill.title);
-      if (!files.includes(r.path)) files.push(r.path);
     } else {
       failures.push(r.skill.title);
     }
   }
-  if (skills.length === 0) return null;
+  if (generated.length === 0) return null;
 
-  // Always write the tool's canonical entrypoint (CLAUDE.md / AGENTS.md / …):
-  // the agent only authors skill files, so without this the file the tool reads
-  // by default is absent and the deterministic guidance never lands on disk.
-  const entrypoint = writeEntrypoint(provider, answers, sections, generated);
-  if (entrypoint && !files.includes(entrypoint)) files.unshift(entrypoint);
+  const files: string[] = [];
+  files.push(
+    writeAgentsEntrypoint(
+      sections,
+      generated.map((r) => ({
+        title: r.skill.title,
+        description: r.skill.description,
+        path: r.path,
+      })),
+    ),
+  );
+  files.push(writeClaudeShim());
+  for (const r of generated) files.push(r.path);
+  for (const shim of createSkillShims(generated.map((r) => r.skill.id))) files.push(shim.path);
 
   return {
     mode: 'ai',
     providerName: provider.displayName,
     files,
-    skills,
+    skills: generated.map((r) => r.skill.title),
     failures: failures.length ? failures : undefined,
   };
-}
-
-/**
- * Render the provider's static entrypoint (its `buildBaseRules` guidance) and
- * append an index of the skills this run generated, so the tool's default-read
- * file always exists in AI mode and static/AI output cannot silently diverge.
- * Returns the written path, or undefined if the provider has no entrypoint.
- */
-function writeEntrypoint(
-  provider: AiProvider,
-  answers: Answers,
-  sections: RuleSection[],
-  generated: SkillRun[],
-): string | undefined {
-  const [entry] = provider.generate({ answers, sections });
-  if (!entry) return undefined;
-  const index = generated
-    .map((r) => `- **${r.skill.title}** — \`${r.path}\`: ${r.skill.description}`)
-    .join('\n');
-  const body = index
-    ? `${entry.content.trimEnd()}\n\n## Generated Skills\n\n${index}\n`
-    : entry.content;
-  writeArtifact({ path: entry.path, content: body });
-  return entry.path;
-}
-
-/**
- * AI mode for single-file tools: stage each skill to a per-skill file in
- * parallel, then concatenate the survivors into the one master doc the tool
- * expects. The staging dir is stable (not random) so an interrupted run leaves
- * its finished sections behind to resume from; it is removed on the terminal
- * paths here (success or none-written), which an interruption skips.
- */
-async function runSingleFile(
-  provider: AiProvider,
-  runner: AgentRunner,
-  specs: SkillSpec[],
-  answers: Answers,
-  sections: RuleSection[],
-  hooks: GenerateHooks,
-  resume?: ResumeStore,
-): Promise<GenerationResult | null> {
-  hooks.onStart?.('ai', provider.displayName, specs.length);
-  const stagingDir = path.join(config.payo.dir(), 'staging');
-  fs.mkdirSync(stagingDir, { recursive: true });
-  const stagingRel = path.relative(process.cwd(), stagingDir);
-  try {
-    const runs = await runParallel(
-      runner,
-      specs,
-      hooks,
-      (skill) => path.join(stagingRel, `${skill.id}.md`),
-      (skill, outPath) => composeSectionPrompt(provider, skill, answers, sections, outPath),
-      resume,
-    );
-
-    const survivors = runs.filter((r) => r.wrote);
-    if (survivors.length === 0) return null;
-
-    const body = survivors
-      .map((r) => {
-        const content = fs.readFileSync(path.resolve(process.cwd(), r.path), 'utf-8').trim();
-        return `## ${r.skill.title}\n\n${content}`;
-      })
-      .join('\n\n');
-    const master = runner.outputPath('');
-    writeArtifact({ path: master, content: `# ${provider.displayName} Guide\n\n${body}\n` });
-
-    const failures = runs.filter((r) => !r.wrote).map((r) => r.skill.title);
-    return {
-      mode: 'ai',
-      providerName: provider.displayName,
-      files: [master],
-      skills: survivors.map((r) => r.skill.title),
-      failures: failures.length ? failures : undefined,
-    };
-  } finally {
-    fs.rmSync(stagingDir, { recursive: true, force: true });
-  }
 }
 
 /** The provider Strategy for the collected answers (custom tools ⇒ generic). */
@@ -391,28 +332,19 @@ function providerFor(answers: Answers): AiProvider {
 }
 
 /**
- * The project-relative paths a `generate()` run with these answers will write,
- * mirroring its mode decision (AI agent vs static templates). Lets the CLI
- * warn about existing files before any generation starts.
+ * The project-relative paths a `generate()` run with these answers will write.
+ * The universal layout is identical whether the agent or the static floor runs
+ * (only the content differs), so this is provider-independent: the entrypoint,
+ * the shim, and — when any skill applies — each skill file plus its discovery
+ * shims. Lets the CLI warn about existing files before generation starts.
  */
 export function predictTargets(answers: Answers): string[] {
-  const provider = providerFor(answers);
-  const sections = buildBaseRules(answers);
-  const staticPaths = provider.generate({ answers, sections }).map((a) => a.path);
-  const runner = provider.agent;
-  if (runner && isAvailable(runner)) {
-    const specs = selectSkills(answers);
-    if (specs.length > 0) {
-      const aiPaths = runner.singleFile
-        ? [runner.outputPath('')]
-        : specs.map((s) => runner.outputPath(s.id));
-      // The static fallback (runStatic) still fires if every agent run fails,
-      // writing these targets — so guard them too. Otherwise a pre-existing
-      // CLAUDE.md is clobbered outside the user's overwrite choice (B2).
-      return [...new Set([...aiPaths, ...staticPaths])];
-    }
-  }
-  return staticPaths;
+  const base = [AGENTS_ENTRYPOINT, CLAUDE_SHIM];
+  const specs = selectSkills(answers);
+  if (specs.length === 0) return base;
+  const skillFiles = specs.map((s) => skillPath(s.id));
+  const shimPaths = SHIM_ROOTS.flatMap((root) => specs.map((s) => `${root}/${s.id}`));
+  return [...new Set([...base, ...skillFiles, ...shimPaths])];
 }
 
 /**
@@ -465,9 +397,7 @@ export async function generate(
   if (runner && isAvailable(runner)) {
     const specs = selectSkills(answers);
     if (specs.length > 0) {
-      const result = runner.singleFile
-        ? await runSingleFile(provider, runner, specs, answers, sections, hooks, resume)
-        : await runMultiFile(provider, runner, specs, answers, sections, hooks, resume);
+      const result = await runUniversal(provider, runner, specs, answers, sections, hooks, resume);
       // null ⇒ the agent wrote nothing usable; fall through to the static floor.
       if (result) return result;
     }

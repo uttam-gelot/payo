@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, it, expect, afterEach } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { setAgentOverride, resetAgentOverride } from '../helpers/agentMock';
+import { resetAgentOverride } from '../helpers/agentMock';
 import {
   predictTargets,
   existingTargets,
@@ -9,68 +9,63 @@ import {
   backupFiles,
   resolveContained,
 } from '../../src/generator/index';
-import { listProviders } from '../../src/providers/index';
 import { selectSkills } from '../../src/generator/skills';
-import { buildBaseRules } from '../../src/generator/rules';
+import { skillPath } from '../../src/generator/universal';
+import { SHIM_ROOTS } from '../../src/generator/shims';
 import { inTempProject } from '../helpers/tmpProject';
 import { fullStackAnswers } from '../fixtures';
 
 afterEach(() => resetAgentOverride());
 
-describe('predictTargets — static mode', () => {
-  beforeEach(() => setAgentOverride({ isAvailable: false }));
+/** The full universal target set for a given answer set, in write order. */
+function universalTargets(aiTool: string): string[] {
+  const specs = selectSkills(fullStackAnswers(aiTool));
+  const skillFiles = specs.map((s) => skillPath(s.id));
+  const shimPaths = SHIM_ROOTS.flatMap((root) => specs.map((s) => `${root}/${s.id}`));
+  return ['AGENTS.md', 'CLAUDE.md', ...skillFiles, ...shimPaths];
+}
 
-  for (const provider of listProviders()) {
-    it(`matches the ${provider.id} provider's artifact paths`, () => {
-      const answers = fullStackAnswers(provider.id);
-      const expected = provider
-        .generate({ answers, sections: buildBaseRules(answers) })
-        .map((a) => a.path);
-      expect(predictTargets(answers)).toEqual(expected);
-    });
-  }
-});
+describe('predictTargets — universal layout', () => {
+  it('predicts the same universal targets regardless of the selected CLI', () => {
+    // Layout no longer depends on the provider; only content does.
+    for (const tool of ['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'windsurf']) {
+      expect(predictTargets(fullStackAnswers(tool))).toEqual(universalTargets(tool));
+    }
+  });
 
-describe('predictTargets — AI mode', () => {
-  beforeEach(() => setAgentOverride({ isAvailable: true }));
+  it('always includes the entrypoint and the Claude shim', () => {
+    const targets = predictTargets(fullStackAnswers('claude'));
+    expect(targets).toContain('AGENTS.md');
+    expect(targets).toContain('CLAUDE.md');
+  });
 
-  it('predicts each skill file plus the static fallback target for a multi-file tool (claude)', () => {
+  it('predicts each skill file under .agents/skills and its discovery shims', () => {
     const answers = fullStackAnswers('claude');
-    const skillPaths = selectSkills(answers).map((s) => `.claude/skills/${s.id}/SKILL.md`);
-    // CLAUDE.md is the runStatic fallback target — it must be guarded too (B2).
-    expect(predictTargets(answers)).toEqual([...skillPaths, 'CLAUDE.md']);
-  });
-
-  it('includes the static fallback target so it is not silently clobbered (B2)', () => {
-    // runStatic fires when every agent run fails, writing CLAUDE.md. If predictTargets
-    // omitted it, a pre-existing CLAUDE.md would be overwritten with no prompt/backup.
-    expect(predictTargets(fullStackAnswers('claude'))).toContain('CLAUDE.md');
-  });
-
-  it('predicts the single master file for a single-file tool (codex)', () => {
-    // AI master and static fallback are both AGENTS.md — the union dedupes to one.
-    expect(predictTargets(fullStackAnswers('codex'))).toEqual(['AGENTS.md']);
+    const targets = predictTargets(answers);
+    for (const s of selectSkills(answers)) {
+      expect(targets).toContain(skillPath(s.id));
+      expect(targets).toContain(`.claude/skills/${s.id}`);
+      expect(targets).toContain(`.windsurf/skills/${s.id}`);
+    }
   });
 });
 
 describe('existingTargets — cross-tool config', () => {
-  beforeEach(() => setAgentOverride({ isAvailable: false }));
-
-  it('warns about CLAUDE.md even when a different tool (antigravity) is selected', async () => {
-    // The exact reported bug: a repo with Claude config, user picks Antigravity.
-    // predictTargets only knows AGENTS.md, so without the union the guard never fires.
+  it('warns about a legacy config (.cursorrules) that the universal run does not own', async () => {
+    // Universal output never writes .cursorrules, but a repo may still hold one;
+    // the cross-tool scan must surface it so it is not silently left behind.
     await inTempProject((dir) => {
-      writeFileSync(join(dir, 'CLAUDE.md'), 'hand-tuned', 'utf-8');
-      const answers = fullStackAnswers('antigravity');
-      expect(predictTargets(answers)).not.toContain('CLAUDE.md');
-      expect(existingTargets(answers)).toContain('CLAUDE.md');
+      writeFileSync(join(dir, '.cursorrules'), 'hand-tuned', 'utf-8');
+      const answers = fullStackAnswers('claude');
+      expect(predictTargets(answers)).not.toContain('.cursorrules');
+      expect(existingTargets(answers)).toContain('.cursorrules');
     });
   });
 
   it('only reports config that actually exists on disk', async () => {
     await inTempProject(() => {
-      // Nothing written → no existing AI config, and the static target is absent too.
-      expect(existingTargets(fullStackAnswers('antigravity'))).toEqual([]);
+      // Nothing written → no existing AI config, and no universal target exists yet.
+      expect(existingTargets(fullStackAnswers('claude'))).toEqual([]);
     });
   });
 });
@@ -138,26 +133,23 @@ describe('backupFiles', () => {
 });
 
 describe('predictedExisting — only this run’s own targets', () => {
-  beforeEach(() => setAgentOverride({ isAvailable: false }));
-
-  it('excludes other tools’ configs so backup never moves them', async () => {
+  it('excludes legacy configs the universal run does not write, so backup never moves them', async () => {
     await inTempProject((dir) => {
-      // Repo already holds Claude config; the user picks Cursor.
-      writeFileSync(join(dir, 'CLAUDE.md'), 'hand-tuned', 'utf-8');
-      mkdirSync(join(dir, '.claude/skills'), { recursive: true });
+      // A universal target that already exists, plus a legacy config the run never writes.
+      writeFileSync(join(dir, 'AGENTS.md'), 'prior', 'utf-8');
       writeFileSync(join(dir, '.cursorrules'), 'old cursor', 'utf-8');
-      const answers = fullStackAnswers('cursor');
+      const answers = fullStackAnswers('claude');
 
       const own = predictedExisting(answers);
-      expect(own).toEqual(['.cursorrules']); // only Cursor's own target
-      // The warning set still surfaces the Claude config…
-      expect(existingTargets(answers)).toContain('CLAUDE.md');
+      expect(own).toContain('AGENTS.md'); // its own target, safe to back up
+      expect(own).not.toContain('.cursorrules'); // legacy config excluded
+      // The warning set still surfaces the legacy config…
+      expect(existingTargets(answers)).toContain('.cursorrules');
 
-      // …but backing up only `own` leaves Claude's config untouched.
+      // …but backing up only `own` leaves the legacy config untouched.
       backupFiles(own);
-      expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
-      expect(existsSync(join(dir, '.claude/skills'))).toBe(true);
-      expect(existsSync(join(dir, '.cursorrules.bak'))).toBe(true);
+      expect(existsSync(join(dir, '.cursorrules'))).toBe(true);
+      expect(existsSync(join(dir, 'AGENTS.md.bak'))).toBe(true);
     });
   });
 });
