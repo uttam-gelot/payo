@@ -3,20 +3,11 @@
  * and the generator entry point.
  */
 import type { AiTool } from '../types/index';
-import type { Answers } from '../questions/types';
-import type { SkillSpec } from './skills';
 
 /** A single provider-agnostic block of generated guidance. */
 export interface RuleSection {
   title: string;
   body: string;
-}
-
-/** Everything a provider needs to render its artifact(s). */
-export interface GenerationContext {
-  answers: Answers;
-  /** Provider-agnostic content assembled by the Builder (see rules.ts). */
-  sections: RuleSection[];
 }
 
 /** A file the generator should write, with a path relative to cwd. */
@@ -27,8 +18,10 @@ export interface GeneratedArtifact {
 
 /**
  * Describes how to drive a provider's installed CLI agent in headless mode.
- * Providers that omit this are static-only (template fallback). The agent
- * writes files itself; payo only orchestrates the subprocess.
+ * Providers that omit this are static-only. The agent writes files itself;
+ * payo only orchestrates the subprocess. The output layout and per-skill
+ * frontmatter are universal constants (see generator/universal.ts), so a runner
+ * only declares how to invoke its CLI — not where files land.
  */
 export interface AgentRunner {
   /** Executable on PATH, e.g. 'claude' | 'codex' | 'cursor-agent'. */
@@ -37,24 +30,15 @@ export interface AgentRunner {
   buildArgs(prompt: string): string[];
   /** Pass the prompt on stdin instead of as an argv (default false). */
   promptViaStdin?: boolean;
-  /** This tool consumes one master file; skills are staged per-skill then merged into it. */
-  singleFile?: boolean;
-  /**
-   * The YAML frontmatter block this provider requires at the top of each
-   * generated skill file (e.g. Claude needs `name`/`description` to discover the
-   * skill; Cursor needs `globs`/`alwaysApply` to auto-attach). Returns the full
-   * `---`-delimited block. Absent ⇒ the tool needs no frontmatter (plain markdown).
-   */
-  frontmatter?(skill: SkillSpec): string;
   /** Hard wall-clock cap; defaults to 120s. Guards CLI hang bugs. */
   timeoutMs?: number;
-  /** Concrete project-relative path the skill is written to (prompt + verification). */
-  outputPath(skillId: string): string;
 }
 
 /**
  * Strategy interface: each AI tool implements this once. The registry maps
- * an AiTool id to its implementation, so dispatch never uses a switch.
+ * an AiTool id to its implementation, so dispatch never uses a switch. Output is
+ * universal (generator/universal.ts); a provider only declares its identity, the
+ * artifacts that detect it in a repo, and how to drive its CLI (if any).
  */
 export interface AiProvider {
   id: AiTool;
@@ -68,8 +52,6 @@ export interface AiProvider {
    * more than one provider (e.g. AGENTS.md) can't identify a single tool.
    */
   knownArtifacts: readonly string[];
-  /** Static template renderer — the fallback floor when no agent runs. */
-  generate(ctx: GenerationContext): GeneratedArtifact[];
   /** Optional headless-CLI capability; absent ⇒ static-only. */
   agent?: AgentRunner;
 }

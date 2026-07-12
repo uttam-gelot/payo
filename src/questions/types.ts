@@ -28,6 +28,12 @@ export interface Question {
   allowOther?: boolean;
   /** multiselect: require at least one. */
   required?: boolean;
+  /**
+   * multiselect: dynamic initial checks derived from prior answers, used when
+   * there is no stored answer yet. Unlike the `recommended` hint, this seeds the
+   * default selection without tagging any option "recommended".
+   */
+  initialFrom?: (a: Answers) => string[];
   /** text: validation message or undefined when valid. */
   validate?: (v: string) => string | undefined;
   /** text: placeholder shown in the input — static or derived from prior answers. */

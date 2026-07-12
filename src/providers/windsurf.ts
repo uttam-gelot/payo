@@ -1,11 +1,9 @@
 import type { AiProvider } from '../generator/types';
-import { renderMarkdown } from '../generator/rules';
 
+// Static-only: Windsurf has no headless CLI runner, so it relies on the
+// universal AGENTS.md entrypoint and its `.windsurf/skills` discovery shim.
 export const windsurfProvider: AiProvider = {
   id: 'windsurf',
   displayName: 'Windsurf',
   knownArtifacts: ['.windsurfrules'],
-  generate: (ctx) => [
-    { path: '.windsurfrules', content: renderMarkdown('Windsurf Rules', ctx.sections) },
-  ],
 };

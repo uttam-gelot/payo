@@ -96,7 +96,11 @@ async function runMultiselect(q: Question, a: Answers): Promise<string[]> {
     ? [...options, { value: OTHER, label: 'Other (specify)' }]
     : options;
 
-  const initialValues = multiselectSeed(a[q.id], finalOptions);
+  // A stored answer wins; otherwise a question-supplied dynamic default seeds the
+  // checks (no "recommended" tag); otherwise fall back to the recommended options.
+  const prior = a[q.id];
+  const seed = prior ?? (q.initialFrom ? q.initialFrom(a) : undefined);
+  const initialValues = multiselectSeed(seed, finalOptions);
 
   const picked = await multiselect({
     message: q.message,
@@ -301,6 +305,21 @@ export async function confirmOverwrite(existing: string[]): Promise<OverwriteCho
       { value: 'overwrite', label: 'Overwrite — replace the existing files' },
       { value: 'skip', label: 'Skip — keep existing files and generate nothing' },
     ],
+  });
+  guardCancel(value);
+  return value;
+}
+
+/**
+ * Offer to delete legacy per-tool config the universal layout supersedes.
+ * Default off — deletion is destructive, so the user opts in explicitly.
+ */
+export async function confirmLegacyCleanup(files: string[]): Promise<boolean> {
+  const shown = files.slice(0, 3).join(', ');
+  const more = files.length > 3 ? ` and ${files.length - 3} more` : '';
+  const value = await confirm({
+    message: `Remove legacy config now replaced by the universal layout (${shown}${more})?`,
+    initialValue: false,
   });
   guardCancel(value);
   return value;

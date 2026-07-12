@@ -112,9 +112,12 @@ function asciiLogo(): string | null {
 
 /** One-line summary plus the controls the user can rely on during a run. */
 const DESCRIPTION = [
-  'payo generates AI coding rules & skills tailored to your stack.',
+  'payo generates Agent Skills tailored to your stack — one universal layout',
+  '(AGENTS.md + .agents/skills) that works across Claude Code, Codex, Cursor,',
+  'Copilot, Gemini, Antigravity & Windsurf. Write once, use in every agent.',
   '',
-  'Answer a few questions and payo writes the config for your AI tool.',
+  'It detects your stack across 8 languages, then asks a few questions and',
+  'writes skills your AI agents follow from the very first prompt.',
   '',
   'Controls:',
   '  • Press Ctrl+C any time to stop — your answers are saved.',

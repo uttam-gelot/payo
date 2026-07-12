@@ -13,11 +13,13 @@ import {
   confirmResume,
   confirmBootstrapPrompt,
   confirmOverwrite,
+  confirmLegacyCleanup,
   confirmStartMode,
   confirmDetectionDepth,
   summarizeDetection,
   runQuestion,
 } from '../questions/runner';
+import { findLegacyArtifacts, removeLegacyArtifacts } from '../generator/legacy';
 import { detectStack } from '../detect/index';
 import { scanExistingAiConfigs, detectAiTool } from '../detect/aiconfig';
 import { llmDetect, willLlmDetectRun } from '../detect/llm';
@@ -223,6 +225,17 @@ export async function run(): Promise<void> {
       `Generated via ${result.providerName} (static) in ${process.cwd()}`,
     );
   }
+  // Offer to remove retired per-tool config the universal layout supersedes.
+  // Only after a successful write, so we never delete the old files before the
+  // replacement exists. Default off — the user opts into deletion.
+  const legacy = findLegacyArtifacts();
+  if (legacy.length > 0 && (await confirmLegacyCleanup(legacy))) {
+    const removed = removeLegacyArtifacts(legacy);
+    if (removed.length > 0) {
+      note(removed.map((f) => `• ${f}`).join('\n'), 'Removed legacy config');
+    }
+  }
+
   // Generation finished — remove the working dir (.payo/) and its session.
   cleanupWorkspace();
 

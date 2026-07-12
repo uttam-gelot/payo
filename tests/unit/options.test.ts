@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'bun:test';
 import '../../src/stack/modules/index'; // populate the module registry
 import {
+  aiToolOptions,
+  supportToolOptions,
+  defaultSupportTools,
   ormOptions,
   loggerOptions,
   frameworkOptions,
@@ -15,6 +18,7 @@ import {
   hasServer,
   isStandalone,
 } from '../../src/questions/options';
+import '../../src/providers/index'; // populate the provider registry
 import type { Option } from '../../src/questions/types';
 
 const vals = (opts: Option<string>[]): string[] => opts.map((o) => o.value);
@@ -22,6 +26,41 @@ const recCount = (opts: Option<string>[]): number =>
   opts.filter((o) => o.hint === 'recommended').length;
 const hintOf = (opts: Option<string>[], value: string): string | undefined =>
   opts.find((o) => o.value === value)?.hint;
+
+describe('aiToolOptions', () => {
+  it('offers only providers with a CLI runner (static-only tools excluded)', () => {
+    const ids = vals(aiToolOptions());
+    // Q1 picks the generator CLI; only CLI-capable providers qualify.
+    expect(ids).toEqual(['claude', 'codex', 'antigravity', 'cursor', 'copilot']);
+    expect(ids).not.toContain('windsurf'); // static-only
+    expect(ids).not.toContain('other'); // internal fallback
+  });
+
+  it('tags no option recommended (the first option is the plain default)', () => {
+    expect(recCount(aiToolOptions())).toBe(0);
+  });
+});
+
+describe('supportToolOptions', () => {
+  it('offers every supported tool except the internal fallback, untagged', () => {
+    const ids = vals(supportToolOptions());
+    expect(ids).toEqual(['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'windsurf']);
+    expect(ids).not.toContain('other');
+    expect(recCount(supportToolOptions())).toBe(0);
+  });
+});
+
+describe('defaultSupportTools', () => {
+  it('preselects the generator CLI’s own tool', () => {
+    expect(defaultSupportTools({ aiTool: 'claude' })).toEqual(['claude']);
+    expect(defaultSupportTools({ aiTool: 'codex' })).toEqual(['codex']);
+  });
+
+  it('is empty when no valid generator tool is chosen', () => {
+    expect(defaultSupportTools({})).toEqual([]);
+    expect(defaultSupportTools({ aiTool: 'other' })).toEqual([]); // not a support option
+  });
+});
 
 describe('loggerOptions', () => {
   it('frontend: only a recommended centralized wrapper and none', () => {

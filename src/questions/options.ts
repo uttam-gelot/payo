@@ -7,16 +7,32 @@ import { listProviders } from '../providers/index';
 import { modulesFor } from '../stack/registry';
 import { isMongo } from '../stack/predicates';
 
-// Only the tools we natively support are offered — the generic 'other'
-// provider is an internal fallback, not a user-selectable choice.
+// Q1 picks which agent CLI authors the content — the output layout is universal
+// and works with every skills-compatible tool. Offer only providers that expose
+// a CLI runner (static-only tools like Windsurf and the generic fallback are not
+// generators). No recommended tag — the first option is the plain default.
 export const aiToolOptions = (): Option<string>[] =>
   listProviders()
-    .filter((p) => p.id !== 'other')
+    .filter((p) => p.agent)
     .map((p) => ({
       value: p.id,
       label: p.displayName,
       ...(p.hint ? { hint: p.hint } : {}),
     }));
+
+// Q2 picks which tools the generated skills should support (drives which
+// discovery shims are written). Every Payo-supported tool is offered; the
+// generic fallback is internal-only, so it is excluded.
+export const supportToolOptions = (): Option<string>[] =>
+  listProviders()
+    .filter((p) => p.id !== 'other')
+    .map((p) => ({ value: p.id, label: p.displayName }));
+
+/** Default support selection: the generator CLI's own tool (from Q1), if valid. */
+export const defaultSupportTools = (a: Answers): string[] => {
+  const valid = new Set(supportToolOptions().map((o) => o.value));
+  return typeof a.aiTool === 'string' && valid.has(a.aiTool) ? [a.aiTool] : [];
+};
 
 export const projectTypeOptions: Option<string>[] = [
   { value: 'full-stack', label: 'Full-stack' },

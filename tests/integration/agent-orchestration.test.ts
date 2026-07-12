@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'bun:test';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { setAgentOverride, resetAgentOverride } from '../helpers/agentMock';
 import { generate } from '../../src/generator/index';
@@ -10,6 +10,9 @@ import type { AgentResult } from '../../src/generator/agent';
 import type { AgentRunner, ResumeStore } from '../../src/generator/types';
 
 const answers = () => fullStackAnswers('claude');
+
+/** The universal, provider-agnostic path for a skill's spec file. */
+const skillFile = (id: string) => `.agents/skills/${id}/SKILL.md`;
 
 type Mode = 'success' | 'empty' | 'fail';
 
@@ -31,13 +34,6 @@ function simulate(mode: Mode, failSkill = ''): (runner: unknown, prompt: string)
     }
     return { ok: true };
   };
-}
-
-/** True if no `staging` dir leaked under the project's `.payo/` root. */
-function noStagingLeft(dir: string): boolean {
-  const root = join(dir, '.payo');
-  if (!existsSync(root)) return true;
-  return !readdirSync(root).some((name) => name.startsWith('staging'));
 }
 
 /** A counting agent override around `simulate('success')`; reports call count. */
@@ -65,21 +61,75 @@ function resumeWith(ids: string[]): { store: ResumeStore; marked: string[] } {
 describe('generate() — AI agent orchestration (mocked agent)', () => {
   afterEach(() => resetAgentOverride());
 
-  it('success: mode=ai and native skill files are written', async () => {
+  it('success: mode=ai and universal skill files are written', async () => {
     await inTempProject(async (dir) => {
       setAgentOverride({ isAvailable: true, runAgent: simulate('success') });
       const res = await generate(answers());
       expect(res.mode).toBe('ai');
       expect(res.skills?.length ?? 0).toBeGreaterThan(0);
-      expect(existsSync(join(dir, '.claude/skills/project-overview/SKILL.md'))).toBe(true);
+      expect(existsSync(join(dir, skillFile('project-overview')))).toBe(true);
     });
   });
 
-  it('every skill fails → falls back to the static template', async () => {
+  it('universal layout is identical whichever CLI is selected (former single-file Codex)', async () => {
+    await inTempProject(async (dir) => {
+      setAgentOverride({ isAvailable: true, runAgent: simulate('success') });
+      const res = await generate(fullStackAnswers('codex'));
+      expect(res.mode).toBe('ai');
+      // Codex used to merge into one AGENTS.md; now it emits the same .agents/skills tree.
+      expect(existsSync(join(dir, skillFile('project-overview')))).toBe(true);
+      expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
+      expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
+      expect(res.files).toContain('AGENTS.md');
+      expect(res.files).toContain(skillFile('project-overview'));
+    });
+  });
+
+  it('creates discovery shims for Claude Code and Windsurf', async () => {
+    await inTempProject(async (dir) => {
+      setAgentOverride({ isAvailable: true, runAgent: simulate('success') });
+      await generate(answers());
+      for (const root of ['.claude/skills', '.windsurf/skills']) {
+        const link = join(dir, root, 'project-overview');
+        expect(lstatSync(link).isSymbolicLink()).toBe(true);
+        // Resolves through the shim to the canonical spec file.
+        expect(existsSync(join(link, 'SKILL.md'))).toBe(true);
+      }
+    });
+  });
+
+  it('scopes shims and CLAUDE.md to the supported tools', async () => {
+    await inTempProject(async (dir) => {
+      setAgentOverride({ isAvailable: true, runAgent: simulate('success') });
+
+      // Claude only → .claude/skills + CLAUDE.md, no .windsurf/skills.
+      await generate({ ...answers(), supportTools: ['claude'] });
+      expect(existsSync(join(dir, '.claude/skills/project-overview'))).toBe(true);
+      expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
+      expect(existsSync(join(dir, '.windsurf/skills/project-overview'))).toBe(false);
+    });
+  });
+
+  it('a native-only selection (Codex) writes no CLAUDE.md or shim dirs', async () => {
+    await inTempProject(async (dir) => {
+      setAgentOverride({ isAvailable: true, runAgent: simulate('success') });
+      const res = await generate({ ...fullStackAnswers('codex'), supportTools: ['codex'] });
+      expect(res.mode).toBe('ai');
+      expect(existsSync(join(dir, skillFile('project-overview')))).toBe(true); // universal core
+      expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
+      expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(false);
+      expect(existsSync(join(dir, '.claude/skills'))).toBe(false);
+      expect(existsSync(join(dir, '.windsurf/skills'))).toBe(false);
+      expect(res.files).not.toContain('CLAUDE.md');
+    });
+  });
+
+  it('every skill fails → falls back to the static layout', async () => {
     await inTempProject(async (dir) => {
       setAgentOverride({ isAvailable: true, runAgent: simulate('fail') });
       const res = await generate(answers());
       expect(res.mode).toBe('static');
+      expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
       expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
     });
   });
@@ -89,7 +139,7 @@ describe('generate() — AI agent orchestration (mocked agent)', () => {
       setAgentOverride({ isAvailable: true, runAgent: simulate('empty') });
       const res = await generate(answers());
       expect(res.mode).toBe('static');
-      expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
+      expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
     });
   });
 
@@ -99,8 +149,8 @@ describe('generate() — AI agent orchestration (mocked agent)', () => {
       const res = await generate(answers());
       expect(res.mode).toBe('ai');
       expect(res.failures).toContain('Tooling');
-      expect(existsSync(join(dir, '.claude/skills/project-overview/SKILL.md'))).toBe(true);
-      expect(existsSync(join(dir, '.claude/skills/tooling/SKILL.md'))).toBe(false);
+      expect(existsSync(join(dir, skillFile('project-overview')))).toBe(true);
+      expect(existsSync(join(dir, skillFile('tooling')))).toBe(false);
     });
   });
 
@@ -138,7 +188,7 @@ describe('generate() — AI agent orchestration (mocked agent)', () => {
       expect(res.mode).toBe('ai');
       expect(res.failures ?? []).toEqual([]); // all recovered via retry
       expect(res.skills?.length).toBe(selectSkills(answers()).length);
-      expect(existsSync(join(dir, '.claude/skills/project-overview/SKILL.md'))).toBe(true);
+      expect(existsSync(join(dir, skillFile('project-overview')))).toBe(true);
     });
   });
 
@@ -161,7 +211,7 @@ describe('generate() — AI agent orchestration (mocked agent)', () => {
         // No retry → every skill fails its single attempt → static fallback.
         const res = await generate(answers());
         expect(res.mode).toBe('static');
-        expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(true);
+        expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
       });
     } finally {
       if (prev === undefined) delete process.env.PAYO_RETRIES;
@@ -169,70 +219,13 @@ describe('generate() — AI agent orchestration (mocked agent)', () => {
     }
   });
 
-  it('single-file tool (Codex) stages skills in parallel and merges AGENTS.md', async () => {
-    await inTempProject(async (dir) => {
-      const codexAnswers = fullStackAnswers('codex');
-      let calls = 0;
-      const sim = simulate('success');
-      const runAgent = (runner: AgentRunner, prompt: string): AgentResult => {
-        calls += 1;
-        return sim(runner, prompt);
-      };
-      setAgentOverride({ isAvailable: true, runAgent });
-
-      const res = await generate(codexAnswers);
-      const expected = selectSkills(codexAnswers).length;
-      expect(calls).toBe(expected); // one run per skill, in parallel — not a single combined run
-      expect(res.mode).toBe('ai');
-      expect(res.files).toEqual(['AGENTS.md']);
-      expect(res.skills?.length).toBe(expected);
-
-      const master = readFileSync(join(dir, 'AGENTS.md'), 'utf-8');
-      // Every applicable skill is embedded as its own `## <Title>` section, in
-      // selectSkills (importance) order.
-      const positions = selectSkills(codexAnswers).map((skill) => {
-        const at = master.indexOf(`## ${skill.title}`);
-        expect(at).toBeGreaterThanOrEqual(0);
-        return at;
-      });
-      const sorted = [...positions].sort((a, b) => a - b);
-      expect(positions).toEqual(sorted); // sections appear in importance order
-      expect(noStagingLeft(dir)).toBe(true); // staging dir cleaned up
-    });
-  });
-
-  it('Codex partial failure: master keeps survivors, failed skill reported', async () => {
-    await inTempProject(async (dir) => {
-      const codexAnswers = fullStackAnswers('codex');
-      setAgentOverride({ isAvailable: true, runAgent: simulate('success', 'tooling') });
-
-      const res = await generate(codexAnswers);
-      expect(res.mode).toBe('ai');
-      expect(res.failures).toContain('Tooling');
-      const master = readFileSync(join(dir, 'AGENTS.md'), 'utf-8');
-      expect(master).toContain('## Project Overview');
-      expect(master).not.toContain('## Tooling');
-      expect(noStagingLeft(dir)).toBe(true);
-    });
-  });
-
-  it('Codex all skills fail → static fallback writes inline AGENTS.md', async () => {
-    await inTempProject(async (dir) => {
-      setAgentOverride({ isAvailable: true, runAgent: simulate('fail') });
-      const res = await generate(fullStackAnswers('codex'));
-      expect(res.mode).toBe('static');
-      expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
-      expect(noStagingLeft(dir)).toBe(true);
-    });
-  });
-
-  it('resume (multi-file): a prior skill is reused, only the rest regenerate', async () => {
+  it('resume: a prior skill is reused, only the rest regenerate', async () => {
     await inTempProject(async (dir) => {
       const a = answers();
       const specs = selectSkills(a);
       const doneId = specs[0].id;
-      // Seed the prior run's native file so the skip gate's file check passes.
-      const donePath = join(dir, `.claude/skills/${doneId}/SKILL.md`);
+      // Seed the prior run's spec file so the skip gate's file check passes.
+      const donePath = join(dir, skillFile(doneId));
       mkdirSync(dirname(donePath), { recursive: true });
       writeFileSync(donePath, '# prior run\n', 'utf-8');
 
@@ -257,7 +250,7 @@ describe('generate() — AI agent orchestration (mocked agent)', () => {
       const a = answers();
       const specs = selectSkills(a);
       const id = specs[0].id;
-      const p = join(dir, `.claude/skills/${id}/SKILL.md`);
+      const p = join(dir, skillFile(id));
       mkdirSync(dirname(p), { recursive: true });
       writeFileSync(p, 'PARTIAL', 'utf-8'); // partial leftover, never recorded done
 
@@ -272,33 +265,22 @@ describe('generate() — AI agent orchestration (mocked agent)', () => {
     });
   });
 
-  it('C1: prepends provider frontmatter when the agent omits it (claude)', async () => {
+  it('prepends spec frontmatter when the agent omits it', async () => {
     await inTempProject((dir) => {
       // simulate('success') writes bare "# generated" — no frontmatter.
       setAgentOverride({ isAvailable: true, runAgent: simulate('success') });
       return generate(answers()).then(() => {
-        const file = readFileSync(join(dir, '.claude/skills/project-overview/SKILL.md'), 'utf-8');
+        const file = readFileSync(join(dir, skillFile('project-overview')), 'utf-8');
         expect(file.startsWith('---\n')).toBe(true);
         expect(file).toContain('name: "project-overview"');
         expect(file).toContain('description:');
+        expect(file).toContain('metadata:'); // custom fields nested, spec-only top level
         expect(file).toContain('# generated'); // original body preserved after the block
       });
     });
   });
 
-  it('C1: emits cursor-specific frontmatter keys (globs/alwaysApply)', async () => {
-    await inTempProject((dir) => {
-      setAgentOverride({ isAvailable: true, runAgent: simulate('success') });
-      return generate(fullStackAnswers('cursor')).then(() => {
-        const file = readFileSync(join(dir, '.cursor/rules/project-overview.mdc'), 'utf-8');
-        expect(file.startsWith('---\n')).toBe(true);
-        expect(file).toContain('globs: "**/*"');
-        expect(file).toContain('alwaysApply: false');
-      });
-    });
-  });
-
-  it('C1: does not double-wrap frontmatter the agent already wrote', async () => {
+  it('does not double-wrap frontmatter the agent already wrote', async () => {
     await inTempProject((dir) => {
       const runAgent = (_r: AgentRunner, prompt: string): AgentResult => {
         const target = /\.\/(\S+)/.exec(prompt)?.[1];
@@ -310,70 +292,44 @@ describe('generate() — AI agent orchestration (mocked agent)', () => {
       };
       setAgentOverride({ isAvailable: true, runAgent });
       return generate(answers()).then(() => {
-        const file = readFileSync(join(dir, '.claude/skills/project-overview/SKILL.md'), 'utf-8');
+        const file = readFileSync(join(dir, skillFile('project-overview')), 'utf-8');
         expect(file.match(/^---/gm)?.length).toBe(2); // one block only (open + close)
         expect(file).toContain('name: "custom"'); // agent's own block kept
       });
     });
   });
 
-  it('H2: writes the canonical entrypoint (CLAUDE.md) with a skills index in AI mode', async () => {
+  it('writes AGENTS.md with base rules and a skills index; CLAUDE.md shims it', async () => {
     await inTempProject((dir) => {
       setAgentOverride({ isAvailable: true, runAgent: simulate('success') });
       return generate(answers()).then((res) => {
-        const entry = join(dir, 'CLAUDE.md');
-        expect(existsSync(entry)).toBe(true);
+        expect(res.files).toContain('AGENTS.md');
         expect(res.files).toContain('CLAUDE.md');
-        const content = readFileSync(entry, 'utf-8');
-        expect(content).toContain('## Tech Stack'); // deterministic buildBaseRules guidance
-        expect(content).toContain('## Generated Skills'); // index of what was generated
-        expect(content).toContain('.claude/skills/project-overview/SKILL.md');
+        const agents = readFileSync(join(dir, 'AGENTS.md'), 'utf-8');
+        expect(agents).toContain('## Tech Stack'); // deterministic buildBaseRules guidance
+        expect(agents).toContain('## Skills'); // index of what was generated
+        expect(agents).toContain(skillFile('project-overview'));
+        const claude = readFileSync(join(dir, 'CLAUDE.md'), 'utf-8');
+        expect(claude).toContain('@AGENTS.md'); // shim imports the entrypoint
       });
     });
   });
 
-  it('H2: entrypoint lists only skills that succeeded', async () => {
+  it('skills index lists only skills that succeeded', async () => {
     await inTempProject((dir) => {
       setAgentOverride({ isAvailable: true, runAgent: simulate('success', 'tooling') });
       return generate(answers()).then(() => {
-        const content = readFileSync(join(dir, 'CLAUDE.md'), 'utf-8');
-        expect(content).toContain('## Generated Skills');
-        expect(content).not.toContain('.claude/skills/tooling/SKILL.md'); // failed skill omitted
+        const content = readFileSync(join(dir, 'AGENTS.md'), 'utf-8');
+        expect(content).toContain('## Skills');
+        expect(content).not.toContain(skillFile('tooling')); // failed skill omitted
       });
-    });
-  });
-
-  it('resume (single-file): staged sections are reused and merged', async () => {
-    await inTempProject(async (dir) => {
-      const codexAnswers = fullStackAnswers('codex');
-      const specs = selectSkills(codexAnswers);
-      const doneId = specs[0].id;
-      // Pre-stage the prior run's section under the stable staging dir.
-      const stagePath = join(dir, '.payo', 'staging', `${doneId}.md`);
-      mkdirSync(dirname(stagePath), { recursive: true });
-      writeFileSync(stagePath, 'PRIOR SECTION BODY', 'utf-8');
-
-      const agent = countingSuccess();
-      setAgentOverride({ isAvailable: true, runAgent: agent.runAgent });
-      const skipped: string[] = [];
-      const { store } = resumeWith([doneId]);
-
-      const res = await generate(codexAnswers, { onSkillSkip: (t) => skipped.push(t) }, store);
-
-      expect(res.mode).toBe('ai');
-      expect(agent.calls()).toBe(specs.length - 1); // staged section reused
-      expect(skipped).toEqual([specs[0].title]);
-      const master = readFileSync(join(dir, 'AGENTS.md'), 'utf-8');
-      for (const s of specs) expect(master).toContain(`## ${s.title}`); // all merged
-      expect(master).toContain('PRIOR SECTION BODY'); // reused body embedded
-      expect(noStagingLeft(dir)).toBe(true); // stable dir removed on success
     });
   });
 
   it('a no-op run over a pre-existing target is a failure, not a success', async () => {
     await inTempProject(async (dir) => {
       // Stale file at one skill's target; the agent exits 0 without writing it.
-      const stale = join(dir, '.claude/skills/project-overview/SKILL.md');
+      const stale = join(dir, skillFile('project-overview'));
       mkdirSync(dirname(stale), { recursive: true });
       writeFileSync(stale, 'STALE CONTENT', 'utf-8');
       const sim = simulate('success');
@@ -409,7 +365,7 @@ describe('generate() — AI agent orchestration (mocked agent)', () => {
       const res = await generate(answers());
 
       expect(res.failures).toContain('Project Overview');
-      expect(existsSync(join(dir, '.claude/skills/project-overview/SKILL.md'))).toBe(false);
+      expect(existsSync(join(dir, skillFile('project-overview')))).toBe(false);
     });
   });
 
@@ -432,7 +388,7 @@ describe('generate() — AI agent orchestration (mocked agent)', () => {
       const res = await generate(answers());
 
       expect(res.failures).toContain('Project Overview');
-      expect(existsSync(join(dir, '.claude/skills/project-overview/SKILL.md'))).toBe(false);
+      expect(existsSync(join(dir, skillFile('project-overview')))).toBe(false);
     });
   });
 

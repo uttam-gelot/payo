@@ -38,6 +38,7 @@ const { clearSession } = await import('../../src/state/index');
 /** A mid-flow session: stack questions already answered, groups still ahead. */
 const BASE: Answers = {
   aiTool: 'claude',
+  supportTools: ['claude'],
   projectType: 'full-stack',
   projectDefinition: 'x',
   language: 'typescript',
@@ -110,6 +111,7 @@ describe('runFlow — manual (decline-all gates)', () => {
 /** A frontend persona with DB left unanswered, so their gates decide. */
 const FRONTEND: Answers = {
   aiTool: 'claude',
+  supportTools: ['claude'],
   projectType: 'frontend',
   projectDefinition: 'x',
   language: 'typescript',

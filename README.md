@@ -59,14 +59,15 @@ over Prisma, that handlers live in `src/routes`, that you write Vitest specs
 beside the file, or that commits follow Conventional Commits. So you re-explain
 it — in chat after chat — and still get code that ignores half of it.
 
-The fix is the guidance files each tool already reads (`CLAUDE.md`,
-`.cursorrules`, `.github/copilot-instructions.md`, `AGENTS.md`). But writing them
-by hand is tedious, easy to get wrong, and different for every tool. Most people
-never do it, or do it once and let it rot.
+The fix is the guidance files agents read — an `AGENTS.md` entrypoint plus
+[Agent Skills](https://agentskills.io) under `.agents/skills/`. But writing them
+by hand is tedious and easy to get wrong. Most people never do it, or do it once
+and let it rot.
 
-Payo writes them for you in minutes — tailored to your actual stack,
-in each tool's native format — so your assistant follows _your_ conventions from
-the first prompt instead of guessing.
+Payo writes them for you in minutes — tailored to your actual stack, in one
+universal layout that **every skills-compatible tool reads** (Claude Code, Codex,
+Cursor, Copilot, Gemini, Antigravity, Windsurf, …) — so your assistant follows
+_your_ conventions from the first prompt instead of guessing.
 
 ### Vibe coding, without the mess
 
@@ -91,7 +92,7 @@ instead of fighting it.
 - **Teams enforcing conventions** who need every contributor's assistant to
   follow the same folder structure, naming, testing, and git rules.
 - **Multi-tool users** who switch between Claude, Cursor, and Copilot and want
-  the _same_ project guidance expressed in each tool's native format.
+  the _same_ project guidance in one universal layout every tool reads.
 - **Anyone bootstrapping a stack** they haven't wired up before — Payo encodes
   sensible, framework-specific defaults and can scaffold a runnable project.
 
@@ -131,9 +132,10 @@ guidance files straight into your repo.
    summary of every answer. Choose **Edit an answer** to change any response — or
    re-open a section you skipped — right from the review; dependent questions are
    re-asked automatically. Pick **Generate** when it looks right.
-5. **Payo generates the guidance.** It writes each tool's files in their native
-   format and location (see the table below). With the tool's CLI installed,
-   files are generated in parallel by the AI; otherwise solid templates are used.
+5. **Payo generates the guidance.** It writes one universal layout that every
+   skills-compatible tool reads (see the table below). With an agent CLI
+   installed, skills are generated in parallel by the AI; otherwise solid
+   templates are used.
 6. **(Optional) Get a bootstrap prompt.** Payo offers to write a paste-ready
    `bootstrap-prompt.md` you hand to any LLM to scaffold a runnable project that
    honors the guidance it just generated.
@@ -174,20 +176,34 @@ deterministic result stands on its own.
 
 ## What gets generated
 
-Each tool gets files in its own native format and location:
+One universal layout, whichever agent CLI you pick — no per-tool formats:
 
-| Tool                 | Files generated                                                  |
-| -------------------- | --------------------------------------------------------------- |
-| Claude (Anthropic)   | `CLAUDE.md` · `.claude/skills/**`                               |
-| Cursor               | `.cursorrules` · `.cursor/rules/**`                             |
-| GitHub Copilot       | `.github/copilot-instructions.md` · `.github/instructions/**`  |
-| Codex CLI            | `AGENTS.md`                                                      |
-| Antigravity (Google) | `AGENTS.md` · `.agents/skills/**`                               |
-| Windsurf             | `.windsurfrules`                                                 |
-| Other / generic      | `AI_RULES.md`                                                    |
+| Path                            | What it is                                                          |
+| ------------------------------- | ------------------------------------------------------------------ |
+| `AGENTS.md`                     | The entrypoint most tools read natively — your project's base rules |
+| `.agents/skills/<id>/SKILL.md`  | One [Agent Skill](https://agentskills.io) per topic, spec frontmatter |
+| `CLAUDE.md`                     | A one-line `@AGENTS.md` import shim so Claude Code picks it up       |
+| `.claude/skills/**`             | Symlinks into `.agents/skills/` (dir copy on Windows) for Claude Code |
+| `.windsurf/skills/**`           | The same shim for Windsurf                                           |
 
-> Rich AI generation needs the selected tool's CLI on your `PATH`. Without it,
-> Payo writes well-structured template defaults instead.
+Who reads what, with no extra work:
+
+- **Codex, Cursor, Copilot, Gemini CLI, Antigravity, Devin** → `.agents/skills/` and
+  `AGENTS.md` natively.
+- **Claude Code** → the `CLAUDE.md` shim plus the `.claude/skills/` symlinks
+  (officially supported; it dedupes if it also reads the target directly).
+- **Windsurf** → `AGENTS.md` plus the `.windsurf/skills/` shim.
+
+The question Payo asks — _"Which agent CLI should Payo use to generate content?"_ —
+picks only **which installed CLI authors the content**. The output above works with
+every skills-compatible tool regardless of that choice.
+
+> Rich AI generation needs an agent CLI on your `PATH`. Without one, Payo writes
+> well-structured template defaults into the same layout instead.
+>
+> Regenerating over an older Payo project? It offers to remove the retired
+> per-tool files (`.cursorrules`, `.windsurfrules`, `.cursor/rules/**`,
+> `.github/instructions/**`, `.github/copilot-instructions.md`, `AI_RULES.md`).
 
 ## What it asks about
 

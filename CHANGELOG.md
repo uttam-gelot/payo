@@ -7,8 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Universal output layout (breaking).** Payo now emits one tool-agnostic
+  layout regardless of the selected CLI — an `AGENTS.md` entrypoint, a
+  `CLAUDE.md` `@AGENTS.md` import shim, and one Agent Skills file per topic at
+  `.agents/skills/<id>/SKILL.md` (spec frontmatter: `name` == directory,
+  `description`, custom fields under `metadata`). The per-tool formats
+  (`.cursorrules`, `.cursor/rules/*.mdc`, `.github/instructions/*`,
+  `.windsurfrules`, `AI_RULES.md`, and the single-file `AGENTS.md` merge) are
+  retired. Claude Code and Windsurf are covered by `.claude/skills` and
+  `.windsurf/skills` shims (relative symlinks; recursive directory copies where
+  symlinks are unavailable, e.g. Windows without Developer Mode).
+- The AI-tool question is reframed and rephrased ("Which AI CLI should Payo use
+  to write your skills?"): it picks which agent CLI authors the content (the
+  output works with every skills-compatible tool). Its options list only
+  providers with a CLI runner, with no "recommended" tag.
+- The welcome banner now describes the universal Agent Skills layout and the
+  8-language stack detection.
+- Providers shrank to identity, `knownArtifacts` (kept for detection and the
+  overwrite guard), and an optional CLI runner (`binary` + `buildArgs`); output
+  paths and per-tool frontmatter are gone. `buildArgs` — the agent permission
+  boundary — is unchanged.
+
 ### Added
 
+- A "which AI tools should the skills support?" multiselect scopes shim output
+  to the tools you actually use: only Claude Code (`.claude/skills` + `CLAUDE.md`)
+  and Windsurf (`.windsurf/skills`) produce shim artifacts; tools that read
+  `.agents/skills` natively (Codex, Cursor, Copilot, Antigravity) add nothing
+  extra. It defaults to the generator CLI's own tool. `AGENTS.md` and
+  `.agents/skills/**` are always written.
+- On regeneration, Payo offers to remove retired per-tool config the universal
+  layout supersedes (`.cursorrules`, `.windsurfrules`, `.cursor/rules`,
+  `.github/instructions`, `.github/copilot-instructions.md`, `AI_RULES.md`) —
+  opt-in, only after a successful write.
 - Koa support on both paths: the questionnaire offers Koa (framework) with
   follow-ups for routing (`@koa/router`), body parsing, and security middleware,
   and detection reads `package.json` to recognize the `koa` dependency.
@@ -33,6 +66,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   OmniAuth (auth), and Ruby-ecosystem tooling (RuboCop / StandardRB, Lograge /
   Semantic Logger, RSpec / Minitest, dry-validation, Thor / GLI), and detection
   reads the `Gemfile` to pre-fill them.
+
+### Fixed
+
+- The Antigravity provider wrote skills as flat `.agents/skills/<id>.md` files,
+  which the Agent Skills spec — and every `.agents/skills` reader — cannot
+  discover (it requires a `<id>/SKILL.md` directory whose name matches the
+  `name` frontmatter). The universal layout fixes this by construction.
 
 ## [1.2.0] - 2026-07-03
 
