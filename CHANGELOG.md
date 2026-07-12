@@ -19,10 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retired. Claude Code and Windsurf are covered by `.claude/skills` and
   `.windsurf/skills` shims (relative symlinks; recursive directory copies where
   symlinks are unavailable, e.g. Windows without Developer Mode).
-- The AI-tool question is reframed: it now picks which installed agent CLI
-  authors the content (the output works with every skills-compatible tool). Its
-  options list only providers with a CLI runner, and the first CLI found on
-  `PATH` is preselected.
+- The AI-tool question is reframed and rephrased ("Which AI CLI should Payo use
+  to write your skills?"): it picks which agent CLI authors the content (the
+  output works with every skills-compatible tool). Its options list only
+  providers with a CLI runner, with no "recommended" tag.
+- The welcome banner now describes the universal Agent Skills layout and the
+  8-language stack detection.
 - Providers shrank to identity, `knownArtifacts` (kept for detection and the
   overwrite guard), and an optional CLI runner (`binary` + `buildArgs`); output
   paths and per-tool frontmatter are gone. `buildArgs` — the agent permission
@@ -30,6 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A "which AI tools should the skills support?" multiselect scopes shim output
+  to the tools you actually use: only Claude Code (`.claude/skills` + `CLAUDE.md`)
+  and Windsurf (`.windsurf/skills`) produce shim artifacts; tools that read
+  `.agents/skills` natively (Codex, Cursor, Copilot, Antigravity) add nothing
+  extra. It defaults to the generator CLI's own tool. `AGENTS.md` and
+  `.agents/skills/**` are always written.
 - On regeneration, Payo offers to remove retired per-tool config the universal
   layout supersedes (`.cursorrules`, `.windsurfrules`, `.cursor/rules`,
   `.github/instructions`, `.github/copilot-instructions.md`, `AI_RULES.md`) —
