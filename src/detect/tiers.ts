@@ -46,7 +46,7 @@ export const TIER2: ReadonlySet<string> = new Set([
   'commitScope',
   'commitScratchGuard',
   'confirmPush',
-  'verifyBeforeCommit',
+  'verifyTiming',
   'atomicCommits',
   'envExampleOnly',
   'rbac',

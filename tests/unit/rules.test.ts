@@ -68,13 +68,14 @@ describe('buildBaseRules', () => {
         commitScope: true,
         commitScratchGuard: true,
         confirmPush: true,
-        verifyBeforeCommit: true,
+        verifyTiming: 'push',
         atomicCommits: true,
       }),
     );
     expect(md).toContain('Scope each commit');
     expect(md).toContain('scratch/planning files');
     expect(md).toContain('Never push to a remote without explicit confirmation');
+    expect(md).toContain('before pushing');
     expect(md).toContain('atomic');
 
     const off = renderMarkdown(

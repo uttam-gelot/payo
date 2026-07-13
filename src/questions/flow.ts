@@ -190,12 +190,13 @@ const core: Record<string, Question> = {
     message: 'Ask before pushing to a remote (never push automatically)?',
     recommended: true,
   },
-  verifyBeforeCommit: {
-    id: 'verifyBeforeCommit',
-    type: 'confirm',
-    summary: 'Verify before commit',
-    message: 'Run the formatter, linter, and tests — and ensure they pass — before committing?',
-    recommended: true,
+  verifyTiming: {
+    id: 'verifyTiming',
+    type: 'select',
+    summary: 'Verify timing',
+    message: 'When should the formatter, linter, and tests run (and pass) in the git workflow?',
+    options: opt.verifyTimingOptions,
+    allowOther: false,
   },
   atomicCommits: {
     id: 'atomicCommits',
@@ -351,7 +352,7 @@ export const flow: FlowSection[] = [
       core.commitScope,
       core.commitScratchGuard,
       core.confirmPush,
-      core.verifyBeforeCommit,
+      core.verifyTiming,
       core.atomicCommits,
       core.envExampleOnly,
     ],

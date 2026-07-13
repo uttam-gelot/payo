@@ -55,6 +55,11 @@ export async function run(): Promise<void> {
     session = existing ?? createSession();
   }
 
+  // Whether the user chose to work with an already-existing project (Gate 1).
+  // Bootstrap-prompt generation only makes sense when scaffolding a new project,
+  // so it is suppressed on this path.
+  let startedFromExisting = false;
+
   // --- Auto-detect existing stack (fresh sessions only; resume keeps answers) ---
   if (session.answered.length === 0) {
     const detected = detectStack(process.cwd());
@@ -83,6 +88,7 @@ export async function run(): Promise<void> {
 
       // Gate 1 — work with the existing project, or start fresh?
       if ((await confirmStartMode()) === 'existing') {
+        startedFromExisting = true;
         // Gate 2 — detect everything (incl. convention pre-fills) or just the stack?
         const depth = await confirmDetectionDepth();
 
@@ -242,7 +248,7 @@ export async function run(): Promise<void> {
   // Offer a paste-ready prompt to scaffold a working project from the new skills.
   // The provider's CLI agent writes it when installed; otherwise a deterministic
   // template is used as the floor.
-  if (await confirmBootstrapPrompt()) {
+  if (!startedFromExisting && (await confirmBootstrapPrompt())) {
     // The agent run blocks; show a spinner while it generates (AI path only).
     let spin: ReturnType<typeof spinner> | undefined;
     const bootstrap = await generateBootstrap(session.answers, result.files, (name) => {

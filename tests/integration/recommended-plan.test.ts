@@ -54,7 +54,7 @@ describe('recommended path applies correct values', () => {
     expect(a.commitScope).toBe(true);
     expect(a.commitScratchGuard).toBe(true);
     expect(a.confirmPush).toBe(true);
-    expect(a.verifyBeforeCommit).toBe(true);
+    expect(a.verifyTiming).toBe('push');
     expect(a.atomicCommits).toBe(true);
     expect(a.envExampleOnly).toBe(true);
 
