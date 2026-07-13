@@ -166,7 +166,8 @@ describe('runFlow — skip (skip every group)', () => {
     expect(a.commitScope).toBe(false);
     expect(a.commitScratchGuard).toBe(false);
     expect(a.confirmPush).toBe(false);
-    expect(a.verifyBeforeCommit).toBe(false);
+    // verifyTiming is a select, so skip stores the 'none' sentinel
+    expect(a.verifyTiming).toBe('none');
     expect(a.atomicCommits).toBe(false);
 
     // when-gated-by-skip questions never surface: authStrategy needs auth !== none,

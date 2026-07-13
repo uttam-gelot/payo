@@ -281,9 +281,12 @@ const skills: SkillSpec[] = [
         base +=
           ' Ask before committing scratch/planning files (e.g. .md or .html notes created only for planning, R&D, or local use).';
       if (a.confirmPush === true) base += ' Never push to a remote without explicit confirmation.';
-      if (a.verifyBeforeCommit === true)
+      if (a.verifyTiming === 'commit')
         base +=
           ' Run the formatter, linter, and tests before committing, and only commit when they pass.';
+      if (a.verifyTiming === 'push')
+        base +=
+          ' Run the formatter, linter, and tests before pushing, and only push when they pass.';
       if (a.atomicCommits === true)
         base += ' Keep commits small and atomic — one logical change per commit.';
       return base;

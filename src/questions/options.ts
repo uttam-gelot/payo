@@ -576,6 +576,13 @@ export const gitWorkflowOptions: Option<string>[] = [
   { value: 'none', label: 'None' },
 ];
 
+/** When to run the formatter, linter, and tests in the git workflow. */
+export const verifyTimingOptions: Option<string>[] = [
+  { value: 'push', label: 'Before pushing to a remote', hint: 'recommended' },
+  { value: 'commit', label: 'Before every commit' },
+  { value: 'none', label: 'Never automatically' },
+];
+
 // --- Authentication ---------------------------------------------------------
 
 /** Hosted identity providers offered regardless of language. */

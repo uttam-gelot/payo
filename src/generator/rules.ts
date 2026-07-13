@@ -203,9 +203,13 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
       );
     if (answers.confirmPush === true)
       lines.push('- Never push to a remote without explicit confirmation.');
-    if (answers.verifyBeforeCommit === true)
+    if (answers.verifyTiming === 'commit')
       lines.push(
         '- Run the formatter, linter, and tests before committing; only commit when they pass.',
+      );
+    if (answers.verifyTiming === 'push')
+      lines.push(
+        '- Run the formatter, linter, and tests before pushing; only push when they pass.',
       );
     if (answers.atomicCommits === true)
       lines.push('- Keep commits small and atomic — one logical change per commit.');

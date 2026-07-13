@@ -111,7 +111,7 @@ export function fullStackAnswers(aiTool?: string): Answers {
     commitScope: true,
     commitScratchGuard: true,
     confirmPush: true,
-    verifyBeforeCommit: true,
+    verifyTiming: 'push',
     atomicCommits: true,
   };
 }
