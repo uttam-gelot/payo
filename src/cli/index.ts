@@ -60,6 +60,11 @@ export async function run(): Promise<void> {
   // so it is suppressed on this path.
   let startedFromExisting = false;
 
+  // Set when the user picks "detect everything": the questionnaire then auto-fills
+  // every convention/preference gate with recommended defaults instead of asking,
+  // deferring all confirmation to the review screen.
+  let autoRecommendGates = false;
+
   // --- Auto-detect existing stack (fresh sessions only; resume keeps answers) ---
   if (session.answered.length === 0) {
     const detected = detectStack(process.cwd());
@@ -89,8 +94,9 @@ export async function run(): Promise<void> {
       // Gate 1 — work with the existing project, or start fresh?
       if ((await confirmStartMode()) === 'existing') {
         startedFromExisting = true;
-        // Gate 2 — detect everything (incl. convention pre-fills) or just the stack?
+        // Gate 2 — detect everything (auto-fill + review) or just the stack?
         const depth = await confirmDetectionDepth();
+        autoRecommendGates = depth === 'everything';
 
         // Stage 2 — LLM pass over the chosen agent (additive; static-only fallback).
         const aiTool =
@@ -119,14 +125,22 @@ export async function run(): Promise<void> {
 
         summarizeDetection(result);
 
-        // Apply by tier. Deterministic Tier-1 stack facts (manifest/lockfile/
-        // config evidence) are recorded — and so skipped. Stage-2 LLM fills are
-        // only guesses, so they are seeded instead: pre-selected in the prompt
-        // but still asked, giving the least-trustworthy source an explicit
-        // confirmation. In "everything" mode, detected Tier-2 conventions get
-        // the same treatment; in "partial" mode they are left to the interview.
+        // Apply by tier and depth.
+        // - "everything": the user confirms once at the review screen, so every
+        //   detected fact (both tiers, LLM guesses included) is recordAnswer'd —
+        //   skipped inline, pre-filled and editable at review. runFlow then
+        //   auto-fills the remaining convention/preference gates (see below).
+        // - "partial": deterministic Tier-1 facts are recorded (skipped); Stage-2
+        //   LLM fills are seeded instead (pre-selected but still asked, giving the
+        //   least-trustworthy source an explicit confirmation); Tier-2 conventions
+        //   are left entirely to the interview.
         const { tier1, tier2 } = splitByTier(result.answers as Record<string, unknown>);
-        const apply = (entries: Record<string, unknown>): void => {
+        const applyRecorded = (entries: Record<string, unknown>): void => {
+          for (const [id, value] of Object.entries(entries)) {
+            session = recordAnswer(session, id, value);
+          }
+        };
+        const applySeeded = (entries: Record<string, unknown>): void => {
           for (const [id, value] of Object.entries(entries)) {
             session =
               result.sources[id] === 'llm'
@@ -134,8 +148,18 @@ export async function run(): Promise<void> {
                 : recordAnswer(session, id, value);
           }
         };
-        apply(tier1);
-        if (depth === 'everything') apply(tier2);
+        if (depth === 'everything') {
+          applyRecorded(tier1);
+          applyRecorded(tier2);
+        } else {
+          applySeeded(tier1);
+        }
+
+        // Carry per-package stacks (monorepo) to the generator as derived data.
+        // Not a Question, so it never surfaces as an editable review line.
+        if (result.packages && result.packages.length > 0) {
+          session = recordAnswer(session, 'monorepoPackages', result.packages);
+        }
 
         // Detectors seed facts independent of project shape (e.g. a styling lib
         // on a backend project). Drop any recorded answer whose question is
@@ -149,7 +173,7 @@ export async function run(): Promise<void> {
   }
 
   // --- Dynamic questionnaire ---
-  session = await runFlow(flow, session);
+  session = await runFlow(flow, session, { autoRecommendGates });
 
   // --- Review answers before generating (with inline edit) ---
   session = await reviewAndEdit(flow, session);

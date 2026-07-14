@@ -214,7 +214,8 @@ export async function confirmDetectionDepth(
     options: [
       {
         value: 'everything',
-        label: 'Detect everything — stack plus conventions (you still confirm conventions)',
+        label:
+          'Detect everything — stack and conventions auto-filled; you review before generating',
       },
       { value: 'partial', label: 'Just the high-level stack — answer conventions yourself' },
     ],
