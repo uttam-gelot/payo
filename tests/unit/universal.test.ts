@@ -86,6 +86,8 @@ describe('writeAgentsEntrypoint', () => {
       expect(content).toContain('## Skills');
       expect(content).toContain(generated[0].path);
       expect(content).toContain('## Authentication');
+      // The index must be preceded by a directive to follow the skills.
+      expect(content).toContain('consult the skills below and follow the ones that apply');
     });
   });
 

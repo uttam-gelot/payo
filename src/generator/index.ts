@@ -108,7 +108,10 @@ function ensureFrontmatter(skill: SkillSpec, rel: string): void {
  * AGENTS.md and restate when this skill applies. Keeps `.agents/skills/`
  * populated (so shims and cross-tool discovery work) without a CLI to author it.
  */
-function staticSkillBody(skill: SkillSpec): string {
+function staticSkillBody(skill: SkillSpec, answers: Answers): string {
+  // Skills whose content is a fixed procedure (not stack-derived) supply their
+  // own body; the rest point back at the full rules in AGENTS.md.
+  if (skill.staticBody) return skill.staticBody(answers);
   return [
     `This project's full rules live in [AGENTS.md](../../../${AGENTS_ENTRYPOINT}).`,
     '',
@@ -137,7 +140,7 @@ function runStatic(
   }));
   const files = [writeAgentsEntrypoint(sections, index)];
   if (wantsClaude(tools)) files.push(writeClaudeShim());
-  for (const s of specs) files.push(writeStaticSkill(s, staticSkillBody(s)));
+  for (const s of specs) files.push(writeStaticSkill(s, staticSkillBody(s, answers)));
   for (const shim of createSkillShims(
     specs.map((s) => s.id),
     tools,

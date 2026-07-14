@@ -58,6 +58,25 @@ describe('selectSkills', () => {
     expect(prompt).not.toContain('selected logger (centralized)');
   });
 
+  it('includes change-audit only when opted in', () => {
+    expect(ids(contexts.tsBackend)).not.toContain('change-audit');
+    expect(ids({ ...contexts.tsBackend, auditSkill: true })).toContain('change-audit');
+    expect(ids({ ...contexts.tsBackend, auditSkill: false })).not.toContain('change-audit');
+  });
+
+  it('change-audit body and prompt reflect the chosen timing and stay smart-select', () => {
+    const commit: Answers = { ...contexts.tsBackend, auditSkill: true, auditTiming: 'commit' };
+    const push: Answers = { ...contexts.tsBackend, auditSkill: true, auditTiming: 'push' };
+    const skill = (a: Answers) => selectSkills(a).find((s) => s.id === 'change-audit')!;
+
+    expect(skill(commit).staticBody!(commit)).toContain('committing');
+    expect(skill(push).staticBody!(push)).toContain('pushing');
+    expect(skill(push).buildPrompt(push)).toContain('git log @{u}..');
+    // Must not tell the agent to read every skill.
+    expect(skill(commit).buildPrompt(commit).toLowerCase()).toContain('do not read');
+    expect(skill(commit).staticBody!(commit)).toContain('.agents/skills/');
+  });
+
   it('adds .env-read guidance to coding-standards when envExampleOnly is set', () => {
     const a: Answers = { ...contexts.tsBackend, envExampleOnly: true };
     const skill = selectSkills(a).find((s) => s.id === 'coding-standards');

@@ -24,6 +24,7 @@ function seedSingles(): Session {
     language: 'python',
     database: 'none',
     logger: 'none',
+    auditSkill: false,
   };
   for (const [id, value] of Object.entries(singles)) s = recordAnswer(s, id, value);
   return s;

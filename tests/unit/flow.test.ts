@@ -55,6 +55,16 @@ describe('flow gating by project type', () => {
     expect(reachable({ ...base, database: 'postgresql' }).has('postgresql.migrations')).toBe(true);
   });
 
+  it('asks the change-audit opt-in on every project but hides timing until opted in', () => {
+    const base = { projectType: 'backend', language: 'go' };
+    // Opt-in is always reachable.
+    expect(reachable(base).has('auditSkill')).toBe(true);
+    // Timing follow-up is gated on the opt-in.
+    expect(reachable(base).has('auditTiming')).toBe(false);
+    expect(reachable({ ...base, auditSkill: true }).has('auditTiming')).toBe(true);
+    expect(reachable({ ...base, auditSkill: false }).has('auditTiming')).toBe(false);
+  });
+
   it('existing shapes are unchanged: backend keeps API, frontend keeps styling', () => {
     const backend = reachable({ projectType: 'backend', language: 'go' });
     expect(backend.has('apiArchitecture')).toBe(true);

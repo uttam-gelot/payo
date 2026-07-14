@@ -204,6 +204,15 @@ Who reads what, with no extra work:
   (officially supported; it dedupes if it also reads the target directly).
 - **Windsurf** → `AGENTS.md` plus the `.windsurf/skills/` shim.
 
+`AGENTS.md` opens its skills index with a directive telling the agent to consult and
+follow the applicable skills before writing code — so the guidance is used, not just
+present.
+
+Optionally, Payo adds a **change-audit** skill (`.agents/skills/change-audit/SKILL.md`):
+if you opt in, it asks when to run — before every commit or before pushing — and the
+agent uses it at that point to check your pending change against the relevant project
+skills and flag anything that conflicts.
+
 The question Payo asks — _"Which agent CLI should Payo use to generate content?"_ —
 picks only **which installed CLI authors the content**. The output above works with
 every skills-compatible tool regardless of that choice.
@@ -234,6 +243,8 @@ questions to whatever you pick. Dimensions covered:
 - **Tooling** — package manager, runtime, formatter, linter
 - **TypeScript** — `tsconfig` strictness, target, module resolution, path aliases
 - **Conventions** — folder structure, coding standards, docs, git workflow
+- **Change audit** _(optional)_ — opt into a skill that checks your pending
+  change against the project skills before commit or push
 
 ## AI vs. template generation
 

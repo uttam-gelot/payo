@@ -583,6 +583,12 @@ export const verifyTimingOptions: Option<string>[] = [
   { value: 'none', label: 'Never automatically' },
 ];
 
+/** When the change-audit skill should run in the workflow. */
+export const auditTimingOptions: Option<string>[] = [
+  { value: 'commit', label: 'Before every commit', hint: 'recommended' },
+  { value: 'push', label: 'Before pushing to a remote' },
+];
+
 // --- Authentication ---------------------------------------------------------
 
 /** Hosted identity providers offered regardless of language. */

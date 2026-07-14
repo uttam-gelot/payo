@@ -20,6 +20,12 @@ export interface SkillSpec {
   appliesTo(a: Answers): boolean;
   /** Task instruction for the agent (project context is added by the caller). */
   buildPrompt(a: Answers): string;
+  /**
+   * Optional deterministic body for the no-CLI floor. When set, `runStatic`
+   * writes this instead of the generic "see AGENTS.md" pointer — for skills
+   * whose content is a fixed procedure, not stack-derived guidance.
+   */
+  staticBody?(a: Answers): string;
 }
 
 /** A string answer is "set" when it is a non-empty value other than 'none'. */
@@ -292,7 +298,61 @@ const skills: SkillSpec[] = [
       return base;
     },
   },
+  {
+    id: 'change-audit',
+    title: 'Change Audit',
+    description:
+      'Use right before committing or pushing to check the pending change against this ' +
+      "project's skills and report any that conflict.",
+    appliesTo: (a) => a.auditSkill === true,
+    buildPrompt: (a): string => {
+      const timing = auditTiming(a);
+      const changeSet =
+        timing === 'push'
+          ? 'the commits about to be pushed (e.g. `git log @{u}..` / `git diff @{push}..`, ' +
+            'falling back to the diff against the upstream branch)'
+          : 'the staged changes (`git diff --staged`)';
+      return (
+        'Write a MINIMAL, token-frugal change-audit skill for this project. When invoked ' +
+        `right before ${auditGerund(timing)}, it should: (1) read ${changeSet}; ` +
+        '(2) from the changed files, smartly select ONLY the few skills in `.agents/skills/` ' +
+        'that are relevant to those changes (judge by each skill directory name and its ' +
+        'description — do NOT read or check every skill); (3) compare the change against just ' +
+        'those relevant skills and output a short report: one line per checked skill (pass or ' +
+        'the specific conflict) followed by a one-line overall verdict. It flags conflicts for ' +
+        'the human to resolve — it does not rewrite code. Keep the whole skill and its output ' +
+        'short to conserve tokens; the file must not restate the other skills, only reference them.'
+      );
+    },
+    staticBody: (a): string => auditStaticBody(auditTiming(a)),
+  },
 ];
+
+/** Audit timing answer, defaulting to 'commit' when unset. */
+function auditTiming(a: Answers): 'commit' | 'push' {
+  return a.auditTiming === 'push' ? 'push' : 'commit';
+}
+
+/** Gerund phrase for prose ("committing" / "pushing to a remote"). */
+function auditGerund(timing: 'commit' | 'push'): string {
+  return timing === 'push' ? 'pushing to a remote' : 'committing';
+}
+
+/** Deterministic no-CLI body for the change-audit skill. */
+function auditStaticBody(timing: 'commit' | 'push'): string {
+  const changeSet =
+    timing === 'push'
+      ? '`git log @{u}..` and `git diff @{push}..` (fall back to the diff against the upstream branch)'
+      : '`git diff --staged`';
+  return [
+    `Run this right before ${auditGerund(timing)} to catch changes that conflict with this project's skills. Keep it short — do not read every skill.`,
+    '',
+    '1. Get the change set with ' + changeSet + '.',
+    '2. From the changed files, pick ONLY the few skills in `.agents/skills/` that are relevant (judge by each skill directory name and its description — do not open every skill).',
+    '3. Compare the change against just those skills.',
+    '4. Report: one line per checked skill (pass, or the specific conflict), then a one-line verdict. Flag conflicts for the human to fix; do not rewrite code.',
+  ].join('\n');
+}
 
 /** The skills that apply to the current answers, in declared order. */
 export function selectSkills(a: Answers): SkillSpec[] {

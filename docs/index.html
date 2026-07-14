@@ -92,6 +92,11 @@
         "@type": "Question",
         "name": "Does Payo support monorepos?",
         "acceptedAnswer": { "@type": "Answer", "text": "Yes. Payo enumerates workspace members across pnpm, npm, yarn, lerna, Cargo, go.work, and Maven / Gradle, detects each package's stack, and uses the real app stack (not the near-empty root manifest) as the primary answers. The generated AGENTS.md adds a Workspace Packages list naming each member and its stack, plus monorepo conventions." }
+      },
+      {
+        "@type": "Question",
+        "name": "Can Payo audit my changes against the project rules?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes, optionally. Payo can add a change-audit skill: opt in during the questionnaire and choose when it runs — before every commit or before pushing. At that point your AI assistant reads the pending change, picks only the relevant project skills, and reports anything that conflicts before you commit or push. It's a model-invoked skill, so there are no git hooks to install. The generated AGENTS.md also tells the assistant to consult and follow the applicable skills before writing code." }
       }
     ]
   }
@@ -321,7 +326,9 @@
           stack, then writes one universal layout — an <strong>AGENTS.md</strong> entrypoint plus
           <strong>Agent Skills</strong> in <strong>.agents/skills/</strong> — that every
           skills-compatible tool reads. Claude Code and Windsurf get thin shims; nothing is
-          duplicated.
+          duplicated. The <strong>AGENTS.md</strong> entrypoint tells the assistant to follow
+          those skills — and you can opt into a <strong>change-audit</strong> skill that checks
+          your pending change against them before you commit or push.
         </p>
       </div>
       <div class="tools">
@@ -528,6 +535,10 @@
         <details>
           <summary>Does Payo support monorepos?</summary>
           <p>Yes. Payo enumerates workspace members across pnpm, npm, yarn, lerna, Cargo, <code>go.work</code>, and Maven / Gradle, detects each package's stack, and uses the real app stack — not the near-empty root manifest — as the primary answers. The generated <code>AGENTS.md</code> adds a <strong>Workspace Packages</strong> list naming each member and its stack, plus monorepo conventions.</p>
+        </details>
+        <details>
+          <summary>Can Payo audit my changes against the project rules?</summary>
+          <p>Yes, optionally. Opt into the <strong>change-audit</strong> skill during the questionnaire and pick when it runs — before every commit or before pushing. At that point your assistant reads the pending change, selects only the relevant project skills, and reports anything that conflicts. It's a model-invoked skill, so there are no git hooks to install. The generated <code>AGENTS.md</code> also tells the assistant to consult and follow the applicable skills before writing code.</p>
         </details>
         <details>
           <summary>Is Payo free and open source?</summary>
