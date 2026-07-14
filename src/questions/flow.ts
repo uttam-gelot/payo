@@ -308,6 +308,23 @@ const core: Record<string, Question> = {
     optionsFrom: opt.stateManagementOptions,
     when: (a) => opt.hasUI(a),
   },
+  auditSkill: {
+    id: 'auditSkill',
+    type: 'confirm',
+    summary: 'Change-audit skill',
+    message:
+      'Add a change-audit skill that reviews your pending changes against these project skills before you commit or push?',
+    recommended: false,
+  },
+  auditTiming: {
+    id: 'auditTiming',
+    type: 'select',
+    summary: 'Audit timing',
+    message: 'When should the change-audit run?',
+    options: opt.auditTimingOptions,
+    allowOther: false,
+    when: (a) => a.auditSkill === true,
+  },
 };
 
 /** Wrap stack-defining single questions — asked individually, no recommended gate. */
@@ -385,4 +402,7 @@ export const flow: FlowSection[] = [
     gate: () => ({ id: 'testing.__recommended', title: 'Testing' }),
     questions: () => [core.testTypes, core.testRunner, core.e2eTool],
   },
+  // Opt-in change-audit skill — asked explicitly on every project; the timing
+  // follow-up only surfaces once opted in.
+  single(core.auditSkill, core.auditTiming),
 ];
