@@ -6,6 +6,7 @@
  */
 import type { Answers } from '../questions/types';
 import type { RuleSection } from './types';
+import type { PackageSummary } from '../detect/types';
 import { resolveGuidance } from './guidance';
 
 /**
@@ -54,6 +55,33 @@ const DOC_GUIDANCE: Record<string, string> = {
   adr: '- Record significant architectural decisions as ADRs (lightweight markdown under docs/adr).',
   changelog: '- Keep a CHANGELOG (Keep a Changelog format), updated with each release.',
 };
+
+/** One review line per workspace package: `path — Language / Framework (type), db`. */
+function packageLine(p: PackageSummary): string {
+  const stack: string[] = [];
+  if (p.language) stack.push(p.language);
+  if (p.framework && p.framework !== 'none') stack.push(p.framework);
+  let line = `- \`${p.path}\``;
+  if (stack.length) line += ` — ${stack.join(' / ')}`;
+  if (p.projectType) line += ` (${p.projectType})`;
+  if (p.database && p.database !== 'none') line += `, ${p.database}`;
+  return line;
+}
+
+/**
+ * The "Workspace Packages" section for a monorepo — one line per detected member
+ * and its stack — or null when no package summaries were carried through. Reads
+ * the synthetic `monorepoPackages` answer the CLI records from detection.
+ */
+function workspacePackagesSection(answers: Answers): RuleSection | null {
+  const pkgs = answers.monorepoPackages;
+  if (!Array.isArray(pkgs) || pkgs.length === 0) return null;
+  const lines = (pkgs as PackageSummary[])
+    .filter((p) => p && typeof p.path === 'string')
+    .map(packageLine);
+  if (lines.length === 0) return null;
+  return { title: 'Workspace Packages', body: lines.join('\n') };
+}
 
 export function buildBaseRules(answers: Answers): RuleSection[] {
   const sections: RuleSection[] = [];
@@ -122,7 +150,18 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
   }
 
   const structure = str(answers, 'structure');
-  if (structure) {
+  if (structure === 'monorepo') {
+    const lines = [
+      '- Organize the repo as a monorepo of independent workspace packages.',
+      '- Respect package boundaries: import another package through its public entrypoint, never by reaching into its internal files.',
+      '- Keep shared tooling and config (formatter, linter, TS config, CI) at the root; per-package config only overrides what it must.',
+      '- Run scripts scoped to the package you are changing; drive cross-package tasks through the workspace tool (Turborepo / Nx / pnpm / Cargo / Go workspaces).',
+      '- Add a dependency to the specific package that uses it, not the root, unless it is genuinely shared.',
+    ];
+    sections.push({ title: 'Monorepo Structure', body: lines.join('\n') });
+    const pkgSection = workspacePackagesSection(answers);
+    if (pkgSection) sections.push(pkgSection);
+  } else if (structure) {
     sections.push({ title: 'Folder Structure', body: `Use a ${structure} layout.` });
   }
 

@@ -132,6 +132,47 @@ describe('buildBaseRules', () => {
   });
 });
 
+describe('monorepo structure', () => {
+  it('emits Monorepo Structure + Workspace Packages instead of the plain layout line', () => {
+    const a: Answers = {
+      ...contexts.tsFullstack,
+      structure: 'monorepo',
+      monorepoPackages: [
+        {
+          path: 'apps/web',
+          language: 'typescript',
+          framework: 'nextjs',
+          projectType: 'full-stack',
+          database: 'postgresql',
+        },
+        {
+          path: 'services/api',
+          language: 'typescript',
+          framework: 'fastify',
+          projectType: 'backend',
+        },
+      ],
+    };
+    const t = titles(a);
+    expect(t).toContain('Monorepo Structure');
+    expect(t).toContain('Workspace Packages');
+    expect(t).not.toContain('Folder Structure');
+
+    const md = renderMarkdown('G', buildBaseRules(a));
+    expect(md).toContain('Respect package boundaries');
+    expect(md).toContain('`apps/web` — typescript / nextjs (full-stack), postgresql');
+    expect(md).toContain('`services/api` — typescript / fastify (backend)');
+    // The synthetic key never leaks into the generic Tech Details dump.
+    expect(md).not.toContain('monorepoPackages');
+  });
+
+  it('a non-monorepo structure still uses the plain Folder Structure line', () => {
+    const md = renderMarkdown('G', buildBaseRules({ ...contexts.tsBackend, structure: 'modular' }));
+    expect(md).toContain('Use a modular layout.');
+    expect(md).not.toContain('Monorepo Structure');
+  });
+});
+
 describe('renderMarkdown', () => {
   it('renders the title and section headers', () => {
     const md = renderMarkdown('My Guide', [{ title: 'A', body: 'x' }]);
