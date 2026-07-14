@@ -74,7 +74,13 @@ export function writeAgentsEntrypoint(
   const index = generated
     .map((s) => `- **${s.title}** — \`${s.path}\`: ${s.description}`)
     .join('\n');
-  const body = index ? `${rules}\n\n## Skills\n\n${index}\n` : `${rules}\n`;
+  // The index alone only tells a reader the skills exist; this directive tells
+  // the agent to actually consult and obey the applicable ones before working.
+  const directive =
+    'Before writing or changing code in this project, consult the skills below and ' +
+    'follow the ones that apply. Each skill file states when it applies; load it and ' +
+    'obey its rules for any matching work.';
+  const body = index ? `${rules}\n\n## Skills\n\n${directive}\n\n${index}\n` : `${rules}\n`;
   writeArtifact({ path: AGENTS_ENTRYPOINT, content: body });
   return AGENTS_ENTRYPOINT;
 }
