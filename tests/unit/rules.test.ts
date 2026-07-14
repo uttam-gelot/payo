@@ -42,7 +42,30 @@ describe('buildBaseRules', () => {
       buildBaseRules({ ...contexts.tsBackend, 'tsconfig.strict': true }),
     );
     expect(md).toContain('## Tech Details');
-    expect(md).toContain('- strict: yes');
+    expect(md).toContain('- TypeScript Config / Strict mode: yes');
+  });
+
+  it('renders Python follow-up details without leaking recommended gate decisions', () => {
+    const md = renderMarkdown(
+      'G',
+      buildBaseRules({
+        ...contexts.pyBackend,
+        authApproach: 'custom-jwt',
+        'fastapi.__recommended': 'recommended',
+        'fastapi.structure': 'routers',
+        'fastapi.async': 'async',
+        'fastapi.server': 'uvicorn',
+        'custom-jwt.__recommended': 'recommended',
+        'custom-jwt.refresh': true,
+      }),
+    );
+
+    expect(md).toContain('- FastAPI / Structure: APIRouters + dependency injection');
+    expect(md).toContain('- FastAPI / Concurrency: async def endpoints');
+    expect(md).toContain('- FastAPI / ASGI server: uvicorn');
+    expect(md).toContain('- Custom JWT / Sessions / Refresh tokens: yes');
+    expect(md).not.toContain('recommended: recommended');
+    expect(md).not.toContain('__recommended');
   });
 
   it('reflects the AI-attribution choice in the Git Workflow section', () => {

@@ -4,10 +4,14 @@
  * function the generator calls — the seam where an AI-backed builder can
  * later swap in.
  */
-import type { Answers } from '../questions/types';
+import type { Answers, Question } from '../questions/types';
 import type { RuleSection } from './types';
 import type { PackageSummary } from '../detect/types';
+import type { TechModule } from '../stack/types';
 import { resolveGuidance } from './guidance';
+import { dbFamily } from '../stack/predicates';
+import { getModule, modulesFor } from '../stack/registry';
+import '../stack/modules/index'; // side-effect: ensure modules are registered for renderer-only calls
 
 /**
  * Fence untrusted prompt content between explicit data markers. Anything quoted
@@ -33,16 +37,81 @@ function str(a: Answers, key: string): string | undefined {
   return v;
 }
 
-/** Human-friendly label for a namespaced tech-detail id (e.g. 'nestjs.arch'). */
-function detailLabel(id: string): string {
-  const part = id.split('.').slice(1).join('.') || id;
-  return part.replace(/[-_]/g, ' ');
-}
-
 function formatValue(v: unknown): string {
   if (Array.isArray(v)) return v.join(', ');
   if (typeof v === 'boolean') return v ? 'yes' : 'no';
   return String(v);
+}
+
+/** True when a stored answer carries no real content (skipped / not-applicable). */
+function isUnset(value: unknown): boolean {
+  if (value === undefined || value === null || value === '' || value === 'none') return true;
+  return Array.isArray(value) && value.length === 0;
+}
+
+/** Concise label for a question in the Tech Details section. */
+function questionSummary(q: Question): string {
+  if (q.summary) return q.summary;
+  return q.message
+    .replace(/\s*\(.*?\)\s*/g, ' ')
+    .replace(/\?\s*$/, '')
+    .trim();
+}
+
+/** Render a stored answer through the question's option labels when available. */
+function questionValue(q: Question, value: unknown, answers: Answers): string {
+  if (typeof value === 'boolean') return formatValue(value);
+
+  const options = q.optionsFrom ? q.optionsFrom(answers) : (q.options ?? []);
+  const labelOf = (v: string): string => options.find((o) => o.value === v)?.label ?? v;
+  if (Array.isArray(value)) {
+    return value.map((v) => (typeof v === 'string' ? labelOf(v) : String(v))).join(', ');
+  }
+  if (typeof value === 'string') return labelOf(value);
+  return String(value);
+}
+
+function uniqueModules(modules: Array<TechModule | undefined>): TechModule[] {
+  const seen = new Set<string>();
+  const out: TechModule[] = [];
+  for (const m of modules) {
+    if (!m || seen.has(m.id)) continue;
+    seen.add(m.id);
+    out.push(m);
+  }
+  return out;
+}
+
+/** Selected/applicable modules that own namespaced follow-up answers. */
+function techDetailModules(answers: Answers): TechModule[] {
+  return uniqueModules([
+    getModule(answers.framework),
+    getModule(dbFamily(answers)),
+    getModule(answers.orm),
+    getModule(answers.stylingLibrary),
+    getModule(answers.authApproach),
+    ...modulesFor('config', answers),
+  ]);
+}
+
+/** Human-readable follow-up answers for selected modules; internal gate ids are omitted. */
+function techDetails(answers: Answers): string[] {
+  const lines: string[] = [];
+  const seen = new Set<string>();
+  for (const module of techDetailModules(answers)) {
+    if (answers[`${module.id}.__recommended`] === 'skip') continue;
+    const moduleTitle = module.title ?? module.id;
+    for (const q of module.questions(answers)) {
+      if (seen.has(q.id)) continue;
+      if (q.id.endsWith('__recommended')) continue;
+      if (q.when && !q.when(answers)) continue;
+      const value = answers[q.id];
+      if (isUnset(value)) continue;
+      seen.add(q.id);
+      lines.push(`- ${moduleTitle} / ${questionSummary(q)}: ${questionValue(q, value, answers)}`);
+    }
+  }
+  return lines;
 }
 
 /** Guidance line per selected documentation artifact (see documentationOptions). */
@@ -261,9 +330,7 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
   sections.push(...resolveGuidance(answers));
 
   // Tech-specific follow-up answers (namespaced ids like 'nestjs.arch').
-  const details = Object.keys(answers)
-    .filter((k) => k.includes('.') && answers[k] !== undefined && answers[k] !== '')
-    .map((k) => `- ${detailLabel(k)}: ${formatValue(answers[k])}`);
+  const details = techDetails(answers);
   if (details.length) sections.push({ title: 'Tech Details', body: details.join('\n') });
 
   return sections;
