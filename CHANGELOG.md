@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   providers with a CLI runner, with no "recommended" tag.
 - The welcome banner now describes the universal Agent Skills layout and the
   8-language stack detection.
+- "Detect everything" now means everything: on an existing project it records
+  the detected stack *and* conventions and auto-fills the remaining convention/
+  preference gates with recommended defaults, so nothing is confirmed inline —
+  you review (and edit) the whole set once on the summary screen before
+  generating. "Just the high-level stack" is unchanged (conventions still
+  interviewed).
 - Providers shrank to identity, `knownArtifacts` (kept for detection and the
   overwrite guard), and an optional CLI runner (`binary` + `buildArgs`); output
   paths and per-tool frontmatter are gone. `buildArgs` — the agent permission
@@ -32,6 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Monorepo workspace detection. On existing projects Payo now enumerates
+  workspace members across pnpm / npm / yarn / lerna, Cargo, `go.work`, and
+  Maven / Gradle, detects each package's stack, and surfaces the real app stack
+  as the primary answers (the root manifest is usually just workspace config +
+  shared tooling). The generated `AGENTS.md` gains a **Monorepo Structure**
+  guidance section plus a **Workspace Packages** list naming each member and its
+  stack. Single-package repos are unaffected.
 - A "which AI tools should the skills support?" multiselect scopes shim output
   to the tools you actually use: only Claude Code (`.claude/skills` + `CLAUDE.md`)
   and Windsurf (`.windsurf/skills`) produce shim artifacts; tools that read
