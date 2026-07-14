@@ -48,6 +48,7 @@ const BASE: Answers = {
   database: 'postgresql',
   orm: 'prisma',
   logger: 'pino',
+  auditSkill: false,
 };
 
 beforeEach(() => {
