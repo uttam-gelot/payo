@@ -710,4 +710,37 @@ describe('detectStack — greenfield / tie-break', () => {
     expect(det.answers.language).toBe('go');
     expect(det.answers.framework).toBe('gin');
   });
+
+  it('monorepo: pulls the primary stack from a member and lists all packages', () => {
+    // Root manifest is just workspace config + tooling — no framework. The real
+    // app stack (Next.js) lives in a member and must become the primary answers.
+    const files = {
+      'pnpm-workspace.yaml': "packages:\n  - 'apps/*'\n  - 'services/*'\n",
+      'package.json': JSON.stringify({ devDependencies: { prettier: '3' } }),
+      'apps/web/package.json': JSON.stringify({
+        dependencies: { next: '15', react: '18' },
+        devDependencies: { typescript: '5' },
+      }),
+      'services/api/package.json': JSON.stringify({ dependencies: { fastify: '4' } }),
+    };
+    const det = inProject(files, (dir) => detectStack(dir));
+
+    // Structure is forced to monorepo; primary stack came from apps/web.
+    expect(det.answers.structure).toBe('monorepo');
+    expect(det.answers.framework).toBe('nextjs');
+    expect(det.answers.language).toBe('typescript');
+
+    // Every member is summarized for the generator.
+    const paths = (det.packages ?? []).map((p) => p.path).sort();
+    expect(paths).toEqual(['apps/web', 'services/api']);
+    const api = det.packages?.find((p) => p.path === 'services/api');
+    expect(api?.framework).toBe('fastify');
+  });
+
+  it('non-monorepo detection is unchanged (no packages field)', () => {
+    const pkg = JSON.stringify({ dependencies: { next: '15' } });
+    const det = inProject({ 'package.json': pkg }, (dir) => detectStack(dir));
+    expect(det.packages).toBeUndefined();
+    expect(det.answers.framework).toBe('nextjs');
+  });
 });

@@ -5,9 +5,11 @@
  * confirm-and-skip: detected values are `recordAnswer`d so the interview walks
  * past them.
  *
- * Tier 2 — conventions / intent a manifest cannot encode. **Never auto-skipped.**
- * Detected values are surfaced only as `initialValue` pre-fills (the question is
- * still asked), and only in "detect everything" mode.
+ * Tier 2 — conventions / intent a manifest cannot encode. Handled by depth:
+ *   - "partial": never applied — left entirely to the interview.
+ *   - "everything": recorded like Tier-1 and confirmed once at the review screen;
+ *     the remaining un-detected convention gates are auto-filled with recommended
+ *     defaults (see runFlow's autoRecommendGates), never asked inline.
  *
  * This is the single source of truth both the CLI apply step and the Stage-2 LLM
  * scope read from.

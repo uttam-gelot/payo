@@ -154,18 +154,28 @@ When detection finds a manifest, you get two quick choices:
 
 - **Work with the existing project, or start fresh?** Keep the detected answers, or
   ignore them and answer from scratch.
-- **Detect everything, or just the stack?** Fill in stack facts only, or also
-  pre-fill the convention questions (folder structure and the like) that Payo can
-  infer from your layout.
+- **Detect everything, or just the stack?**
+  - **Detect everything** fills in the whole config with no question-by-question
+    prompts: stack facts and conventions are taken from what Payo detects, and any
+    convention it can't detect is set to a sensible recommended default. You land
+    straight on the review screen and edit anything that's off before generating —
+    everything means everything, confirmed once at the end.
+  - **Just the high-level stack** fills in the stack facts only and interviews you
+    for the convention questions (folder structure and the like).
 
-How detected answers are applied:
+How detected answers are applied in **Just the high-level stack** mode:
 
 - **Stack facts** (language, framework, database, ORM, package manager, test
   runner, linter…) are filled in and **skipped** — they're things a manifest can
   state authoritatively, so there's nothing to ask.
-- **Conventions and preferences** are surfaced as **pre-filled defaults you still
-  confirm** — a manifest can't encode intent, so Payo never silently decides these
-  for you.
+- **Conventions and preferences** are left to the interview — a manifest can't
+  encode intent, so Payo asks rather than guessing.
+
+**Monorepos** are detected too: Payo enumerates workspace members (pnpm / npm /
+yarn / lerna, Cargo, `go.work`, Maven / Gradle), detects each package's stack, and
+uses the real app stack as the primary answers instead of the near-empty root
+manifest. The generated guidance gains a **Workspace Packages** list and monorepo
+conventions.
 
 Detection runs deterministically from your files first. When the chosen AI tool's
 CLI is installed, an **optional second pass** uses **your own** assistant to fill
@@ -266,13 +276,12 @@ generating what's missing. Finished runs clean the directory up automatically.
 
 Payo works today, but it's still early. Here's where it's headed:
 
-- **Deeper existing-project detection.** Payo already detects an established
-  repo's stack and pre-fills the questionnaire (see
+- **Deeper monorepo support.** Payo now enumerates workspace members, detects
+  each package's stack, and writes per-package notes into one root config (see
   [Already have a project?](#already-have-a-project-payo-detects-your-stack)).
-  Next is making that just as sharp on **monorepos**: today detection reads the
-  root manifest, so a workspace whose real stack lives in `apps/*` and
-  `packages/*` underfills. Workspace-aware, multi-root detection — plus broader
-  signal coverage — is the next step.
+  Next is going further: per-package skills and guidance for repos where each
+  workspace wants its own conventions, and workspace enumeration for the
+  remaining ecosystems (Python, PHP, .NET, Ruby).
 - **Broader stack coverage.** More languages, frameworks, ORMs, databases, and
   AI tools, plus deeper, more opinionated defaults for the ones already
   supported — so the guidance fits more of the ecosystem out of the box.

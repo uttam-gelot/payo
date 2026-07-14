@@ -302,7 +302,23 @@ export async function reviewAndEdit(
   }
 }
 
-export async function runFlow(flow: FlowSection[], session: Session): Promise<Session> {
+/** Options controlling how runFlow resolves recommendable gates. */
+export interface RunFlowOptions {
+  /**
+   * Resolve every recommendable gate to its recommended defaults WITHOUT prompting
+   * — recommended value per question where one exists, else the skip sentinel.
+   * Used by "detect everything", where the user confirms once at the review screen
+   * instead of gate-by-gate. Already-answered ids (detected facts) are untouched,
+   * so detection always wins over a recommended default.
+   */
+  autoRecommendGates?: boolean;
+}
+
+export async function runFlow(
+  flow: FlowSection[],
+  session: Session,
+  opts: RunFlowOptions = {},
+): Promise<Session> {
   for (const section of flow) {
     const gate = activeGate(section, session.answers);
 
@@ -312,6 +328,19 @@ export async function runFlow(flow: FlowSection[], session: Session): Promise<Se
       if (skipPlan.length > 0) {
         const plan = planRecommended(section, session);
         const hasRecommended = !!plan && plan.length > 0;
+
+        // Auto mode: settle the whole group to recommended-or-skip, no prompt.
+        // Record the gate decision as 'recommended' so the review's edit list can
+        // still re-open the section. planSkip already covers every askable
+        // question; overlay recommended values where a default exists.
+        if (opts.autoRecommendGates) {
+          session = recordAnswer(session, gate.id, 'recommended');
+          const recommended = new Map(plan?.map((p) => [p.question.id, p.value]));
+          for (const { question, value } of skipPlan) {
+            session = recordAnswer(session, question.id, recommended.get(question.id) ?? value);
+          }
+          continue;
+        }
 
         let decision = gateDecision(session.answers[gate.id]);
         if (decision === undefined) {
