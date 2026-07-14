@@ -243,6 +243,8 @@ questions to whatever you pick. Dimensions covered:
 - **Tooling** — package manager, runtime, formatter, linter
 - **TypeScript** — `tsconfig` strictness, target, module resolution, path aliases
 - **Conventions** — folder structure, coding standards, docs, git workflow
+- **Change audit** _(optional)_ — opt into a skill that checks your pending
+  change against the project skills before commit or push
 
 ## AI vs. template generation
 

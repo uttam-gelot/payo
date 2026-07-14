@@ -38,6 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `AGENTS.md` now opens its skills index with a directive telling the agent to
+  consult and follow the applicable skills before writing or changing code — so
+  the generated guidance is used, not merely listed. Written on both the
+  AI-authored and static-template paths.
+- Opt-in **change-audit** skill. The questionnaire (every project) asks whether
+  to add it and, if so, when it runs — before every commit or before pushing.
+  When enabled, Payo writes `.agents/skills/change-audit/SKILL.md`: a minimal,
+  token-frugal skill the agent invokes at that point to read the pending change,
+  smartly select only the relevant project skills (not every skill), and report
+  anything that conflicts. Model-invoked only — no git hooks or runtime tooling.
 - Monorepo workspace detection. On existing projects Payo now enumerates
   workspace members across pnpm / npm / yarn / lerna, Cargo, `go.work`, and
   Maven / Gradle, detects each package's stack, and surfaces the real app stack
