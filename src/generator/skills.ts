@@ -16,6 +16,12 @@ export interface SkillSpec {
    * whether to load the skill, so it must read as a trigger, not a title.
    */
   description: string;
+  /**
+   * Optional answer-dependent override for `description`. When present, its
+   * result replaces `description` at selection time (see `selectSkills`), so
+   * frontmatter and the AGENTS index reflect the chosen answers, not a default.
+   */
+  describe?(a: Answers): string;
   /** Whether this skill applies to the current answers. */
   appliesTo(a: Answers): boolean;
   /** Task instruction for the agent (project context is added by the caller). */
@@ -371,8 +377,11 @@ const skills: SkillSpec[] = [
     id: 'change-audit',
     title: 'Change Audit',
     description:
-      'Use right before committing or pushing to check the pending change against this ' +
+      'Use right before pushing to a remote to check the pending change against this ' +
       "project's skills and report any that conflict.",
+    describe: (a): string =>
+      `Use right before ${auditGerund(auditTiming(a))} to check the pending change against ` +
+      "this project's skills and report any that conflict.",
     appliesTo: (a) => a.auditSkill === true,
     buildPrompt: (a): string => {
       const timing = auditTiming(a);
@@ -425,5 +434,7 @@ function auditStaticBody(timing: 'commit' | 'push'): string {
 
 /** The skills that apply to the current answers, in declared order. */
 export function selectSkills(a: Answers): SkillSpec[] {
-  return skills.filter((s) => s.appliesTo(a));
+  return skills
+    .filter((s) => s.appliesTo(a))
+    .map((s) => (s.describe ? { ...s, description: s.describe(a) } : s));
 }

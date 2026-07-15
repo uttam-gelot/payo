@@ -77,6 +77,18 @@ describe('selectSkills', () => {
     expect(skill(commit).staticBody!(commit)).toContain('.agents/skills/');
   });
 
+  it('change-audit description names only the chosen timing', () => {
+    const spec = (a: Answers) => selectSkills(a).find((s) => s.id === 'change-audit')!;
+
+    const commit = spec({ ...contexts.tsBackend, auditSkill: true, auditTiming: 'commit' });
+    expect(commit.description).toContain('committing');
+    expect(commit.description).not.toContain('pushing');
+
+    const push = spec({ ...contexts.tsBackend, auditSkill: true, auditTiming: 'push' });
+    expect(push.description).toContain('pushing to a remote');
+    expect(push.description).not.toContain('committing');
+  });
+
   it('api-conventions prescribes /v1 normally, documents reality under detect-everything', () => {
     const base: Answers = { ...contexts.tsBackend, apiArchitecture: 'rest' };
     const spec = (a: Answers) => selectSkills(a).find((s) => s.id === 'api-conventions')!;
