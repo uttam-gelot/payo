@@ -25,12 +25,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   providers with a CLI runner, with no "recommended" tag.
 - The welcome banner now describes the universal Agent Skills layout and the
   8-language stack detection.
-- "Detect everything" now means everything: on an existing project it records
-  the detected stack *and* conventions and auto-fills the remaining convention/
-  preference gates with recommended defaults, so nothing is confirmed inline —
-  you review (and edit) the whole set once on the summary screen before
-  generating. "Just the high-level stack" is unchanged (conventions still
-  interviewed).
+- **"Detect everything" now treats the existing code as the source of truth.**
+  It records exactly what it detects (stack, conventions, and git branch/commit
+  style) and **skips anything it can't find** — no skill is created for it and it
+  is not mentioned. Undetected topics are no longer filled with recommended
+  defaults, so it no longer fabricates testing, API versioning, folder structure,
+  or auth the project doesn't have. Only a small set of safe assistant policies
+  (no AI attribution, task-scoped/atomic commits, confirm-before-push,
+  verify-before-push, `.env.example`-only, DRY/modular standards) are applied
+  without detection — shown explicitly up front and editable on the review screen.
+  The generated skills document the conventions actually present in the code
+  (e.g. no `/v1` versioning is prescribed unless the API is versioned). "Just the
+  high-level stack" is unchanged (conventions still interviewed).
 - Providers shrank to identity, `knownArtifacts` (kept for detection and the
   overwrite guard), and an optional CLI runner (`binary` + `buildArgs`); output
   paths and per-tool frontmatter are gone. `buildArgs` — the agent permission
@@ -38,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Git convention detection.** Payo now infers your branch-naming and
+  commit-message conventions by parsing recent **local** git history (branch
+  names and commit subjects) — Conventional Commits, gitmoji, ticket-prefixed, or
+  free-form; `feature/`-style, ticket-keyed, or kebab-case branches. The parse
+  stays on your machine and is never placed in any AI prompt. New
+  `branchNaming` / `commitConvention` questions carry it into the generated
+  git-workflow guidance, each with an "Other" option for a custom format.
 - `AGENTS.md` now opens its skills index with a directive telling the agent to
   consult and follow the applicable skills before writing or changing code — so
   the generated guidance is used, not merely listed. Written on both the

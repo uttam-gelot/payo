@@ -98,6 +98,27 @@ export async function run(): Promise<void> {
         const depth = await confirmDetectionDepth();
         autoRecommendGates = depth === 'everything';
 
+        // Be explicit about what "detect everything" does, so the user knows what
+        // to expect: code is the source of truth, undetected topics are skipped,
+        // and a few safe assistant policies are applied (and editable at review).
+        if (autoRecommendGates) {
+          note(
+            [
+              'Payo will use your code, folder structure, and git history as the source of truth.',
+              'Anything it cannot find is skipped — no skill is created for it and it is not mentioned.',
+              '',
+              'These safe assistant policies are applied (edit any at the review screen):',
+              '• No AI attribution in commits/PRs',
+              '• Task-scoped, small atomic commits',
+              '• Ask before pushing to a remote',
+              '• Run formatter/linter/tests before pushing',
+              '• Work from .env.example (never read the real .env)',
+              '• DRY, modular, separation-of-concerns coding standards',
+            ].join('\n'),
+            'Detect everything',
+          );
+        }
+
         // Stage 2 — LLM pass over the chosen agent (additive; static-only fallback).
         const aiTool =
           typeof session.answers.aiTool === 'string' ? session.answers.aiTool : undefined;

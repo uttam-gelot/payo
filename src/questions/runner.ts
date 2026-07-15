@@ -217,7 +217,7 @@ export async function confirmDetectionDepth(
       {
         value: 'everything',
         label:
-          'Detect everything — stack and conventions auto-filled; you review before generating',
+          'Detect everything — use the code, structure & git history as the source of truth; skip what is not found',
       },
       { value: 'partial', label: 'Just the high-level stack — answer conventions yourself' },
     ],

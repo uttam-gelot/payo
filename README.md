@@ -155,11 +155,15 @@ When detection finds a manifest, you get two quick choices:
 - **Work with the existing project, or start fresh?** Keep the detected answers, or
   ignore them and answer from scratch.
 - **Detect everything, or just the stack?**
-  - **Detect everything** fills in the whole config with no question-by-question
-    prompts: stack facts and conventions are taken from what Payo detects, and any
-    convention it can't detect is set to a sensible recommended default. You land
-    straight on the review screen and edit anything that's off before generating —
-    everything means everything, confirmed once at the end.
+  - **Detect everything** treats your **code, folder structure, and git history as
+    the source of truth**. It records exactly what it finds — stack, conventions,
+    and your branch-naming / commit-message style read from recent git history — and
+    **skips anything it can't find**: no skill is created for it and it isn't
+    mentioned. The only things applied without detection are a few safe assistant
+    policies (no AI attribution in commits, task-scoped atomic commits, confirm
+    before push, verify before push, work from `.env.example`, and DRY/modular
+    coding standards) — all shown up front and editable on the review screen. You
+    land straight on that review screen and confirm once.
   - **Just the high-level stack** fills in the stack facts only and interviews you
     for the convention questions (folder structure and the like).
 
@@ -177,9 +181,11 @@ uses the real app stack as the primary answers instead of the near-empty root
 manifest. The generated guidance gains a **Workspace Packages** list and monorepo
 conventions.
 
-Detection runs deterministically from your files first. When the chosen AI tool's
-CLI is installed, an **optional second pass** uses **your own** assistant to fill
-gaps on unusual stacks — it reads only the manifest and the directory listing,
+Detection runs deterministically from your files first. Branch-naming and
+commit-message conventions are inferred by parsing your **local** git history on
+your machine — that history is never placed in any AI prompt. When the chosen AI
+tool's CLI is installed, an **optional second pass** uses **your own** assistant to
+fill gaps on unusual stacks — it reads only the manifest and the directory listing,
 runs under your own account, and never sends anything to a Payo server (see
 [Your data stays yours](#your-data-stays-yours)). If no CLI is present, the
 deterministic result stands on its own.
