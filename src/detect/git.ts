@@ -30,9 +30,6 @@ const TICKET = /^[A-Z][A-Z0-9]+-\d+/;
 const CONVENTIONAL =
   /^(feat|fix|chore|docs|refactor|test|style|perf|build|ci|revert)(\([^)]+\))?!?:\s/i;
 
-/** A gitmoji prefix — either the `:shortcode:` form or a leading emoji. */
-const GITMOJI = /^(:\w[\w-]*:|\p{Extended_Pictographic})/u;
-
 /** Plain kebab-case slug (lowercase words joined by hyphens), no path separator. */
 const KEBAB = /^[a-z0-9]+(-[a-z0-9]+)+$/;
 
@@ -91,7 +88,6 @@ export function classifyBranches(slugs: string[]): string | undefined {
 export function classifyCommits(subjects: string[]): string | undefined {
   if (subjects.length === 0) return undefined;
   if (majority(subjects, (s) => CONVENTIONAL.test(s))) return 'conventional';
-  if (majority(subjects, (s) => GITMOJI.test(s))) return 'gitmoji';
   if (majority(subjects, (s) => TICKET.test(s))) return 'ticket';
   return 'freeform'; // commits exist but follow no structured convention
 }

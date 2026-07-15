@@ -71,7 +71,6 @@ const BRANCH_NAMING_DESC: Record<string, string> = {
 /** Prose describing a commit-message answer; falls back to a custom (Other) value. */
 const COMMIT_CONVENTION_DESC: Record<string, string> = {
   conventional: 'Conventional Commits (type(scope): description)',
-  gitmoji: 'gitmoji-prefixed commit messages (e.g. :sparkles: description)',
   ticket: 'ticket-prefixed commit messages (e.g. ABC-123: description)',
   freeform: 'free-form commit messages',
   none: 'no enforced commit-message convention',
