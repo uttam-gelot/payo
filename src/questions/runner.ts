@@ -184,6 +184,8 @@ const DETECT_LABELS: Record<string, string> = {
   'tsconfig.path-aliases': 'TS path aliases',
   // Tier-2 conventions detection can infer (shown so "detect everything" is visible).
   structure: 'Structure',
+  branchNaming: 'Branch naming',
+  commitConvention: 'Commit convention',
 };
 
 /** Order detected lines read top-down like the questionnaire. */

@@ -576,6 +576,27 @@ export const gitWorkflowOptions: Option<string>[] = [
   { value: 'none', label: 'None' },
 ];
 
+/** Branch-naming convention. Inferred from local branch names; "Other" allows a custom rule. */
+export const branchNamingOptions: Option<string>[] = [
+  { value: 'type-slash', label: 'Type prefix — feature/…, fix/…, chore/…', hint: 'recommended' },
+  { value: 'ticket', label: 'Ticket key — ABC-123-short-description' },
+  { value: 'kebab', label: 'Plain kebab-case — short-description' },
+  { value: 'none', label: 'No convention' },
+];
+
+/** Commit-message convention. Inferred from recent commits; "Other" allows a custom format. */
+export const commitConventionOptions: Option<string>[] = [
+  {
+    value: 'conventional',
+    label: 'Conventional Commits — type(scope): description',
+    hint: 'recommended',
+  },
+  { value: 'gitmoji', label: 'Gitmoji — :sparkles: description' },
+  { value: 'ticket', label: 'Ticket-prefixed — ABC-123: description' },
+  { value: 'freeform', label: 'Free-form — no enforced structure' },
+  { value: 'none', label: 'No convention' },
+];
+
 /** When to run the formatter, linter, and tests in the git workflow. */
 export const verifyTimingOptions: Option<string>[] = [
   { value: 'push', label: 'Before pushing to a remote', hint: 'recommended' },

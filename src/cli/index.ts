@@ -153,6 +153,12 @@ export async function run(): Promise<void> {
           applyRecorded(tier2);
         } else {
           applySeeded(tier1);
+          // Git conventions are inferred deterministically from local history; seed
+          // them so the interview pre-selects the detected value (still asked in
+          // partial mode, where the rest of Tier-2 is left entirely to the user).
+          for (const [id, value] of Object.entries(tier2)) {
+            if (result.sources[id] === 'git') session = seedDetected(session, { [id]: value });
+          }
         }
 
         // Carry per-package stacks (monorepo) to the generator as derived data.

@@ -16,6 +16,7 @@ import { detectPhp } from './php';
 import { detectDotnet } from './dotnet';
 import { detectJava } from './java';
 import { detectRuby } from './ruby';
+import { detectGit } from './git';
 import { enumerateWorkspaces } from './workspaces';
 
 export type { DetectionResult, DetectionSource, PackageSummary } from './types';
@@ -81,7 +82,10 @@ function summarize(rel: string, result: DetectionResult): PackageSummary {
  * returns the plain single-directory detection unchanged.
  */
 export function detectStack(cwd: string = process.cwd()): DetectionResult {
-  const root = detectAt(cwd);
+  // Git branch/commit conventions are repo-level (independent of ecosystem and
+  // of workspace members), so they merge onto whichever primary stack is chosen.
+  const gitConv = detectGit(cwd);
+  const root = withGit(detectAt(cwd), gitConv);
 
   const members = enumerateWorkspaces(cwd);
   if (members.length === 0) return root;
@@ -96,11 +100,24 @@ export function detectStack(cwd: string = process.cwd()): DetectionResult {
   const primary =
     'framework' in root.answers ? root : (memberWithFramework ?? memberWithLanguage ?? root);
 
-  const base = coherent({
-    answers: { ...primary.answers, structure: 'monorepo' },
-    sources: { ...primary.sources, structure: 'config' },
-  });
+  const base = withGit(
+    coherent({
+      answers: { ...primary.answers, structure: 'monorepo' },
+      sources: { ...primary.sources, structure: 'config' },
+    }),
+    gitConv,
+  );
   return { ...base, packages: detected.map((d) => summarize(d.rel, d.result)) };
+}
+
+/** Merge repo-level git conventions onto a detection result (git fills, never overrides). */
+function withGit(result: DetectionResult, git: DetectionResult): DetectionResult {
+  if (Object.keys(git.answers).length === 0) return result;
+  return {
+    ...result,
+    answers: { ...git.answers, ...result.answers },
+    sources: { ...git.sources, ...result.sources },
+  };
 }
 
 /**
