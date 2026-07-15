@@ -184,6 +184,12 @@ export async function run(): Promise<void> {
   // --- Review answers before generating (with inline edit) ---
   session = await reviewAndEdit(flow, session);
 
+  // Mark the detect-everything path so the generator treats the existing code as
+  // the source of truth — documenting the conventions actually present instead of
+  // prescribing defaults. Recorded after the last reconcile (in reviewAndEdit) so
+  // it survives to generation; not a Question, so it never showed in the review.
+  if (autoRecommendGates) session = recordAnswer(session, 'detectEverything', true);
+
   // --- Generate provider artifact(s) ---
   // Resume: skip skills a prior interrupted run already finished. The working
   // dir is removed once we reach the end of run(), so only a killed run (which

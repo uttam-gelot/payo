@@ -65,12 +65,7 @@ function majority(samples: string[], test: (s: string) => boolean): boolean {
 
 /** Branch names worth classifying — remotes stripped of `origin/`, base branches dropped. */
 function branchSlugs(cwd: string): string[] {
-  const raw = git(cwd, [
-    'for-each-ref',
-    '--format=%(refname:short)',
-    'refs/heads',
-    'refs/remotes',
-  ]);
+  const raw = git(cwd, ['for-each-ref', '--format=%(refname:short)', 'refs/heads', 'refs/remotes']);
   if (!raw) return [];
   const seen = new Set<string>();
   for (const ref of raw) {

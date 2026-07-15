@@ -152,8 +152,28 @@ function workspacePackagesSection(answers: Answers): RuleSection | null {
   return { title: 'Workspace Packages', body: lines.join('\n') };
 }
 
+/** Prose describing a branch-naming answer; falls back to a custom (Other) value. */
+const BRANCH_NAMING_DESC: Record<string, string> = {
+  'type-slash': 'type-prefixed branches (feature/…, fix/…, chore/…)',
+  ticket: 'ticket-keyed branches (e.g. ABC-123-short-description)',
+  kebab: 'plain kebab-case branch names',
+  none: 'no enforced branch-naming convention',
+};
+
+/** Prose describing a commit-message answer; falls back to a custom (Other) value. */
+const COMMIT_CONVENTION_DESC: Record<string, string> = {
+  conventional: 'Conventional Commits (type(scope): description)',
+  gitmoji: 'gitmoji-prefixed commit messages (e.g. :sparkles: description)',
+  ticket: 'ticket-prefixed commit messages (e.g. ABC-123: description)',
+  freeform: 'free-form commit messages',
+  none: 'no enforced commit-message convention',
+};
+
 export function buildBaseRules(answers: Answers): RuleSection[] {
   const sections: RuleSection[] = [];
+  // Detect-everything: the existing code is the source of truth, so the static
+  // floor omits prescriptive conventions it cannot verify from the project.
+  const fromCode = answers.detectEverything === true;
 
   const def = str(answers, 'projectDefinition');
   if (def) sections.push({ title: 'Project Overview', body: def });
@@ -207,15 +227,21 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
   }
 
   if (str(answers, 'apiArchitecture')) {
-    sections.push({
-      title: 'API Conventions',
-      body: [
-        '- Version the API via a URL prefix (e.g. /v1).',
-        '- Return a consistent structured response envelope for both success and error payloads.',
+    // In detect-everything, drop prescriptive specifics (e.g. a /v1 scheme) the
+    // project may not use — document only conventions that always hold.
+    const apiLines = [
+      '- Return a consistent structured response envelope for both success and error payloads.',
+      '- Use appropriate status codes and validate every request and response.',
+    ];
+    if (!fromCode) {
+      apiLines.unshift('- Version the API via a URL prefix (e.g. /v1).');
+      apiLines.splice(
+        2,
+        0,
         '- Paginate list endpoints (limit/offset or cursor) with consistent metadata.',
-        '- Use appropriate status codes and validate every request and response.',
-      ].join('\n'),
-    });
+      );
+    }
+    sections.push({ title: 'API Conventions', body: apiLines.join('\n') });
   }
 
   const structure = str(answers, 'structure');
@@ -256,32 +282,41 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
     sections.push({ title: 'Documentation', body: body.join('\n') });
   }
 
+  // Error Handling & Logging is universal guidance, but under detect-everything
+  // with no logger detected we skip it rather than prescribe one that isn't there.
   const logger = str(answers, 'logger');
-  const loggingLine =
-    logger === 'centralized'
-      ? '- Build one simple centralized logger module (a thin wrapper over the stdlib output) and import it everywhere; no third-party logging library, no raw console/print, with appropriate log levels.'
-      : `- Log through ${logger ?? 'a dedicated logger'} (not raw console/print) with appropriate log levels.`;
-  sections.push({
-    title: 'Error Handling & Logging',
-    body: [
-      '- Use a consistent error strategy: typed/wrapped errors, fail fast, never swallow exceptions.',
-      loggingLine,
-      '- Never log secrets or sensitive data.',
-    ].join('\n'),
-  });
-
-  const testTypes = answers.testTypes;
-  const testLines = [
-    '- Keep a separate testing setup: dedicated test config and directory layout; use fixtures/factories.',
-  ];
-  if (Array.isArray(testTypes) && testTypes.length) {
-    testLines.unshift(`- Test types: ${testTypes.join(', ')}.`);
+  if (logger || !fromCode) {
+    const loggingLine =
+      logger === 'centralized'
+        ? '- Build one simple centralized logger module (a thin wrapper over the stdlib output) and import it everywhere; no third-party logging library, no raw console/print, with appropriate log levels.'
+        : `- Log through ${logger ?? 'a dedicated logger'} (not raw console/print) with appropriate log levels.`;
+    sections.push({
+      title: 'Error Handling & Logging',
+      body: [
+        '- Use a consistent error strategy: typed/wrapped errors, fail fast, never swallow exceptions.',
+        loggingLine,
+        '- Never log secrets or sensitive data.',
+      ].join('\n'),
+    });
   }
+
+  // Only emit Testing guidance when the project actually has tests (types/runner/
+  // e2e), so detect-everything never fabricates a testing setup that isn't there.
+  const testTypes = answers.testTypes;
   const runner = str(answers, 'testRunner');
-  if (runner) testLines.push(`- Use ${runner} for unit and integration tests.`);
   const e2e = str(answers, 'e2eTool');
-  if (e2e) testLines.push(`- Use ${e2e} for end-to-end tests.`);
-  sections.push({ title: 'Testing', body: testLines.join('\n') });
+  const hasTesting = (Array.isArray(testTypes) && testTypes.length > 0) || !!runner || !!e2e;
+  if (hasTesting) {
+    const testLines = [
+      '- Keep a separate testing setup: dedicated test config and directory layout; use fixtures/factories.',
+    ];
+    if (Array.isArray(testTypes) && testTypes.length) {
+      testLines.unshift(`- Test types: ${testTypes.join(', ')}.`);
+    }
+    if (runner) testLines.push(`- Use ${runner} for unit and integration tests.`);
+    if (e2e) testLines.push(`- Use ${e2e} for end-to-end tests.`);
+    sections.push({ title: 'Testing', body: testLines.join('\n') });
+  }
 
   const tooling: string[] = [];
   const fmt = str(answers, 'formatter');
@@ -296,6 +331,16 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
       `Follow the ${git} workflow.`,
       '- Maintain a comprehensive .gitignore (build output, dependencies, environment/secret files, OS/editor artifacts).',
     ];
+    const branch = str(answers, 'branchNaming');
+    if (branch)
+      lines.push(
+        `- Name branches using ${BRANCH_NAMING_DESC[branch] ?? `the "${branch}" convention`}.`,
+      );
+    const commit = str(answers, 'commitConvention');
+    if (commit)
+      lines.push(
+        `- Write commit messages using ${COMMIT_CONVENTION_DESC[commit] ?? `the "${commit}" convention`}.`,
+      );
     if (typeof answers.aiAttribution === 'boolean') {
       lines.push(
         answers.aiAttribution

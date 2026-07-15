@@ -39,6 +39,46 @@ function val(a: Answers, key: string): string | undefined {
   return has(a, key) ? (a[key] as string) : undefined;
 }
 
+/**
+ * True on the "detect everything" path: the project already exists and its code is
+ * the source of truth. Skill prompts then document the conventions ACTUALLY present
+ * and omit anything the project does not do, instead of prescribing defaults.
+ */
+function fromCode(a: Answers): boolean {
+  return a.detectEverything === true;
+}
+
+/** A directive appended to convention skills so the agent documents reality, not defaults. */
+const SOURCE_OF_TRUTH =
+  ' This is an existing codebase: document ONLY the conventions it actually follows, ' +
+  'inferred from the current code — omit anything the project does not do, and do not ' +
+  'introduce conventions it has not already adopted.';
+
+/** Prose describing a branch-naming answer; falls back to a custom (Other) value. */
+const BRANCH_NAMING_DESC: Record<string, string> = {
+  'type-slash': 'type-prefixed branches (feature/…, fix/…, chore/…)',
+  ticket: 'ticket-keyed branches (e.g. ABC-123-short-description)',
+  kebab: 'plain kebab-case branch names',
+  none: 'no enforced branch-naming convention',
+};
+
+/** Prose describing a commit-message answer; falls back to a custom (Other) value. */
+const COMMIT_CONVENTION_DESC: Record<string, string> = {
+  conventional: 'Conventional Commits (type(scope): description)',
+  gitmoji: 'gitmoji-prefixed commit messages (e.g. :sparkles: description)',
+  ticket: 'ticket-prefixed commit messages (e.g. ABC-123: description)',
+  freeform: 'free-form commit messages',
+  none: 'no enforced commit-message convention',
+};
+
+function branchNamingDesc(v: string): string {
+  return BRANCH_NAMING_DESC[v] ?? `the "${v}" branch-naming convention`;
+}
+
+function commitConventionDesc(v: string): string {
+  return COMMIT_CONVENTION_DESC[v] ?? `the "${v}" commit-message convention`;
+}
+
 // Declared in order of importance — this drives the section order when a
 // single-file tool (e.g. Codex AGENTS.md) merges the skills into one doc.
 const skills: SkillSpec[] = [
@@ -125,8 +165,20 @@ const skills: SkillSpec[] = [
     appliesTo: (a) => has(a, 'apiArchitecture'),
     buildPrompt: (a): string => {
       const api = val(a, 'apiArchitecture');
+      const forWhat = api ? `the ${api} API` : 'the chosen API architecture';
+      if (fromCode(a)) {
+        // Detect-everything: describe the API as it exists — only cover versioning,
+        // envelopes, pagination, etc. where the code actually implements them.
+        return (
+          `Document the API conventions this codebase actually uses for ${forWhat}: ` +
+          'endpoint/handler structure, versioning scheme IF the API is versioned, the response ' +
+          'shape it returns for success and errors, how (or whether) list endpoints paginate, ' +
+          'request/response validation, and status-code/error semantics.' +
+          SOURCE_OF_TRUTH
+        );
+      }
       return (
-        `Write API conventions for ${api ? `the ${api} API` : 'the chosen API architecture'}: ` +
+        `Write API conventions for ${forWhat}: ` +
         'endpoint/handler structure, a URL versioning scheme (e.g. a /v1 prefix), a consistent ' +
         'structured response envelope for both success and error payloads, pagination conventions for ' +
         'list endpoints (limit/offset or cursor) with consistent metadata, request/response validation, ' +
@@ -277,6 +329,10 @@ const skills: SkillSpec[] = [
         `Write git-workflow guidance for the ${wf ?? 'selected'} workflow: branching, commit message ` +
         'conventions, and PR practices, and maintaining a comprehensive .gitignore (build output, ' +
         'dependencies, environment/secret files, and OS/editor artifacts).';
+      const branch = val(a, 'branchNaming');
+      if (branch) base += ` Follow ${branchNamingDesc(branch)} for branch names.`;
+      const commit = val(a, 'commitConvention');
+      if (commit) base += ` Use ${commitConventionDesc(commit)} for commit messages.`;
       if (typeof a.aiAttribution === 'boolean')
         base += a.aiAttribution
           ? ' In commits and PRs, attribute AI-assisted work (e.g. a Co-Authored-By trailer).'

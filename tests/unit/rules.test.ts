@@ -121,10 +121,44 @@ describe('buildBaseRules', () => {
     expect(titles({ ...contexts.tsBackend, authApproach: 'none' })).not.toContain('Authentication');
   });
 
-  it('always includes Error Handling & Logging and Testing', () => {
-    const t = titles(contexts.tsBackend);
-    expect(t).toContain('Error Handling & Logging');
-    expect(t).toContain('Testing');
+  it('includes Error Handling & Logging by default; Testing only with test content', () => {
+    expect(titles(contexts.tsBackend)).toContain('Error Handling & Logging');
+    // No test types/runner/e2e → no fabricated Testing section.
+    expect(titles(contexts.tsBackend)).not.toContain('Testing');
+    // With test content it appears.
+    expect(titles({ ...contexts.tsBackend, testTypes: ['unit'] })).toContain('Testing');
+  });
+
+  it('detect-everything treats existing code as source of truth', () => {
+    // No API versioning prescribed, no fabricated Testing, and no logger invented.
+    const md = renderMarkdown(
+      'G',
+      buildBaseRules({
+        ...contexts.tsBackend,
+        apiArchitecture: 'rest',
+        logger: 'none',
+        testTypes: [],
+        detectEverything: true,
+      }),
+    );
+    expect(md).toContain('## API Conventions');
+    expect(md).not.toContain('/v1');
+    expect(md).not.toContain('## Testing');
+    expect(md).not.toContain('## Error Handling & Logging');
+  });
+
+  it('renders detected git branch/commit conventions in the Git Workflow section', () => {
+    const md = renderMarkdown(
+      'G',
+      buildBaseRules({
+        ...contexts.tsBackend,
+        gitWorkflow: 'standard',
+        branchNaming: 'type-slash',
+        commitConvention: 'conventional',
+      }),
+    );
+    expect(md).toContain('type-prefixed branches');
+    expect(md).toContain('Conventional Commits');
   });
 
   it('adds the .env-read guard line only when envExampleOnly is set', () => {
