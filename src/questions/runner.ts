@@ -262,7 +262,7 @@ export async function confirmResume(answeredCount: number): Promise<boolean> {
  */
 type SelectPrompt = (opts: {
   message: string;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; hint?: string }[];
 }) => Promise<string | symbol>;
 
 /** Review-screen choice: generate now, or edit a prior answer first. */
