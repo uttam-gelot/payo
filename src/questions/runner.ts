@@ -215,11 +215,15 @@ export async function confirmDetectionDepth(
     message: 'How much should payo detect?',
     options: [
       {
+        value: 'partial',
+        label: 'Just the high-level stack — answer conventions yourself',
+        hint: 'recommended',
+      },
+      {
         value: 'everything',
         label:
           'Detect everything — use the code, structure & git history as the source of truth; skip what is not found',
       },
-      { value: 'partial', label: 'Just the high-level stack — answer conventions yourself' },
     ],
   });
   guardCancel(value);
