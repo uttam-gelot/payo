@@ -397,9 +397,9 @@ const skills: SkillSpec[] = [
   },
 ];
 
-/** Audit timing answer, defaulting to 'commit' when unset. */
+/** Audit timing answer, defaulting to 'push' (the recommended timing) when unset. */
 function auditTiming(a: Answers): 'commit' | 'push' {
-  return a.auditTiming === 'push' ? 'push' : 'commit';
+  return a.auditTiming === 'commit' ? 'commit' : 'push';
 }
 
 /** Gerund phrase for prose ("committing" / "pushing to a remote"). */
