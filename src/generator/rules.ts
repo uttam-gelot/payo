@@ -4,10 +4,14 @@
  * function the generator calls — the seam where an AI-backed builder can
  * later swap in.
  */
-import type { Answers } from '../questions/types';
+import type { Answers, Question } from '../questions/types';
 import type { RuleSection } from './types';
 import type { PackageSummary } from '../detect/types';
+import type { TechModule } from '../stack/types';
 import { resolveGuidance } from './guidance';
+import { dbFamily } from '../stack/predicates';
+import { getModule, modulesFor } from '../stack/registry';
+import '../stack/modules/index'; // side-effect: ensure modules are registered for renderer-only calls
 
 /**
  * Fence untrusted prompt content between explicit data markers. Anything quoted
@@ -33,16 +37,81 @@ function str(a: Answers, key: string): string | undefined {
   return v;
 }
 
-/** Human-friendly label for a namespaced tech-detail id (e.g. 'nestjs.arch'). */
-function detailLabel(id: string): string {
-  const part = id.split('.').slice(1).join('.') || id;
-  return part.replace(/[-_]/g, ' ');
-}
-
 function formatValue(v: unknown): string {
   if (Array.isArray(v)) return v.join(', ');
   if (typeof v === 'boolean') return v ? 'yes' : 'no';
   return String(v);
+}
+
+/** True when a stored answer carries no real content (skipped / not-applicable). */
+function isUnset(value: unknown): boolean {
+  if (value === undefined || value === null || value === '' || value === 'none') return true;
+  return Array.isArray(value) && value.length === 0;
+}
+
+/** Concise label for a question in the Tech Details section. */
+function questionSummary(q: Question): string {
+  if (q.summary) return q.summary;
+  return q.message
+    .replace(/\s*\(.*?\)\s*/g, ' ')
+    .replace(/\?\s*$/, '')
+    .trim();
+}
+
+/** Render a stored answer through the question's option labels when available. */
+function questionValue(q: Question, value: unknown, answers: Answers): string {
+  if (typeof value === 'boolean') return formatValue(value);
+
+  const options = q.optionsFrom ? q.optionsFrom(answers) : (q.options ?? []);
+  const labelOf = (v: string): string => options.find((o) => o.value === v)?.label ?? v;
+  if (Array.isArray(value)) {
+    return value.map((v) => (typeof v === 'string' ? labelOf(v) : String(v))).join(', ');
+  }
+  if (typeof value === 'string') return labelOf(value);
+  return String(value);
+}
+
+function uniqueModules(modules: Array<TechModule | undefined>): TechModule[] {
+  const seen = new Set<string>();
+  const out: TechModule[] = [];
+  for (const m of modules) {
+    if (!m || seen.has(m.id)) continue;
+    seen.add(m.id);
+    out.push(m);
+  }
+  return out;
+}
+
+/** Selected/applicable modules that own namespaced follow-up answers. */
+function techDetailModules(answers: Answers): TechModule[] {
+  return uniqueModules([
+    getModule(answers.framework),
+    getModule(dbFamily(answers)),
+    getModule(answers.orm),
+    getModule(answers.stylingLibrary),
+    getModule(answers.authApproach),
+    ...modulesFor('config', answers),
+  ]);
+}
+
+/** Human-readable follow-up answers for selected modules; internal gate ids are omitted. */
+function techDetails(answers: Answers): string[] {
+  const lines: string[] = [];
+  const seen = new Set<string>();
+  for (const module of techDetailModules(answers)) {
+    if (answers[`${module.id}.__recommended`] === 'skip') continue;
+    const moduleTitle = module.title ?? module.id;
+    for (const q of module.questions(answers)) {
+      if (seen.has(q.id)) continue;
+      if (q.id.endsWith('__recommended')) continue;
+      if (q.when && !q.when(answers)) continue;
+      const value = answers[q.id];
+      if (isUnset(value)) continue;
+      seen.add(q.id);
+      lines.push(`- ${moduleTitle} / ${questionSummary(q)}: ${questionValue(q, value, answers)}`);
+    }
+  }
+  return lines;
 }
 
 /** Guidance line per selected documentation artifact (see documentationOptions). */
@@ -83,8 +152,28 @@ function workspacePackagesSection(answers: Answers): RuleSection | null {
   return { title: 'Workspace Packages', body: lines.join('\n') };
 }
 
+/** Prose describing a branch-naming answer; falls back to a custom (Other) value. */
+const BRANCH_NAMING_DESC: Record<string, string> = {
+  'type-slash': 'type-prefixed branches (feature/…, fix/…, chore/…)',
+  ticket: 'ticket-keyed branches (e.g. ABC-123-short-description)',
+  kebab: 'plain kebab-case branch names',
+  none: 'no enforced branch-naming convention',
+};
+
+/** Prose describing a commit-message answer; falls back to a custom (Other) value. */
+const COMMIT_CONVENTION_DESC: Record<string, string> = {
+  conventional: 'Conventional Commits (type(scope): description)',
+  gitmoji: 'gitmoji-prefixed commit messages (e.g. :sparkles: description)',
+  ticket: 'ticket-prefixed commit messages (e.g. ABC-123: description)',
+  freeform: 'free-form commit messages',
+  none: 'no enforced commit-message convention',
+};
+
 export function buildBaseRules(answers: Answers): RuleSection[] {
   const sections: RuleSection[] = [];
+  // Detect-everything: the existing code is the source of truth, so the static
+  // floor omits prescriptive conventions it cannot verify from the project.
+  const fromCode = answers.detectEverything === true;
 
   const def = str(answers, 'projectDefinition');
   if (def) sections.push({ title: 'Project Overview', body: def });
@@ -138,15 +227,21 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
   }
 
   if (str(answers, 'apiArchitecture')) {
-    sections.push({
-      title: 'API Conventions',
-      body: [
-        '- Version the API via a URL prefix (e.g. /v1).',
-        '- Return a consistent structured response envelope for both success and error payloads.',
+    // In detect-everything, drop prescriptive specifics (e.g. a /v1 scheme) the
+    // project may not use — document only conventions that always hold.
+    const apiLines = [
+      '- Return a consistent structured response envelope for both success and error payloads.',
+      '- Use appropriate status codes and validate every request and response.',
+    ];
+    if (!fromCode) {
+      apiLines.unshift('- Version the API via a URL prefix (e.g. /v1).');
+      apiLines.splice(
+        2,
+        0,
         '- Paginate list endpoints (limit/offset or cursor) with consistent metadata.',
-        '- Use appropriate status codes and validate every request and response.',
-      ].join('\n'),
-    });
+      );
+    }
+    sections.push({ title: 'API Conventions', body: apiLines.join('\n') });
   }
 
   const structure = str(answers, 'structure');
@@ -187,32 +282,41 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
     sections.push({ title: 'Documentation', body: body.join('\n') });
   }
 
+  // Error Handling & Logging is universal guidance, but under detect-everything
+  // with no logger detected we skip it rather than prescribe one that isn't there.
   const logger = str(answers, 'logger');
-  const loggingLine =
-    logger === 'centralized'
-      ? '- Build one simple centralized logger module (a thin wrapper over the stdlib output) and import it everywhere; no third-party logging library, no raw console/print, with appropriate log levels.'
-      : `- Log through ${logger ?? 'a dedicated logger'} (not raw console/print) with appropriate log levels.`;
-  sections.push({
-    title: 'Error Handling & Logging',
-    body: [
-      '- Use a consistent error strategy: typed/wrapped errors, fail fast, never swallow exceptions.',
-      loggingLine,
-      '- Never log secrets or sensitive data.',
-    ].join('\n'),
-  });
-
-  const testTypes = answers.testTypes;
-  const testLines = [
-    '- Keep a separate testing setup: dedicated test config and directory layout; use fixtures/factories.',
-  ];
-  if (Array.isArray(testTypes) && testTypes.length) {
-    testLines.unshift(`- Test types: ${testTypes.join(', ')}.`);
+  if (logger || !fromCode) {
+    const loggingLine =
+      logger === 'centralized'
+        ? '- Build one simple centralized logger module (a thin wrapper over the stdlib output) and import it everywhere; no third-party logging library, no raw console/print, with appropriate log levels.'
+        : `- Log through ${logger ?? 'a dedicated logger'} (not raw console/print) with appropriate log levels.`;
+    sections.push({
+      title: 'Error Handling & Logging',
+      body: [
+        '- Use a consistent error strategy: typed/wrapped errors, fail fast, never swallow exceptions.',
+        loggingLine,
+        '- Never log secrets or sensitive data.',
+      ].join('\n'),
+    });
   }
+
+  // Only emit Testing guidance when the project actually has tests (types/runner/
+  // e2e), so detect-everything never fabricates a testing setup that isn't there.
+  const testTypes = answers.testTypes;
   const runner = str(answers, 'testRunner');
-  if (runner) testLines.push(`- Use ${runner} for unit and integration tests.`);
   const e2e = str(answers, 'e2eTool');
-  if (e2e) testLines.push(`- Use ${e2e} for end-to-end tests.`);
-  sections.push({ title: 'Testing', body: testLines.join('\n') });
+  const hasTesting = (Array.isArray(testTypes) && testTypes.length > 0) || !!runner || !!e2e;
+  if (hasTesting) {
+    const testLines = [
+      '- Keep a separate testing setup: dedicated test config and directory layout; use fixtures/factories.',
+    ];
+    if (Array.isArray(testTypes) && testTypes.length) {
+      testLines.unshift(`- Test types: ${testTypes.join(', ')}.`);
+    }
+    if (runner) testLines.push(`- Use ${runner} for unit and integration tests.`);
+    if (e2e) testLines.push(`- Use ${e2e} for end-to-end tests.`);
+    sections.push({ title: 'Testing', body: testLines.join('\n') });
+  }
 
   const tooling: string[] = [];
   const fmt = str(answers, 'formatter');
@@ -221,12 +325,37 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
   if (lint) tooling.push(`- Linter: ${lint}`);
   if (tooling.length) sections.push({ title: 'Tooling', body: tooling.join('\n') });
 
+  // Render Git Workflow whenever there is any git content — a chosen workflow,
+  // detected branch/commit conventions, or a kept hygiene policy. In detect-
+  // everything the workflow question is skipped, but detected conventions and the
+  // safe policies must still surface, so the section can't hinge on gitWorkflow.
   const git = str(answers, 'gitWorkflow');
-  if (git) {
+  const branch = str(answers, 'branchNaming');
+  const commit = str(answers, 'commitConvention');
+  const gitContent =
+    !!git ||
+    !!branch ||
+    !!commit ||
+    typeof answers.aiAttribution === 'boolean' ||
+    answers.commitScope === true ||
+    answers.commitScratchGuard === true ||
+    answers.confirmPush === true ||
+    answers.verifyTiming === 'commit' ||
+    answers.verifyTiming === 'push' ||
+    answers.atomicCommits === true;
+  if (gitContent) {
     const lines = [
-      `Follow the ${git} workflow.`,
+      git ? `Follow the ${git} workflow.` : 'Follow this project’s git conventions.',
       '- Maintain a comprehensive .gitignore (build output, dependencies, environment/secret files, OS/editor artifacts).',
     ];
+    if (branch)
+      lines.push(
+        `- Name branches using ${BRANCH_NAMING_DESC[branch] ?? `the "${branch}" convention`}.`,
+      );
+    if (commit)
+      lines.push(
+        `- Write commit messages using ${COMMIT_CONVENTION_DESC[commit] ?? `the "${commit}" convention`}.`,
+      );
     if (typeof answers.aiAttribution === 'boolean') {
       lines.push(
         answers.aiAttribution
@@ -261,9 +390,7 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
   sections.push(...resolveGuidance(answers));
 
   // Tech-specific follow-up answers (namespaced ids like 'nestjs.arch').
-  const details = Object.keys(answers)
-    .filter((k) => k.includes('.') && answers[k] !== undefined && answers[k] !== '')
-    .map((k) => `- ${detailLabel(k)}: ${formatValue(answers[k])}`);
+  const details = techDetails(answers);
   if (details.length) sections.push({ title: 'Tech Details', body: details.join('\n') });
 
   return sections;

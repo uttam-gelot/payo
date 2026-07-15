@@ -42,7 +42,30 @@ describe('buildBaseRules', () => {
       buildBaseRules({ ...contexts.tsBackend, 'tsconfig.strict': true }),
     );
     expect(md).toContain('## Tech Details');
-    expect(md).toContain('- strict: yes');
+    expect(md).toContain('- TypeScript Config / Strict mode: yes');
+  });
+
+  it('renders Python follow-up details without leaking recommended gate decisions', () => {
+    const md = renderMarkdown(
+      'G',
+      buildBaseRules({
+        ...contexts.pyBackend,
+        authApproach: 'custom-jwt',
+        'fastapi.__recommended': 'recommended',
+        'fastapi.structure': 'routers',
+        'fastapi.async': 'async',
+        'fastapi.server': 'uvicorn',
+        'custom-jwt.__recommended': 'recommended',
+        'custom-jwt.refresh': true,
+      }),
+    );
+
+    expect(md).toContain('- FastAPI / Structure: APIRouters + dependency injection');
+    expect(md).toContain('- FastAPI / Concurrency: async def endpoints');
+    expect(md).toContain('- FastAPI / ASGI server: uvicorn');
+    expect(md).toContain('- Custom JWT / Sessions / Refresh tokens: yes');
+    expect(md).not.toContain('recommended: recommended');
+    expect(md).not.toContain('__recommended');
   });
 
   it('reflects the AI-attribution choice in the Git Workflow section', () => {
@@ -98,10 +121,64 @@ describe('buildBaseRules', () => {
     expect(titles({ ...contexts.tsBackend, authApproach: 'none' })).not.toContain('Authentication');
   });
 
-  it('always includes Error Handling & Logging and Testing', () => {
-    const t = titles(contexts.tsBackend);
-    expect(t).toContain('Error Handling & Logging');
-    expect(t).toContain('Testing');
+  it('includes Error Handling & Logging by default; Testing only with test content', () => {
+    expect(titles(contexts.tsBackend)).toContain('Error Handling & Logging');
+    // No test types/runner/e2e → no fabricated Testing section.
+    expect(titles(contexts.tsBackend)).not.toContain('Testing');
+    // With test content it appears.
+    expect(titles({ ...contexts.tsBackend, testTypes: ['unit'] })).toContain('Testing');
+  });
+
+  it('detect-everything treats existing code as source of truth', () => {
+    // No API versioning prescribed, no fabricated Testing, and no logger invented.
+    const md = renderMarkdown(
+      'G',
+      buildBaseRules({
+        ...contexts.tsBackend,
+        apiArchitecture: 'rest',
+        logger: 'none',
+        testTypes: [],
+        detectEverything: true,
+      }),
+    );
+    expect(md).toContain('## API Conventions');
+    expect(md).not.toContain('/v1');
+    expect(md).not.toContain('## Testing');
+    expect(md).not.toContain('## Error Handling & Logging');
+  });
+
+  it('renders detected git branch/commit conventions in the Git Workflow section', () => {
+    const md = renderMarkdown(
+      'G',
+      buildBaseRules({
+        ...contexts.tsBackend,
+        gitWorkflow: 'standard',
+        branchNaming: 'type-slash',
+        commitConvention: 'conventional',
+      }),
+    );
+    expect(md).toContain('type-prefixed branches');
+    expect(md).toContain('Conventional Commits');
+  });
+
+  it('renders Git Workflow from detected conventions/policies even when gitWorkflow is skipped', () => {
+    // Mirrors detect-everything: gitWorkflow skipped, but conventions + safe
+    // policies are present and must still surface.
+    const md = renderMarkdown(
+      'G',
+      buildBaseRules({
+        ...contexts.tsBackend,
+        gitWorkflow: 'none',
+        branchNaming: 'kebab',
+        commitConvention: 'conventional',
+        confirmPush: true,
+        aiAttribution: false,
+      }),
+    );
+    expect(md).toContain('## Git Workflow');
+    expect(md).toContain('kebab-case');
+    expect(md).toContain('Conventional Commits');
+    expect(md).toContain('Never push to a remote without explicit confirmation');
   });
 
   it('adds the .env-read guard line only when envExampleOnly is set', () => {

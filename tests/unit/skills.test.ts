@@ -77,6 +77,39 @@ describe('selectSkills', () => {
     expect(skill(commit).staticBody!(commit)).toContain('.agents/skills/');
   });
 
+  it('api-conventions prescribes /v1 normally, documents reality under detect-everything', () => {
+    const base: Answers = { ...contexts.tsBackend, apiArchitecture: 'rest' };
+    const spec = (a: Answers) => selectSkills(a).find((s) => s.id === 'api-conventions')!;
+
+    expect(spec(base).buildPrompt(base)).toContain('/v1');
+
+    const detect: Answers = { ...base, detectEverything: true };
+    const prompt = spec(detect).buildPrompt(detect);
+    expect(prompt).not.toContain('/v1');
+    expect(prompt).toContain('versioning scheme IF');
+    expect(prompt.toLowerCase()).toContain('do not');
+  });
+
+  it('applies git-workflow when conventions/policies are set but gitWorkflow is skipped', () => {
+    expect(ids({ ...contexts.tsBackend, gitWorkflow: 'none' })).not.toContain('git-workflow');
+    expect(ids({ ...contexts.tsBackend, branchNaming: 'kebab' })).toContain('git-workflow');
+    expect(ids({ ...contexts.tsBackend, confirmPush: true })).toContain('git-workflow');
+  });
+
+  it('git-workflow prompt includes detected branch/commit conventions', () => {
+    const a: Answers = {
+      ...contexts.tsBackend,
+      gitWorkflow: 'standard',
+      branchNaming: 'type-slash',
+      commitConvention: 'conventional',
+    };
+    const prompt = selectSkills(a)
+      .find((s) => s.id === 'git-workflow')!
+      .buildPrompt(a);
+    expect(prompt).toContain('type-prefixed branches');
+    expect(prompt).toContain('Conventional Commits');
+  });
+
   it('adds .env-read guidance to coding-standards when envExampleOnly is set', () => {
     const a: Answers = { ...contexts.tsBackend, envExampleOnly: true };
     const skill = selectSkills(a).find((s) => s.id === 'coding-standards');

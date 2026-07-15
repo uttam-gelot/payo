@@ -44,6 +44,8 @@ export const TIER2: ReadonlySet<string> = new Set([
   'codingStandards',
   'documentation',
   'gitWorkflow',
+  'branchNaming',
+  'commitConvention',
   'aiAttribution',
   'commitScope',
   'commitScratchGuard',
@@ -55,11 +57,14 @@ export const TIER2: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Tier-2 convention ids Stage 2 is allowed to infer in "everything" mode. Kept
- * deliberately narrow: only conventions a directory tree can show (e.g. monorepo
- * `structure`) belong here. Git/commit policy and pure-intent conventions stay
- * manual — the git log is never sent (see §10). Extend as new tree-inferable
- * convention questions land.
+ * Tier-2 convention ids Stage 2 (the LLM) is allowed to infer in "everything"
+ * mode. Kept deliberately narrow: only conventions a directory tree can show
+ * (e.g. monorepo `structure`) belong here. Pure-intent conventions stay manual.
+ *
+ * Note `branchNaming` / `commitConvention` are NOT here: they are inferred by a
+ * deterministic Stage-1 pass (`detectGit`) that parses local git history on the
+ * machine. That data is never placed in the LLM prompt — the git log is still
+ * never sent (see §10) — so the privacy stance is unchanged.
  */
 export const TIER2_HINTABLE: readonly string[] = ['structure'];
 

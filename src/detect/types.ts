@@ -14,6 +14,7 @@ export type DetectionSource =
   | 'Gemfile'
   | 'lockfile'
   | 'config'
+  | 'git'
   | 'llm';
 
 /** One workspace member's detected stack, for the monorepo generator notes. */
