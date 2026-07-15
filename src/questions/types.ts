@@ -44,6 +44,13 @@ export interface Question {
    * `hint: 'recommended'`; this field overrides that when set.
    */
   recommended?: string | string[] | boolean;
+  /**
+   * "Detect everything" only: keep the recommended default even when the question
+   * was not detected. Marks a safe assistant-behavior policy (e.g. confirm-before-push)
+   * rather than a code-derived project fact — undetected facts are skipped instead of
+   * fabricated, but these policies are applied (and surfaced explicitly to the user).
+   */
+  policyDefault?: boolean;
 }
 
 /** Yields zero or more questions given current answers. Unit of composition. */

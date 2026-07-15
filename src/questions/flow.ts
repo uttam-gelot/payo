@@ -131,6 +131,9 @@ const core: Record<string, Question> = {
     message: 'Coding standards?',
     options: opt.codingStandardOptions,
     required: true,
+    // Safe assistant-behavior policy — applied in detect-everything even when the
+    // codebase does not advertise it. See Question.policyDefault.
+    policyDefault: true,
   },
   documentation: {
     id: 'documentation',
@@ -167,6 +170,7 @@ const core: Record<string, Question> = {
     summary: 'AI attribution in commits/PRs',
     message: 'Mention the AI assistant (e.g. a Co-Authored-By trailer) in commits and PRs?',
     recommended: false,
+    policyDefault: true,
   },
   commitScope: {
     id: 'commitScope',
@@ -174,6 +178,7 @@ const core: Record<string, Question> = {
     summary: 'Task-scoped commits',
     message: 'Limit each commit to changes for the task at hand, excluding unrelated edits?',
     recommended: true,
+    policyDefault: true,
   },
   commitScratchGuard: {
     id: 'commitScratchGuard',
@@ -182,6 +187,7 @@ const core: Record<string, Question> = {
     message:
       'Ask before committing scratch files (e.g. .md or .html notes created only for planning, R&D, or local use)?',
     recommended: true,
+    policyDefault: true,
   },
   confirmPush: {
     id: 'confirmPush',
@@ -189,6 +195,7 @@ const core: Record<string, Question> = {
     summary: 'Confirm before push',
     message: 'Ask before pushing to a remote (never push automatically)?',
     recommended: true,
+    policyDefault: true,
   },
   verifyTiming: {
     id: 'verifyTiming',
@@ -197,6 +204,7 @@ const core: Record<string, Question> = {
     message: 'When should the formatter, linter, and tests run (and pass) in the git workflow?',
     options: opt.verifyTimingOptions,
     allowOther: false,
+    policyDefault: true,
   },
   atomicCommits: {
     id: 'atomicCommits',
@@ -204,6 +212,7 @@ const core: Record<string, Question> = {
     summary: 'Atomic commits',
     message: 'Keep commits small and atomic (one logical change each)?',
     recommended: true,
+    policyDefault: true,
   },
   envExampleOnly: {
     id: 'envExampleOnly',
@@ -212,6 +221,7 @@ const core: Record<string, Question> = {
     message:
       'Forbid the assistant from reading the real .env, requiring it to work from .env.example instead?',
     recommended: true,
+    policyDefault: true,
   },
   logger: {
     id: 'logger',

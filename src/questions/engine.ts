@@ -345,16 +345,26 @@ export async function runFlow(
         const plan = planRecommended(section, session);
         const hasRecommended = !!plan && plan.length > 0;
 
-        // Auto mode: settle the whole group to recommended-or-skip, no prompt.
-        // Record the gate decision as 'recommended' so the review's edit list can
-        // still re-open the section. planSkip already covers every askable
-        // question; overlay recommended values where a default exists.
+        // Auto mode ("detect everything"): settle the whole group with no prompt,
+        // treating the code as the source of truth. Detected facts are already
+        // answered and untouched. For the rest: keep the recommended default ONLY
+        // for questions marked `policyDefault` (safe assistant-behavior policies);
+        // every other undetected question is skipped, never fabricated. The gate
+        // decision reflects whether any default was kept, so the review edit list
+        // still re-opens the section.
         if (opts.autoRecommendGates) {
-          session = recordAnswer(session, gate.id, 'recommended');
           const recommended = new Map(plan?.map((p) => [p.question.id, p.value]));
+          let keptPolicy = false;
           for (const { question, value } of skipPlan) {
-            session = recordAnswer(session, question.id, recommended.get(question.id) ?? value);
+            const usePolicy = question.policyDefault === true && recommended.has(question.id);
+            if (usePolicy) keptPolicy = true;
+            session = recordAnswer(
+              session,
+              question.id,
+              usePolicy ? recommended.get(question.id)! : value,
+            );
           }
+          session = recordAnswer(session, gate.id, keptPolicy ? 'recommended' : 'skip');
           continue;
         }
 
