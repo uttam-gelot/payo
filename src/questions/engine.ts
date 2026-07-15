@@ -198,6 +198,20 @@ export function forgetSection(flow: FlowSection[], session: Session, gateId: str
   return forgetAnswers(session, [...ids, gateId]);
 }
 
+/** The active recommendable-section gate that owns a question id, if any. */
+function owningGate(
+  flow: FlowSection[],
+  answers: Answers,
+  questionId: string,
+): { id: string; title: string } | null {
+  for (const section of flow) {
+    const gate = activeGate(section, answers);
+    if (!gate) continue;
+    if (section.questions(answers).some((q) => q.id === questionId)) return gate;
+  }
+  return null;
+}
+
 /** The live Question for an id, projected against current answers (questions are dynamic). */
 export function findQuestion(
   flow: FlowSection[],
@@ -295,7 +309,9 @@ export async function reviewAndEdit(
     } else {
       const q = findQuestion(flow, session.answers, id);
       if (!q) continue;
+      const gate = owningGate(flow, session.answers, q.id);
       session = recordAnswer(session, id, await runQuestion(q, session.answers));
+      if (gate) session = recordAnswer(session, gate.id, 'customize');
     }
     session = reconcile(flow, session);
     session = await runFlow(flow, session);

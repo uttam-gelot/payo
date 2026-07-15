@@ -116,6 +116,29 @@ describe('reviewAndEdit', () => {
     expect(out.answers.authApproach).toBe('authjs'); // recommended value, no longer 'none'
   });
 
+  it('marks a recommended section customized when one of its answers is edited', async () => {
+    actions = ['edit', 'generate'];
+    editPicks = ['testTypes'];
+    scripted = {
+      testTypes: ['unit', 'e2e'],
+      e2eTool: 'cypress',
+    };
+
+    const out = await reviewAndEdit(
+      flow,
+      freshSession({
+        ...seed(),
+        'testing.__recommended': 'recommended',
+      }),
+      prompts,
+    );
+
+    expect(out.answers['testing.__recommended']).toBe('customize');
+    expect(out.answers.testTypes).toEqual(['unit', 'e2e']);
+    expect(asked).toContain('e2eTool');
+    expect(out.answers.e2eTool).toBe('cypress');
+  });
+
   it('treats Back as a no-op and returns unchanged on the next Generate', async () => {
     actions = ['edit', 'generate'];
     editPicks = [undefined]; // ← Back
