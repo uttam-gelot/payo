@@ -25,7 +25,7 @@ export function resolveOptions(q: Question, a: Answers): Option<string>[] {
   return hoistRecommended(q.optionsFrom ? q.optionsFrom(a) : (q.options ?? []));
 }
 
-/** Whether to append an "Other (specify)" choice — on by default, opt out with `allowOther: false`. */
+/** Whether to append a "Custom" (specify-your-own) choice — on by default, opt out with `allowOther: false`. */
 export function offersOther(q: Question, options: Option<string>[]): boolean {
   if (q.allowOther === false) return false;
   return !options.some((o) => o.value === 'other' || o.value === 'custom');
@@ -34,7 +34,7 @@ export function offersOther(q: Question, options: Option<string>[]): boolean {
 async function runSelect(q: Question, a: Answers): Promise<string> {
   const options = resolveOptions(q, a);
   const finalOptions = offersOther(q, options)
-    ? [...options, { value: OTHER, label: 'Other (specify)' }]
+    ? [...options, { value: OTHER, label: 'Custom' }]
     : options;
 
   // Pre-select a seeded/prior value when it is a valid option (e.g. a detected
@@ -93,7 +93,7 @@ export function multiselectSeed(prior: unknown, options: Option<string>[]): stri
 async function runMultiselect(q: Question, a: Answers): Promise<string[]> {
   const options = resolveOptions(q, a);
   const finalOptions = offersOther(q, options)
-    ? [...options, { value: OTHER, label: 'Other (specify)' }]
+    ? [...options, { value: OTHER, label: 'Custom' }]
     : options;
 
   // A stored answer wins; otherwise a question-supplied dynamic default seeds the
@@ -215,11 +215,15 @@ export async function confirmDetectionDepth(
     message: 'How much should payo detect?',
     options: [
       {
+        value: 'partial',
+        label: 'Just the high-level stack — answer conventions yourself',
+        hint: 'recommended',
+      },
+      {
         value: 'everything',
         label:
           'Detect everything — use the code, structure & git history as the source of truth; skip what is not found',
       },
-      { value: 'partial', label: 'Just the high-level stack — answer conventions yourself' },
     ],
   });
   guardCancel(value);
@@ -258,7 +262,7 @@ export async function confirmResume(answeredCount: number): Promise<boolean> {
  */
 type SelectPrompt = (opts: {
   message: string;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; hint?: string }[];
 }) => Promise<string | symbol>;
 
 /** Review-screen choice: generate now, or edit a prior answer first. */

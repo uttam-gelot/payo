@@ -22,7 +22,7 @@ export interface Question {
   /** Skip this question when it returns false. */
   when?: (a: Answers) => boolean;
   /**
-   * Append an "Other (specify)" choice to a select/multiselect. Defaults to on;
+   * Append a "Custom" (specify-your-own) choice to a select/multiselect. Defaults to on;
    * set `false` only to force a closed set. (Ignored for confirm/text.)
    */
   allowOther?: boolean;

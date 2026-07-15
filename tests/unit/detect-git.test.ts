@@ -35,9 +35,9 @@ describe('classifyCommits', () => {
     ).toBe('conventional');
   });
 
-  it('detects gitmoji', () => {
+  it('classifies gitmoji commits as freeform (no gitmoji convention)', () => {
     expect(classifyCommits([':sparkles: add login', ':bug: fix crash', '✨ new thing'])).toBe(
-      'gitmoji',
+      'freeform',
     );
   });
 

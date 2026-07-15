@@ -11,6 +11,7 @@ import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { note } from '@clack/prompts';
+import pkg from '../../package.json';
 
 const useColor = process.stdout.isTTY && process.env.NO_COLOR === undefined;
 
@@ -80,7 +81,9 @@ function kittyImage(png: Buffer): string {
   let out = '';
   chunks.forEach((chunk, i) => {
     const more = i < chunks.length - 1 ? 1 : 0;
-    const control = i === 0 ? `a=T,f=100,c=${LOGO_COLS},r=${rows},m=${more}` : `m=${more}`;
+    // C=1 pins the cursor (some terminals, e.g. Ghostty, otherwise advance it
+    // below the image — then the trailing newlines below would double the gap).
+    const control = i === 0 ? `a=T,f=100,c=${LOGO_COLS},r=${rows},C=1,m=${more}` : `m=${more}`;
     out += `\x1b_G${control};${chunk}\x1b\\`;
   });
   return out + '\n'.repeat(rows);
@@ -104,7 +107,9 @@ function imageLogo(): string | null {
  */
 function asciiLogo(): string | null {
   try {
-    return readFileSync(assetPath('logo.ans'), 'utf8');
+    // Collapse the asset's trailing blank line(s) so the logo sits flush
+    // against the welcome note (console.log adds the one separating newline).
+    return readFileSync(assetPath('logo.ans'), 'utf8').replace(/\s*$/, '');
   } catch {
     return null;
   }
@@ -112,6 +117,8 @@ function asciiLogo(): string | null {
 
 /** One-line summary plus the controls the user can rely on during a run. */
 const DESCRIPTION = [
+  `payo v${pkg.version}`,
+  '',
   'payo generates Agent Skills tailored to your stack — one universal layout',
   '(AGENTS.md + .agents/skills) that works across Claude Code, Codex, Cursor,',
   'Copilot, Gemini, Antigravity & Windsurf. Write once, use in every agent.',
@@ -129,7 +136,7 @@ export function printBanner(): void {
   if (useColor) {
     const art = imageLogo() ?? asciiLogo();
     // eslint-disable-next-line no-console
-    if (art) console.log(`\n${art}`);
+    if (art) console.log(art);
   }
   note(DESCRIPTION, 'Welcome to payo');
 }

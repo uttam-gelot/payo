@@ -16,6 +16,12 @@ export interface SkillSpec {
    * whether to load the skill, so it must read as a trigger, not a title.
    */
   description: string;
+  /**
+   * Optional answer-dependent override for `description`. When present, its
+   * result replaces `description` at selection time (see `selectSkills`), so
+   * frontmatter and the AGENTS index reflect the chosen answers, not a default.
+   */
+  describe?(a: Answers): string;
   /** Whether this skill applies to the current answers. */
   appliesTo(a: Answers): boolean;
   /** Task instruction for the agent (project context is added by the caller). */
@@ -65,7 +71,6 @@ const BRANCH_NAMING_DESC: Record<string, string> = {
 /** Prose describing a commit-message answer; falls back to a custom (Other) value. */
 const COMMIT_CONVENTION_DESC: Record<string, string> = {
   conventional: 'Conventional Commits (type(scope): description)',
-  gitmoji: 'gitmoji-prefixed commit messages (e.g. :sparkles: description)',
   ticket: 'ticket-prefixed commit messages (e.g. ABC-123: description)',
   freeform: 'free-form commit messages',
   none: 'no enforced commit-message convention',
@@ -371,8 +376,11 @@ const skills: SkillSpec[] = [
     id: 'change-audit',
     title: 'Change Audit',
     description:
-      'Use right before committing or pushing to check the pending change against this ' +
+      'Use right before pushing to a remote to check the pending change against this ' +
       "project's skills and report any that conflict.",
+    describe: (a): string =>
+      `Use right before ${auditGerund(auditTiming(a))} to check the pending change against ` +
+      "this project's skills and report any that conflict.",
     appliesTo: (a) => a.auditSkill === true,
     buildPrompt: (a): string => {
       const timing = auditTiming(a);
@@ -397,9 +405,9 @@ const skills: SkillSpec[] = [
   },
 ];
 
-/** Audit timing answer, defaulting to 'commit' when unset. */
+/** Audit timing answer, defaulting to 'push' (the recommended timing) when unset. */
 function auditTiming(a: Answers): 'commit' | 'push' {
-  return a.auditTiming === 'push' ? 'push' : 'commit';
+  return a.auditTiming === 'commit' ? 'commit' : 'push';
 }
 
 /** Gerund phrase for prose ("committing" / "pushing to a remote"). */
@@ -425,5 +433,7 @@ function auditStaticBody(timing: 'commit' | 'push'): string {
 
 /** The skills that apply to the current answers, in declared order. */
 export function selectSkills(a: Answers): SkillSpec[] {
-  return skills.filter((s) => s.appliesTo(a));
+  return skills
+    .filter((s) => s.appliesTo(a))
+    .map((s) => (s.describe ? { ...s, description: s.describe(a) } : s));
 }
