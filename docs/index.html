@@ -86,7 +86,7 @@
       {
         "@type": "Question",
         "name": "Does Payo work on an existing project?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Payo detects your stack from what's already in the repo — manifests like package.json, pyproject.toml, go.mod, Cargo.toml, composer.json, *.csproj, pom.xml, build.gradle and Gemfile, plus lockfiles, tool configs, and folder layout — across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby, then pre-fills the questionnaire. Choose Detect everything and it fills the whole config with no per-question prompts, so you just review and edit the summary before generating." }
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Payo detects your stack from what's already in the repo — manifests like package.json, pyproject.toml, go.mod, Cargo.toml, composer.json, *.csproj, pom.xml, build.gradle and Gemfile, plus lockfiles, tool configs, and folder layout — across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby, then pre-fills the questionnaire. Choose Detect everything and it uses your code, folder structure, and git history as the source of truth — recording what it finds (branch-naming and commit conventions included) and skipping what it can't — so you just review the summary before generating." }
       },
       {
         "@type": "Question",
@@ -472,8 +472,9 @@
           <strong>reads what's already there</strong> — <code>package.json</code>, <code>pyproject.toml</code>,
           <code>go.mod</code>, <code>Cargo.toml</code>, <code>composer.json</code>, <code>*.csproj</code>, <code>pom.xml</code>, <code>build.gradle</code>, <code>Gemfile</code>, lockfiles, tool configs, and your folder layout — to detect
           your stack across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby, then pre-fills the questionnaire.
-          Pick <strong>Detect everything</strong> and Payo fills the whole config — stack and conventions — with no
-          question-by-question prompts, so you land straight on the review screen and edit anything that's off before generating.
+          Pick <strong>Detect everything</strong> and Payo treats your code, folder structure, and git history as the
+          source of truth — recording exactly what it finds (including your branch-naming and commit conventions) and
+          skipping anything it can't, with no question-by-question prompts. You land straight on the review screen and confirm.
           <strong>Monorepos</strong> are detected too: it enumerates workspace members (pnpm, Cargo, <code>go.work</code>,
           Maven / Gradle…), reads each package's stack, and adds a Workspace Packages list plus monorepo conventions to the
           generated guidance. You review a summary and tweak — no typing it all out.
@@ -530,7 +531,7 @@
         </details>
         <details>
           <summary>Does Payo work on an existing project?</summary>
-          <p>Yes. Payo detects your stack from what's already in the repo — manifests (<code>package.json</code>, <code>pyproject.toml</code>, <code>go.mod</code>, <code>Cargo.toml</code>, <code>composer.json</code>, <code>*.csproj</code>, <code>pom.xml</code>, <code>build.gradle</code>, <code>Gemfile</code>), lockfiles, tool configs, and folder layout — across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby, then pre-fills the questionnaire. Choose <strong>Detect everything</strong> and it fills the whole config with no per-question prompts — you just review and edit the summary before generating.</p>
+          <p>Yes. Payo detects your stack from what's already in the repo — manifests (<code>package.json</code>, <code>pyproject.toml</code>, <code>go.mod</code>, <code>Cargo.toml</code>, <code>composer.json</code>, <code>*.csproj</code>, <code>pom.xml</code>, <code>build.gradle</code>, <code>Gemfile</code>), lockfiles, tool configs, and folder layout — across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby, then pre-fills the questionnaire. Choose <strong>Detect everything</strong> and it uses your code, folder structure, and git history as the source of truth — recording what it finds (branch-naming and commit conventions included) and skipping what it can't — so you just review the summary before generating.</p>
         </details>
         <details>
           <summary>Does Payo support monorepos?</summary>
