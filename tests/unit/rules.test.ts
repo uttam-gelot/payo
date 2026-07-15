@@ -161,6 +161,26 @@ describe('buildBaseRules', () => {
     expect(md).toContain('Conventional Commits');
   });
 
+  it('renders Git Workflow from detected conventions/policies even when gitWorkflow is skipped', () => {
+    // Mirrors detect-everything: gitWorkflow skipped, but conventions + safe
+    // policies are present and must still surface.
+    const md = renderMarkdown(
+      'G',
+      buildBaseRules({
+        ...contexts.tsBackend,
+        gitWorkflow: 'none',
+        branchNaming: 'kebab',
+        commitConvention: 'conventional',
+        confirmPush: true,
+        aiAttribution: false,
+      }),
+    );
+    expect(md).toContain('## Git Workflow');
+    expect(md).toContain('kebab-case');
+    expect(md).toContain('Conventional Commits');
+    expect(md).toContain('Never push to a remote without explicit confirmation');
+  });
+
   it('adds the .env-read guard line only when envExampleOnly is set', () => {
     const guard = 'Never read or open the real .env file';
     const on = renderMarkdown(

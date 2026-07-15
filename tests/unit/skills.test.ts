@@ -90,6 +90,12 @@ describe('selectSkills', () => {
     expect(prompt.toLowerCase()).toContain('do not');
   });
 
+  it('applies git-workflow when conventions/policies are set but gitWorkflow is skipped', () => {
+    expect(ids({ ...contexts.tsBackend, gitWorkflow: 'none' })).not.toContain('git-workflow');
+    expect(ids({ ...contexts.tsBackend, branchNaming: 'kebab' })).toContain('git-workflow');
+    expect(ids({ ...contexts.tsBackend, confirmPush: true })).toContain('git-workflow');
+  });
+
   it('git-workflow prompt includes detected branch/commit conventions', () => {
     const a: Answers = {
       ...contexts.tsBackend,

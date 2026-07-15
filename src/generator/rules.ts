@@ -325,18 +325,33 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
   if (lint) tooling.push(`- Linter: ${lint}`);
   if (tooling.length) sections.push({ title: 'Tooling', body: tooling.join('\n') });
 
+  // Render Git Workflow whenever there is any git content — a chosen workflow,
+  // detected branch/commit conventions, or a kept hygiene policy. In detect-
+  // everything the workflow question is skipped, but detected conventions and the
+  // safe policies must still surface, so the section can't hinge on gitWorkflow.
   const git = str(answers, 'gitWorkflow');
-  if (git) {
+  const branch = str(answers, 'branchNaming');
+  const commit = str(answers, 'commitConvention');
+  const gitContent =
+    !!git ||
+    !!branch ||
+    !!commit ||
+    typeof answers.aiAttribution === 'boolean' ||
+    answers.commitScope === true ||
+    answers.commitScratchGuard === true ||
+    answers.confirmPush === true ||
+    answers.verifyTiming === 'commit' ||
+    answers.verifyTiming === 'push' ||
+    answers.atomicCommits === true;
+  if (gitContent) {
     const lines = [
-      `Follow the ${git} workflow.`,
+      git ? `Follow the ${git} workflow.` : 'Follow this project’s git conventions.',
       '- Maintain a comprehensive .gitignore (build output, dependencies, environment/secret files, OS/editor artifacts).',
     ];
-    const branch = str(answers, 'branchNaming');
     if (branch)
       lines.push(
         `- Name branches using ${BRANCH_NAMING_DESC[branch] ?? `the "${branch}" convention`}.`,
       );
-    const commit = str(answers, 'commitConvention');
     if (commit)
       lines.push(
         `- Write commit messages using ${COMMIT_CONVENTION_DESC[commit] ?? `the "${commit}" convention`}.`,

@@ -322,7 +322,20 @@ const skills: SkillSpec[] = [
     title: 'Git Workflow',
     description:
       'Branching, commit message conventions, PR practices, and .gitignore hygiene for this workflow.',
-    appliesTo: (a) => has(a, 'gitWorkflow'),
+    // Apply whenever there is git content to document: a chosen workflow, detected
+    // branch/commit conventions, or a kept hygiene policy (detect-everything skips
+    // the workflow question but still carries conventions and safe policies).
+    appliesTo: (a) =>
+      has(a, 'gitWorkflow') ||
+      has(a, 'branchNaming') ||
+      has(a, 'commitConvention') ||
+      typeof a.aiAttribution === 'boolean' ||
+      a.commitScope === true ||
+      a.commitScratchGuard === true ||
+      a.confirmPush === true ||
+      a.verifyTiming === 'commit' ||
+      a.verifyTiming === 'push' ||
+      a.atomicCommits === true,
     buildPrompt: (a): string => {
       const wf = val(a, 'gitWorkflow');
       let base =
