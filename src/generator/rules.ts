@@ -132,6 +132,8 @@ function packageLine(p: PackageSummary): string {
   if (p.framework && p.framework !== 'none') stack.push(p.framework);
   let line = `- \`${p.path}\``;
   if (stack.length) line += ` — ${stack.join(' / ')}`;
+  // A collapsed nested workspace renders as one line for all its members.
+  if (typeof p.memberCount === 'number') line += ` workspace (${p.memberCount} packages)`;
   if (p.projectType) line += ` (${p.projectType})`;
   if (p.database && p.database !== 'none') line += `, ${p.database}`;
   return line;
@@ -184,6 +186,21 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
   };
   push('Project type', 'projectType');
   push('Language', 'language');
+  // A hybrid repo's other stacks (React app + Rust backend) — rendered with the
+  // member dirs that carry each language so the doc says where they live.
+  const secondary = answers.secondaryLanguages;
+  if (Array.isArray(secondary) && secondary.length > 0) {
+    const pkgs = Array.isArray(answers.monorepoPackages)
+      ? (answers.monorepoPackages as PackageSummary[])
+      : [];
+    const labels = secondary
+      .filter((s): s is string => typeof s === 'string')
+      .map((lang) => {
+        const where = pkgs.filter((p) => p?.language === lang).map((p) => p.path);
+        return where.length > 0 ? `${lang} (${where.join(', ')})` : lang;
+      });
+    if (labels.length > 0) stack.push(`- Additional languages: ${labels.join(', ')}`);
+  }
   push('Runtime', 'runtime');
   push('Package manager', 'packageManager');
   push('Framework', 'framework');

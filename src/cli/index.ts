@@ -6,6 +6,7 @@ import {
   recordAnswer,
   recordGenerated,
   seedDetected,
+  forgetAnswer,
   cleanupWorkspace,
   type Session,
 } from '../state/index';
@@ -22,7 +23,7 @@ import {
 import { findLegacyArtifacts, removeLegacyArtifacts } from '../generator/legacy';
 import { detectStack } from '../detect/index';
 import { scanExistingAiConfigs, detectAiTool } from '../detect/aiconfig';
-import { llmDetect, willLlmDetectRun } from '../detect/llm';
+import { llmDetect, willLlmDetectRun, type LlmDetection } from '../detect/llm';
 import { splitByTier } from '../detect/tiers';
 import { runFlow, reviewAndEdit, findQuestion, reconcile } from '../questions/engine';
 import { flow } from '../questions/flow';
@@ -122,7 +123,7 @@ export async function run(): Promise<void> {
         // Stage 2 — LLM pass over the chosen agent (additive; static-only fallback).
         const aiTool =
           typeof session.answers.aiTool === 'string' ? session.answers.aiTool : undefined;
-        let result = detected;
+        let result: LlmDetection = detected;
         // Only spin when the pass will actually run — otherwise the spinner lies
         // ("Analysis complete") on the common no-agent / nothing-to-fill path.
         if (willLlmDetectRun(detected, aiTool, depth)) {
@@ -186,6 +187,36 @@ export async function run(): Promise<void> {
         // Not a Question, so it never surfaces as an editable review line.
         if (result.packages && result.packages.length > 0) {
           session = recordAnswer(session, 'monorepoPackages', result.packages);
+        }
+        // Same for the extra languages of a hybrid repo (React app + Rust
+        // backend): the interview covers the primary stack only, but the
+        // generated docs must not pretend the other stacks don't exist.
+        if (result.secondary && result.secondary.length > 0) {
+          session = recordAnswer(session, 'secondaryLanguages', result.secondary);
+        }
+
+        // Stage-2 conflicts: the agent found evidence contradicting a Stage-1
+        // answer. Never silently overridden — in partial mode the answer is
+        // demoted from recorded to seeded (the interview re-asks it with the
+        // suggestion pre-selected); in "everything" mode the Stage-1 value
+        // stays and the note points the user at the review screen.
+        const conflicts = 'conflicts' in result ? (result.conflicts ?? []) : [];
+        if (conflicts.length > 0) {
+          note(
+            conflicts
+              .map(
+                (c) =>
+                  `• ${c.id}: detected "${String(result.answers[c.id])}", project evidence suggests "${c.suggested}"${c.evidence ? ` — ${c.evidence}` : ''}`,
+              )
+              .join('\n'),
+            'Detection conflicts — confirm at review',
+          );
+          if (depth !== 'everything') {
+            for (const c of conflicts) {
+              session = forgetAnswer(session, c.id);
+              session = seedDetected(session, { [c.id]: c.suggested });
+            }
+          }
         }
 
         // Detectors seed facts independent of project shape (e.g. a styling lib

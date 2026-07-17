@@ -257,3 +257,37 @@ describe('renderMarkdown', () => {
     expect(md).toContain('## A');
   });
 });
+
+describe('hybrid repo rendering', () => {
+  it('Tech Stack lists additional languages with the dirs that carry them', () => {
+    const answers: Answers = {
+      projectType: 'full-stack',
+      language: 'typescript',
+      secondaryLanguages: ['rust'],
+      monorepoPackages: [
+        { path: 'admin-frontend', language: 'typescript', framework: 'react' },
+        { path: 'services', language: 'rust', memberCount: 8 },
+      ],
+    };
+    const md = renderMarkdown('Rules', buildBaseRules(answers));
+    expect(md).toContain('- Additional languages: rust (services)');
+  });
+
+  it('renders a collapsed nested-workspace package line', () => {
+    const answers: Answers = {
+      language: 'typescript',
+      structure: 'monorepo',
+      monorepoPackages: [
+        { path: 'admin-frontend', language: 'typescript', framework: 'react' },
+        { path: 'services', language: 'rust', memberCount: 8 },
+      ],
+    };
+    const md = renderMarkdown('Rules', buildBaseRules(answers));
+    expect(md).toContain('`services` — rust workspace (8 packages)');
+  });
+
+  it('omits the additional-languages line when there are none', () => {
+    const md = renderMarkdown('Rules', buildBaseRules({ language: 'typescript' } as Answers));
+    expect(md).not.toContain('Additional languages');
+  });
+});
