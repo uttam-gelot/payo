@@ -155,3 +155,105 @@ describe('willLlmDetectRun', () => {
     expect(willLlmDetectRun(full, 'claude', 'everything', deps({}))).toBe(false);
   });
 });
+
+describe('llmDetect — __conflicts channel', () => {
+  it('keeps a well-formed conflict against a Stage-1 answer', async () => {
+    const res = await llmDetect(
+      base(),
+      'claude',
+      'partial',
+      '/tmp',
+      deps({
+        database: 'postgresql',
+        __conflicts: [
+          { id: 'projectType', suggested: 'backend', evidence: 'README: Rust Lambda backend' },
+        ],
+      }),
+    );
+    expect(res.conflicts).toEqual([
+      { id: 'projectType', suggested: 'backend', evidence: 'README: Rust Lambda backend' },
+    ]);
+    // The conflicting id itself is NOT overridden.
+    expect(res.answers.projectType).toBe('full-stack');
+  });
+
+  it('drops conflicts for unknown ids, off-vocab suggestions, and same-as-current values', async () => {
+    const res = await llmDetect(
+      base(),
+      'claude',
+      'partial',
+      '/tmp',
+      deps({
+        database: 'postgresql',
+        __conflicts: [
+          { id: 'database', suggested: 'mysql', evidence: 'not answered by Stage 1' },
+          { id: 'projectType', suggested: 'bogus-type', evidence: 'off vocab' },
+          { id: 'projectType', suggested: 'full-stack', evidence: 'same as current' },
+        ],
+      }),
+    );
+    expect(res.conflicts).toBeUndefined();
+  });
+
+  it('caps conflicts at 5 and de-duplicates by id', async () => {
+    const conflictOptions = ['backend', 'frontend', 'cli', 'script', 'library'];
+    const spam = Array.from({ length: 12 }, (_, i) => ({
+      id: 'projectType',
+      suggested: conflictOptions[i % conflictOptions.length],
+      evidence: `n${i}`,
+    }));
+    const res = await llmDetect(
+      base(),
+      'claude',
+      'partial',
+      '/tmp',
+      deps({ database: 'postgresql', __conflicts: spam }),
+    );
+    expect(res.conflicts).toHaveLength(1); // one id → one conflict, rest deduped
+  });
+
+  it('truncates evidence and tolerates malformed entries', async () => {
+    const res = await llmDetect(
+      base(),
+      'claude',
+      'partial',
+      '/tmp',
+      deps({
+        database: 'postgresql',
+        __conflicts: [
+          null,
+          'garbage',
+          { id: 42 },
+          { id: 'projectType', suggested: 'backend', evidence: 'e'.repeat(500) },
+        ],
+      }),
+    );
+    expect(res.conflicts).toHaveLength(1);
+    expect(res.conflicts![0].evidence.length).toBe(200);
+  });
+
+  it('conflicts alone (no fills) still come back', async () => {
+    const res = await llmDetect(
+      base(),
+      'claude',
+      'partial',
+      '/tmp',
+      deps({
+        __conflicts: [{ id: 'projectType', suggested: 'backend', evidence: 'docs' }],
+      }),
+    );
+    expect(res.conflicts).toHaveLength(1);
+  });
+
+  it('preserves a monorepo base: packages and secondary survive the Stage-2 merge', async () => {
+    const mono: DetectionResult = {
+      ...base(),
+      packages: [{ path: 'services', language: 'rust' }],
+      secondary: ['rust'],
+    };
+    const res = await llmDetect(mono, 'claude', 'partial', '/tmp', deps({ database: 'postgresql' }));
+    expect(res.answers.database).toBe('postgresql');
+    expect(res.packages).toEqual([{ path: 'services', language: 'rust' }]);
+    expect(res.secondary).toEqual(['rust']);
+  });
+});

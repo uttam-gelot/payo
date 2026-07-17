@@ -78,28 +78,80 @@ describe('buildPrompt', () => {
     );
   });
 
-  it('M3: sends the manifest matching Stage 1’s ecosystem, not always package.json', () => {
+  it('M3: sends every root manifest, labeled — a polyglot root is not collapsed', () => {
     withProject(
       {
         'package.json': '{"name":"tooling-only","devDependencies":{"prettier":"3"}}',
         'pyproject.toml': '[project]\nname = "svc"\ndependencies = ["fastapi"]',
       },
       (dir) => {
-        // Stage 1 chose Python; a stray package.json exists for tooling.
+        // Stage 1 chose Python; a package.json also exists for tooling. Both go.
         const base: DetectionResult = { answers: { language: 'python' }, sources: {} };
         const prompt = buildPrompt(dir, ['framework'], base);
-        expect(prompt).toContain('Manifest (pyproject.toml)');
-        expect(prompt).toContain('fastapi'); // python manifest body sent
-        expect(prompt).not.toContain('tooling-only'); // node manifest NOT sent
+        expect(prompt).toContain('## Manifest: pyproject.toml');
+        expect(prompt).toContain('fastapi');
+        expect(prompt).toContain('## Manifest: package.json');
+        expect(prompt).toContain('tooling-only');
       },
     );
   });
 
-  it('M3: falls back to the priority list when Stage 1 found no language', () => {
-    withProject({ 'package.json': '{"name":"acme"}' }, (dir) => {
+  it('sends a distinct-language workspace root manifest alongside the root ones', () => {
+    withProject(
+      {
+        'package.json': '{"name":"acme","workspaces":["app"]}',
+        'services/Cargo.toml': '[workspace]\nmembers = ["api"]',
+      },
+      (dir) => {
+        const base: DetectionResult = {
+          answers: { language: 'typescript' },
+          sources: {},
+          packages: [
+            { path: 'app', language: 'typescript' },
+            { path: 'services', language: 'rust' },
+          ],
+        };
+        const prompt = buildPrompt(dir, ['database'], base);
+        expect(prompt).toContain('## Manifest: services/Cargo.toml');
+        expect(prompt).toContain('[workspace]');
+      },
+    );
+  });
+
+  it('caps each manifest body and marks the truncation', () => {
+    withProject({ 'package.json': `{"name":"big","pad":"${'x'.repeat(9000)}"}` }, (dir) => {
       const prompt = buildPrompt(dir, ['framework'], { answers: {}, sources: {} });
-      expect(prompt).toContain('Manifest (package.json)');
-      expect(prompt).toContain('"acme"');
+      expect(prompt).toContain('…(truncated)');
+      expect(prompt).not.toContain('x'.repeat(7000));
+    });
+  });
+
+  it('includes fenced docs excerpts when a README exists', () => {
+    withProject(
+      {
+        'package.json': '{"name":"acme"}',
+        'README.md': '# Acme\nRust-based AWS Lambda backend with a React admin frontend.',
+      },
+      (dir) => {
+        const prompt = buildPrompt(dir, ['framework'], { answers: {}, sources: {} });
+        expect(prompt).toContain('## Project documentation (excerpts)');
+        expect(prompt).toContain('BEGIN PROJECT DATA');
+        expect(prompt).toContain('Rust-based AWS Lambda backend');
+      },
+    );
+  });
+
+  it('solicits conflicts only when Stage 1 answered something', () => {
+    withProject({ 'package.json': '{"name":"acme"}' }, (dir) => {
+      const withKnown = buildPrompt(dir, ['database'], {
+        answers: { projectType: 'frontend' },
+        sources: {},
+      });
+      expect(withKnown).toContain('__conflicts');
+      expect(withKnown).toContain('(known) projectType: currently "frontend"');
+
+      const noKnown = buildPrompt(dir, ['database'], { answers: {}, sources: {} });
+      expect(noKnown).not.toContain('__conflicts');
     });
   });
 
