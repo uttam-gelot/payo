@@ -744,3 +744,85 @@ describe('detectStack — greenfield / tie-break', () => {
     expect(det.answers.framework).toBe('nextjs');
   });
 });
+
+describe('detectStack — hybrid monorepo (root tooling + frontend member + Rust backend)', () => {
+  /** AHRDmail-shaped fixture: npm workspaces, bun lockfile, undeclared Cargo workspace. */
+  const files: Record<string, string> = {
+    'package.json': JSON.stringify({
+      workspaces: ['admin-frontend', 'admin-api'],
+      scripts: {
+        'services:build': 'cargo build --workspace --manifest-path services/Cargo.toml',
+        'admin-frontend:dev': 'bun --prefix admin-frontend run dev',
+        'test:e2e': 'vitest run --config vitest.config.e2e.ts',
+      },
+      devDependencies: { vitest: '4', typescript: '5' },
+    }),
+    'bun.lock': '',
+    'package-lock.json': '{}',
+    '.prettierrc': '{}',
+    'tsconfig.json': '{"compilerOptions":{"strict":true}}',
+    'admin-frontend/package.json': JSON.stringify({
+      dependencies: { react: '18', 'react-dom': '18' },
+      devDependencies: { vite: '5' },
+    }),
+    'admin-api/package.json': JSON.stringify({ devDependencies: { '@types/bun': '1' } }),
+    'services/Cargo.toml': '[workspace]\nmembers = ["client-api", "models"]\n',
+    'services/client-api/Cargo.toml':
+      '[package]\nname = "client-api"\n[dependencies]\naxum = "0.7"\n',
+    'services/models/Cargo.toml': '[package]\nname = "models"\n',
+  };
+
+  it('root repo-level facts survive a member becoming the app primary', () => {
+    const det = inProject(files, (dir) => detectStack(dir));
+    // App shape from admin-frontend…
+    expect(det.answers.framework).toBe('react');
+    expect(det.answers.language).toBe('typescript');
+    // …but repo-level tooling from the root, not blanked by the member.
+    expect(det.answers.packageManager).toBe('bun');
+    expect(det.answers.runtime).toBe('bun');
+    expect(det.answers.testRunner).toBe('vitest');
+    expect(det.answers.formatter).toBe('prettier');
+  });
+
+  it('aggregates projectType to full-stack and reports rust as a secondary language', () => {
+    const det = inProject(files, (dir) => detectStack(dir));
+    expect(det.answers.projectType).toBe('full-stack');
+    expect(det.secondary).toEqual(['rust']);
+    // Not asserted within options: react + full-stack is the same combination
+    // Stage 1 already emits for a react+express repo (frameworkOptions has no
+    // react under full-stack — a pre-existing vocab gap, not a hybrid bug).
+  });
+
+  it('enumerates the undeclared Cargo workspace as packages', () => {
+    const det = inProject(files, (dir) => detectStack(dir));
+    const paths = (det.packages ?? []).map((p) => p.path);
+    expect(paths).toContain('services');
+    expect(paths).toContain('services/client-api');
+    const services = det.packages?.find((p) => p.path === 'services');
+    expect(services?.language).toBe('rust');
+  });
+
+  it('seeds e2e testTypes from the root e2e vitest config script', () => {
+    const det = inProject(files, (dir) => detectStack(dir));
+    expect(det.answers.testTypes).toEqual(['unit', 'integration', 'e2e']);
+  });
+
+  it('collapses >4 same-language members under their nested workspace root', () => {
+    const many = {
+      ...files,
+      'services/Cargo.toml':
+        '[workspace]\nmembers = ["a", "b", "c", "d", "e"]\n',
+      'services/a/Cargo.toml': '[package]\nname = "a"\n',
+      'services/b/Cargo.toml': '[package]\nname = "b"\n',
+      'services/c/Cargo.toml': '[package]\nname = "c"\n',
+      'services/d/Cargo.toml': '[package]\nname = "d"\n',
+      'services/e/Cargo.toml': '[package]\nname = "e"\n',
+    };
+    delete (many as Record<string, string>)['services/client-api/Cargo.toml'];
+    delete (many as Record<string, string>)['services/models/Cargo.toml'];
+    const det = inProject(many, (dir) => detectStack(dir));
+    const services = det.packages?.find((p) => p.path === 'services');
+    expect(services?.memberCount).toBe(5);
+    expect(det.packages?.some((p) => p.path === 'services/a')).toBe(false);
+  });
+});

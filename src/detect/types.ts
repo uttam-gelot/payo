@@ -25,6 +25,12 @@ export interface PackageSummary {
   framework?: string;
   projectType?: string;
   database?: string;
+  /**
+   * Present when this entry stands in for a nested workspace root whose
+   * same-language members were collapsed into it (e.g. a Cargo workspace with
+   * 8 crates renders as one line instead of nine).
+   */
+  memberCount?: number;
 }
 
 export interface DetectionResult {
@@ -34,6 +40,13 @@ export interface DetectionResult {
   sources: Record<string, DetectionSource>;
   /** Workspace members and their stacks — present only for a detected monorepo. */
   packages?: PackageSummary[];
+  /**
+   * Languages present in the repo beyond the primary stack's — a hybrid repo
+   * (React frontend + Rust backend) surfaces the rest of its stacks here
+   * instead of collapsing to one. Not answer ids: the questionnaire still
+   * interviews for a single primary stack.
+   */
+  secondary?: string[];
 }
 
 export const EMPTY_DETECTION: DetectionResult = { answers: {}, sources: {} };

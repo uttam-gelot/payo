@@ -18,6 +18,7 @@ import { detectJava } from './java';
 import { detectRuby } from './ruby';
 import { detectGit } from './git';
 import { enumerateWorkspaces } from './workspaces';
+import { scriptSignals } from './scripts';
 
 export type { DetectionResult, DetectionSource, PackageSummary } from './types';
 
@@ -62,6 +63,107 @@ function str(a: DetectionResult['answers'], key: string): string | undefined {
   return typeof v === 'string' ? v : undefined;
 }
 
+/**
+ * Answer ids that describe the repository rather than one app. In a hoisted
+ * monorepo these live at the root (shared lockfile, shared prettier config,
+ * root test runner), so the root's value wins over a member-primary's — the
+ * member usually has none of its own, and when it does the root still governs
+ * installs and tooling.
+ */
+const REPO_LEVEL_IDS = new Set([
+  'packageManager',
+  'runtime',
+  'formatter',
+  'linter',
+  'testRunner',
+  'e2eTool',
+  'testTypes',
+  'validation',
+]);
+
+function isRepoLevel(id: string): boolean {
+  return REPO_LEVEL_IDS.has(id) || id.startsWith('tsconfig.');
+}
+
+/** Languages whose presence marks a backend package (they never render a UI). */
+const SERVER_LANGUAGES = new Set(['rust', 'go', 'python', 'java', 'csharp', 'php', 'ruby']);
+
+/** True when a package's detection reads as a backend (server) component. */
+function isBackendish(r: DetectionResult): boolean {
+  const type = str(r.answers, 'projectType');
+  if (type === 'backend' || type === 'full-stack') return true;
+  const lang = str(r.answers, 'language');
+  return lang !== undefined && SERVER_LANGUAGES.has(lang);
+}
+
+/**
+ * Classify the repo's shape from all of its packages instead of the primary
+ * alone: a React member next to a Rust workspace is a full-stack repo, not a
+ * frontend. Conservative — only overrides when both shapes (or only backends)
+ * are clearly present; anything ambiguous keeps the primary's own value.
+ */
+function aggregateProjectType(
+  current: string | undefined,
+  results: DetectionResult[],
+): string | undefined {
+  const backend = results.some(isBackendish);
+  const frontend = results.some((r) => str(r.answers, 'projectType') === 'frontend');
+  if (backend && frontend) return 'full-stack';
+  if (backend && current === undefined) return 'backend';
+  return current;
+}
+
+/**
+ * Fold the root package.json script hints into a detection result — fill-only:
+ * script-invoked languages widen `secondary` (and promote a frontend to
+ * full-stack, since they imply a server-side component the manifests hid), and
+ * an e2e hint seeds the test answers when detection found none. A hint never
+ * overrides a manifest- or lockfile-derived fact.
+ */
+function applyScriptHints(result: DetectionResult, cwd: string): DetectionResult {
+  const hints = scriptSignals(cwd);
+  if (hints.languages.size === 0 && hints.e2e === undefined) return result;
+
+  const answers = { ...result.answers };
+  const sources = { ...result.sources };
+  const secondary = result.secondary ? [...result.secondary] : [];
+
+  const primary = str(answers, 'language');
+  for (const lang of hints.languages) {
+    if (lang !== primary && !secondary.includes(lang)) secondary.push(lang);
+  }
+  if (hints.languages.size > 0 && str(answers, 'projectType') === 'frontend') {
+    answers.projectType = 'full-stack';
+    sources.projectType = 'config';
+  }
+
+  if (hints.e2e !== undefined && !('testTypes' in answers)) {
+    answers.testTypes = ['unit', 'integration', 'e2e'];
+    sources.testTypes = 'config';
+    // 'vitest' marks vitest-driven e2e — a test runner, not an e2eTool option.
+    if (hints.e2e !== 'vitest' && !('e2eTool' in answers)) {
+      answers.e2eTool = hints.e2e;
+      sources.e2eTool = 'config';
+    }
+  }
+
+  return { ...result, answers, sources, ...(secondary.length > 0 ? { secondary } : {}) };
+}
+
+/** Unique languages across root + members, minus the primary's — hybrid-repo evidence. */
+function secondaryLanguages(primary: string | undefined, results: DetectionResult[]): string[] {
+  const out: string[] = [];
+  for (const r of results) {
+    const lang = str(r.answers, 'language');
+    if (lang === undefined || lang === primary || out.includes(lang)) continue;
+    // A JS member in a TS repo (or vice versa) is the same stack, not a hybrid.
+    const jsTs = new Set(['javascript', 'typescript']);
+    if (primary !== undefined && jsTs.has(primary) && jsTs.has(lang)) continue;
+    out.push(lang);
+  }
+  return out;
+}
+
 /** Condense a member's detection into the summary the generator renders. */
 function summarize(rel: string, result: DetectionResult): PackageSummary {
   return {
@@ -74,12 +176,42 @@ function summarize(rel: string, result: DetectionResult): PackageSummary {
 }
 
 /**
+ * Fold a nested workspace's many same-language members into their root's entry
+ * (a Cargo workspace's 8 crates become `services (8 packages)`) so the
+ * workspace notes stay readable. Small groups keep their per-member lines —
+ * only above 4 does the list stop carrying information worth the space.
+ */
+function collapsePackages(pkgs: PackageSummary[]): PackageSummary[] {
+  const drop = new Set<string>();
+  const counts = new Map<string, number>();
+  for (const parent of pkgs) {
+    const children = pkgs.filter(
+      (c) =>
+        c.path.startsWith(`${parent.path}/`) &&
+        c.language === parent.language &&
+        !drop.has(c.path),
+    );
+    if (children.length > 4) {
+      counts.set(parent.path, children.length);
+      for (const c of children) drop.add(c.path);
+    }
+  }
+  if (drop.size === 0) return pkgs;
+  return pkgs
+    .filter((p) => !drop.has(p.path))
+    .map((p) => (counts.has(p.path) ? { ...p, memberCount: counts.get(p.path) } : p));
+}
+
+/**
  * Detect the stack rooted at `cwd`. For a monorepo, enumerate the workspace
- * members and detect each one, then surface a single primary stack (the root if
- * it already has a framework, else the first member that does, else the first
- * member with a language) plus a per-package summary the generator turns into
- * workspace notes. `structure` is forced to `monorepo`. A non-monorepo repo
- * returns the plain single-directory detection unchanged.
+ * members and detect each one, then surface a single primary app stack (the
+ * root if it already has a framework, else the first member that does, else
+ * the first member with a language) merged with the root's repo-level tooling
+ * facts, plus a per-package summary the generator turns into workspace notes.
+ * The repo's projectType is aggregated across packages (frontend member +
+ * backend members → full-stack) and extra languages land in `secondary`.
+ * `structure` is forced to `monorepo`. A non-monorepo repo returns the plain
+ * single-directory detection unchanged.
  */
 export function detectStack(cwd: string = process.cwd()): DetectionResult {
   // Git branch/commit conventions are repo-level (independent of ecosystem and
@@ -88,26 +220,54 @@ export function detectStack(cwd: string = process.cwd()): DetectionResult {
   const root = withGit(detectAt(cwd), gitConv);
 
   const members = enumerateWorkspaces(cwd);
-  if (members.length === 0) return root;
+  if (members.length === 0) return applyScriptHints(root, cwd);
 
   const detected = members.map((rel) => ({ rel, result: detectAt(path.join(cwd, rel)) }));
 
   // Pick the stack that best represents the repo. A monorepo root manifest is
   // often just workspace config + shared tooling, so a member's app stack is
-  // usually the real answer.
+  // usually the real answer — but the root's repo-level facts (lockfile,
+  // runtime, formatter, test runner) must survive the member taking over.
   const memberWithFramework = detected.find((d) => 'framework' in d.result.answers)?.result;
   const memberWithLanguage = detected.find((d) => 'language' in d.result.answers)?.result;
-  const primary =
+  const appPrimary =
     'framework' in root.answers ? root : (memberWithFramework ?? memberWithLanguage ?? root);
 
-  const base = withGit(
-    coherent({
-      answers: { ...primary.answers, structure: 'monorepo' },
-      sources: { ...primary.sources, structure: 'config' },
-    }),
-    gitConv,
+  const answers = { ...appPrimary.answers };
+  const sources = { ...appPrimary.sources };
+  for (const [id, value] of Object.entries(root.answers)) {
+    if (!isRepoLevel(id)) continue;
+    answers[id] = value;
+    if (root.sources[id] !== undefined) sources[id] = root.sources[id];
+  }
+
+  // A hoisted member often has no tsconfig or typescript dep of its own, so it
+  // reads as javascript even though the repo is TypeScript — the root knows best.
+  if (str(root.answers, 'language') === 'typescript' && str(answers, 'language') === 'javascript') {
+    answers.language = 'typescript';
+    if (root.sources.language !== undefined) sources.language = root.sources.language;
+  }
+
+  const allResults = [root, ...detected.map((d) => d.result)];
+  const aggregated = aggregateProjectType(str(answers, 'projectType'), allResults);
+  if (aggregated !== undefined && aggregated !== answers.projectType) {
+    answers.projectType = aggregated;
+    sources.projectType = 'config';
+  }
+
+  answers.structure = 'monorepo';
+  sources.structure = 'config';
+
+  const base = withGit(coherent({ answers, sources }), gitConv);
+  const secondary = secondaryLanguages(str(base.answers, 'language'), allResults);
+  return applyScriptHints(
+    {
+      ...base,
+      ...(secondary.length > 0 ? { secondary } : {}),
+      packages: collapsePackages(detected.map((d) => summarize(d.rel, d.result))),
+    },
+    cwd,
   );
-  return { ...base, packages: detected.map((d) => summarize(d.rel, d.result)) };
 }
 
 /** Merge repo-level git conventions onto a detection result (git fills, never overrides). */
