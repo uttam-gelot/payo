@@ -94,3 +94,112 @@ describe('enumerateWorkspaces', () => {
     );
   });
 });
+
+describe('enumerateWorkspaces — nested workspace roots & undeclared members', () => {
+  it('finds an undeclared nested Cargo workspace and its crates', () => {
+    inRepo(
+      {
+        'package.json': '{"workspaces":["apps/*"]}',
+        'apps/web/package.json': '{"dependencies":{"react":"18"}}',
+        'services/Cargo.toml': '[workspace]\nmembers = ["client-api", "models"]\n',
+        'services/client-api/Cargo.toml': '[package]\nname = "client-api"\n',
+        'services/models/Cargo.toml': '[package]\nname = "models"\n',
+      },
+      (dir) => {
+        const members = enumerateWorkspaces(dir);
+        expect(members).toContain('apps/web');
+        expect(members).toContain('services');
+        expect(members).toContain('services/client-api');
+        expect(members).toContain('services/models');
+      },
+    );
+  });
+
+  it('finds a nested go.work workspace', () => {
+    inRepo(
+      {
+        'package.json': '{"workspaces":["web"]}',
+        'web/package.json': '{}',
+        'backend/go.work': 'go 1.22\n\nuse ./svc\n',
+        'backend/svc/go.mod': 'module svc\n',
+      },
+      (dir) => {
+        const members = enumerateWorkspaces(dir);
+        expect(members).toContain('backend/svc');
+      },
+    );
+  });
+
+  it('does not duplicate a nested workspace already declared as a member', () => {
+    inRepo(
+      {
+        'package.json': '{"workspaces":["services"]}',
+        'services/Cargo.toml': '[workspace]\nmembers = ["api"]\n',
+        'services/api/Cargo.toml': '[package]\nname = "api"\n',
+      },
+      (dir) => {
+        const members = enumerateWorkspaces(dir);
+        expect(members.filter((m) => m === 'services')).toHaveLength(1);
+      },
+    );
+  });
+
+  it('adds undeclared manifest dirs only when the repo already reads as a monorepo', () => {
+    inRepo(
+      {
+        'package.json': '{"workspaces":["web"]}',
+        'web/package.json': '{}',
+        'backend/go.mod': 'module backend\n',
+      },
+      (dir) => {
+        expect(enumerateWorkspaces(dir)).toContain('backend');
+      },
+    );
+  });
+
+  it('a stray subdir manifest never turns a single-package repo into a monorepo', () => {
+    inRepo(
+      {
+        'package.json': '{"name":"app","dependencies":{"react":"18"}}',
+        'examples/demo/package.json': '{}',
+      },
+      (dir) => {
+        expect(enumerateWorkspaces(dir)).toEqual([]);
+      },
+    );
+  });
+
+  it('the nested scan skips generated/, but a declared literal member there still resolves', () => {
+    inRepo(
+      {
+        'package.json': '{"workspaces":["generated/client", "web"]}',
+        'web/package.json': '{}',
+        'generated/client/package.json': '{}',
+        'generated/other/Cargo.toml': '[workspace]\nmembers = ["x"]\n',
+        'generated/other/x/Cargo.toml': '[package]\nname = "x"\n',
+      },
+      (dir) => {
+        const members = enumerateWorkspaces(dir);
+        expect(members).toContain('generated/client'); // declared literal survives
+        expect(members).not.toContain('generated/other'); // scan never enters generated/
+        expect(members).not.toContain('generated/other/x');
+      },
+    );
+  });
+
+  it('never descends into a declared member looking for nested workspaces', () => {
+    inRepo(
+      {
+        'package.json': '{"workspaces":["app"]}',
+        'app/package.json': '{}',
+        'app/embedded/Cargo.toml': '[workspace]\nmembers = ["y"]\n',
+        'app/embedded/y/Cargo.toml': '[package]\nname = "y"\n',
+      },
+      (dir) => {
+        const members = enumerateWorkspaces(dir);
+        expect(members).toContain('app');
+        expect(members).not.toContain('app/embedded');
+      },
+    );
+  });
+});

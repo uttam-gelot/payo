@@ -32,26 +32,37 @@ describe('resolveCommands', () => {
   });
 
   it('resolves dev / test / build for a JS stack', () => {
-    const c = cmds({ framework: 'nextjs', packageManager: 'pnpm' });
+    const c = cmds({ framework: 'nextjs', packageManager: 'pnpm', testTypes: ['unit'] });
     expect(c.dev).toBe('pnpm dev');
     expect(c.test).toBe('pnpm test');
     expect(c.build).toBe('pnpm build');
   });
 
   it('returns the fixed commands for Rust / Go / Python stacks', () => {
-    const rust = cmds({ framework: 'axum' });
+    const rust = cmds({ framework: 'axum', testTypes: ['unit'] });
     expect(rust.scaffold).toBe('cargo new <app>');
     expect(rust.test).toBe('cargo test');
     expect(rust.build).toBe('cargo build --release');
 
-    const go = cmds({ framework: 'gin' });
+    const go = cmds({ framework: 'gin', testTypes: ['unit'] });
     expect(go.scaffold).toBe('go mod init <module>');
     expect(go.test).toBe('go test ./...');
 
-    const py = cmds({ framework: 'django' });
+    const py = cmds({ framework: 'django', testTypes: ['unit'] });
     expect(py.scaffold).toBe('django-admin startproject <app>');
     expect(py.test).toBe('python manage.py test');
     expect(py.build).toBeUndefined();
+  });
+
+  it('omits the test command when testing was skipped', () => {
+    // No testTypes / runner at all.
+    expect(cmds({ framework: 'nextjs', packageManager: 'pnpm' }).test).toBeUndefined();
+    // Explicitly declined.
+    expect(cmds({ framework: 'axum', testTypes: [], testRunner: 'none' }).test).toBeUndefined();
+    // A real runner alone is enough to count as selected.
+    expect(cmds({ framework: 'nextjs', packageManager: 'pnpm', testRunner: 'vitest' }).test).toBe(
+      'pnpm test',
+    );
   });
 
   it('returns the fixed CLI command for NestJS (no pm prefix)', () => {
@@ -63,7 +74,7 @@ describe('resolveCommands', () => {
   it('omits scaffold for micro-frameworks with no generator, and is empty when unset', () => {
     expect(cmds({ framework: 'express' }).scaffold).toBeUndefined();
     expect(cmds({ framework: 'fastapi' }).scaffold).toBeUndefined();
-    expect(cmds({ framework: 'fastapi' }).test).toBe('pytest');
+    expect(cmds({ framework: 'fastapi', testTypes: ['unit'] }).test).toBe('pytest');
     expect(cmds({ language: 'typescript' })).toEqual({});
   });
 

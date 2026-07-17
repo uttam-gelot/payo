@@ -230,16 +230,32 @@ export async function confirmDetectionDepth(
   return value as 'everything' | 'partial';
 }
 
+/** The shape summarizeDetection needs from a DetectionResult. */
+interface DetectionLike {
+  answers: Record<string, unknown>;
+  secondary?: string[];
+  packages?: { path: string; language?: string }[];
+}
+
 /** Build the "Detected from your project" lines — one per recorded id, in order. */
-export function detectionSummaryLines(detected: { answers: Record<string, unknown> }): string[] {
-  return DETECT_ORDER.filter((id) => id in detected.answers).map((id) => {
+export function detectionSummaryLines(detected: DetectionLike): string[] {
+  const lines = DETECT_ORDER.filter((id) => id in detected.answers).map((id) => {
     const label = DETECT_LABELS[id];
     return `• ${label.padEnd(16)} ${String(detected.answers[id])}`;
   });
+  // Hybrid repo: show the other stacks too, with the dirs that carry them.
+  if (detected.secondary && detected.secondary.length > 0) {
+    const labels = detected.secondary.map((lang) => {
+      const where = (detected.packages ?? []).filter((p) => p.language === lang).map((p) => p.path);
+      return where.length > 0 ? `${lang} (${where.join(', ')})` : lang;
+    });
+    lines.push(`• ${'Also detected'.padEnd(16)} ${labels.join(', ')}`);
+  }
+  return lines;
 }
 
 /** Read-only summary of what detection produced, shown before the interview continues. */
-export function summarizeDetection(detected: { answers: Record<string, unknown> }): void {
+export function summarizeDetection(detected: DetectionLike): void {
   const lines = detectionSummaryLines(detected);
   if (lines.length === 0) return;
   note(lines.join('\n'), 'Detected from your project');

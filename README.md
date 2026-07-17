@@ -177,18 +177,31 @@ How detected answers are applied in **Just the high-level stack** mode:
 
 **Monorepos** are detected too: Payo enumerates workspace members (pnpm / npm /
 yarn / lerna, Cargo, `go.work`, Maven / Gradle), detects each package's stack, and
-uses the real app stack as the primary answers instead of the near-empty root
-manifest. The generated guidance gains a **Workspace Packages** list and monorepo
-conventions.
+uses the real app stack as the primary answers — merged with the root's repo-level
+tooling (package manager, runtime, formatter, test runner), which in a hoisted
+monorepo lives at the root, not in the member. It also finds **nested workspaces
+the root never declared** (a Cargo `[workspace]` under `services/`, a nested
+`go.work`) and undeclared sibling packages. The generated guidance gains a
+**Workspace Packages** list and monorepo conventions.
+
+**Hybrid / polyglot repos** are understood as one project: a React frontend next
+to a Rust backend is classified **full-stack**, the extra languages show up as
+**Additional languages** (with the dirs that carry them) in the generated Tech
+Stack and in the detection summary, and root `package.json` scripts (`cargo
+build`, a dedicated e2e config) act as extra evidence for stacks the manifests
+hide.
 
 Detection runs deterministically from your files first. Branch-naming and
 commit-message conventions are inferred by parsing your **local** git history on
 your machine — that history is never placed in any AI prompt. When the chosen AI
 tool's CLI is installed, an **optional second pass** uses **your own** assistant to
-fill gaps on unusual stacks — it reads only the manifest and the directory listing,
-runs under your own account, and never sends anything to a Payo server (see
-[Your data stays yours](#your-data-stays-yours)). If no CLI is present, the
-deterministic result stands on its own.
+fill gaps on unusual stacks — it reads the project manifests, the directory
+listing, and short excerpts of your project docs (`README.md`, `CLAUDE.md`,
+`AGENTS.md`, `docs/*.md`), runs under your own account, and never sends anything
+to a Payo server (see [Your data stays yours](#your-data-stays-yours)). It never
+overrides what the deterministic pass found — if the docs clearly contradict a
+detected answer, Payo surfaces the conflict and lets you arbitrate. If no CLI is
+present, the deterministic result stands on its own.
 
 ## What gets generated
 
@@ -294,8 +307,10 @@ generating what's missing. Finished runs clean the directory up automatically.
 
 Payo works today, but it's still early. Here's where it's headed:
 
-- **Deeper monorepo support.** Payo now enumerates workspace members, detects
-  each package's stack, and writes per-package notes into one root config (see
+- **Deeper monorepo support.** Payo now enumerates workspace members — including
+  nested workspaces the root never declared — detects each package's stack,
+  classifies hybrid repos (frontend + backend languages) as one full-stack
+  project, and writes per-package notes into one root config (see
   [Already have a project?](#already-have-a-project-payo-detects-your-stack)).
   Next is going further: per-package skills and guidance for repos where each
   workspace wants its own conventions, and workspace enumeration for the

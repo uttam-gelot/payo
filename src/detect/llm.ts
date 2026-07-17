@@ -5,6 +5,16 @@
  * one picked in Q1). Additive only: it fills answer ids Stage 1 left blank and,
  * in "everything" mode, pre-fills the Tier-2 conventions visible from the tree.
  * Every value is validated against the option vocab and dropped if invalid.
+ * When the evidence contradicts a Stage-1 answer, the agent reports it on a
+ * separate `__conflicts` channel instead of overriding — the CLI surfaces each
+ * conflict for the user to arbitrate, so Stage 2 stays never-load-bearing.
+ *
+ * The prompt carries every root manifest (plus the manifest of each workspace
+ * root whose language differs from the primary's), a paths-only directory
+ * tree, and fenced excerpts of the project docs (README/CLAUDE.md/AGENTS.md) —
+ * docs state outright what dependency lists only imply. The agent already runs
+ * inside the repo with file access, so quoting these files does not widen the
+ * trust boundary; they are fenced as data to blunt prompt injection.
  *
  * The agent writes its answer as JSON to a file (reusing `runAgent`, which drives
  * the agent headless and ignores stdout — the agent is expected to write files).
@@ -27,6 +37,8 @@ import { exists, readText } from './manifest';
 import { optionValuesFor, hasVocab } from './optionVocab';
 import { TIER1, TIER2_HINTABLE } from './tiers';
 import { dirTree } from './tree';
+import { docsExcerpt } from './docs';
+import { fenceProjectData } from '../generator/rules';
 
 export type DetectDepth = 'everything' | 'partial';
 
@@ -47,10 +59,9 @@ const MANIFESTS = [
 ];
 
 /**
- * Preferred manifest(s) per Stage-1 `language`, so Stage 2 sends the LLM the
- * ecosystem's own manifest instead of always `package.json`. A polyglot repo
- * (e.g. a Python project with a tooling `package.json`) would otherwise get
- * contradictory context — `language: python` but a Node manifest.
+ * Manifest filename(s) per language, used to pull the manifest of a workspace
+ * root whose language differs from the primary's (a hybrid repo's Rust
+ * `services/Cargo.toml` next to the root `package.json`).
  */
 const LANG_MANIFEST: Record<string, string[]> = {
   typescript: ['package.json'],
@@ -131,31 +142,92 @@ export function willLlmDetectRun(
   return targetIds(base, depth).length > 0;
 }
 
-/** Build the schema-constrained prompt: manifest + tree + per-id allowed values. */
+/** Per-manifest and total size caps for the prompt's manifest blocks. */
+const MANIFEST_CAP = 6000;
+const MANIFESTS_TOTAL_CAP = 24000;
+
+/**
+ * Every manifest worth showing the agent: all root manifests present, then the
+ * manifest of each workspace root whose language differs from the primary's.
+ * A polyglot repo would otherwise get contradictory context — `language:
+ * python` but only a Node manifest.
+ */
+function gatherManifests(cwd: string, base: DetectionResult): { label: string; body: string }[] {
+  const out: { label: string; body: string }[] = [];
+  let budget = MANIFESTS_TOTAL_CAP;
+  const push = (label: string, body: string | undefined): void => {
+    if (body === undefined || budget <= 0) return;
+    const cap = Math.min(MANIFEST_CAP, budget);
+    const sliced = body.length > cap ? `${body.slice(0, cap)}\n…(truncated)` : body;
+    out.push({ label, body: sliced });
+    budget -= sliced.length;
+  };
+
+  for (const f of MANIFESTS) {
+    if (exists(cwd, f)) push(f, readText(cwd, f));
+  }
+
+  const primary = typeof base.answers.language === 'string' ? base.answers.language : undefined;
+  const seenLangs = new Set<string>();
+  for (const p of base.packages ?? []) {
+    if (!p.language || p.language === primary || seenLangs.has(p.language)) continue;
+    const dir = path.join(cwd, p.path);
+    const file = (LANG_MANIFEST[p.language] ?? []).find((f) => exists(dir, f));
+    if (!file) continue;
+    seenLangs.add(p.language);
+    push(`${p.path}/${file}`, readText(dir, file));
+  }
+  return out;
+}
+
+/** Build the schema-constrained prompt: manifests + tree + docs + per-id allowed values. */
 export function buildPrompt(cwd: string, ids: string[], base: DetectionResult): string {
   const known = base.answers as Answers;
-  // Prefer the manifest matching Stage 1's chosen ecosystem; fall back to the
-  // priority list only when Stage 1 found no language.
-  const lang = known.language;
-  const order = [...(typeof lang === 'string' ? (LANG_MANIFEST[lang] ?? []) : []), ...MANIFESTS];
-  const manifestFile = order.find((f) => exists(cwd, f));
-  const manifestBody = manifestFile ? readText(cwd, manifestFile) : undefined;
+  const manifests = gatherManifests(cwd, base);
   const tree = dirTree(cwd).join('\n');
+  const docs = docsExcerpt(cwd);
   const schema = ids
     .map((id) => `- ${id}: one of [${optionValuesFor(id, known).join(', ')}]`)
     .join('\n');
   const target = path.join(config.payo.dir(), RESULT_FILE);
 
+  const manifestBlocks =
+    manifests.length > 0
+      ? manifests.flatMap((m) => [`## Manifest: ${m.label}`, '```\n' + m.body + '\n```', ''])
+      : ['## Manifest', '(none)', ''];
+
+  // Conflicts are only solicited over ids Stage 1 answered AND that have a
+  // vocabulary to validate a suggestion against.
+  const conflictIds = Object.keys(known).filter((id) => hasVocab(id));
+  const conflictBlock =
+    conflictIds.length > 0
+      ? [
+          '## Conflicts',
+          'If the documentation or manifests CLEARLY contradict one of the known values',
+          'below, do NOT change it. Instead add an entry to a top-level "__conflicts"',
+          'array in the same JSON file: {"id", "suggested", "evidence"} — "suggested"',
+          'must be one of the allowed options, "evidence" a short quote (max ~200 chars).',
+          'Report at most 5 conflicts; when in doubt, report nothing.',
+          ...conflictIds.map(
+            (id) =>
+              `- (known) ${id}: currently ${JSON.stringify(known[id])}, allowed [${optionValuesFor(id, known).join(', ')}]`,
+          ),
+          '',
+        ]
+      : [];
+
   return [
-    "You are detecting a software project's stack from its manifest and directory layout.",
+    "You are detecting a software project's stack from its manifests, directory layout,",
+    'and documentation excerpts.',
     'Use ONLY the information below. Do not read or guess at file contents you were not given.',
     '',
-    `## Manifest (${manifestFile ?? 'none'})`,
-    manifestBody ? '```\n' + manifestBody.slice(0, 8000) + '\n```' : '(none)',
-    '',
+    ...manifestBlocks,
     '## Directory tree (paths only)',
     '```\n' + tree + '\n```',
     '',
+    ...(docs !== undefined
+      ? ['## Project documentation (excerpts)', fenceProjectData(docs), '']
+      : []),
     '## Already known (do not change these)',
     Object.keys(known).length ? JSON.stringify(known, null, 0) : '(none)',
     '',
@@ -165,10 +237,55 @@ export function buildPrompt(cwd: string, ids: string[], base: DetectionResult): 
     'Omit any field you are unsure about — do not guess.',
     schema,
     '',
+    ...conflictBlock,
     `Write your answer as a single JSON object to the file: ${target}`,
     'The JSON keys are the field ids above; values are the chosen option string(s).',
     'Write nothing else.',
   ].join('\n');
+}
+
+/** A Stage-2 disagreement with a Stage-1 answer, for the user to arbitrate. */
+export interface DetectionConflict {
+  id: string;
+  suggested: string;
+  evidence: string;
+}
+
+/** A detection result plus any conflicts Stage 2 reported. */
+export type LlmDetection = DetectionResult & { conflicts?: DetectionConflict[] };
+
+const MAX_CONFLICTS = 5;
+const MAX_EVIDENCE = 200;
+
+/**
+ * Keep only well-formed conflicts: the id must be one Stage 1 answered, the
+ * suggestion in-vocab and actually different. Everything else is dropped —
+ * a noisy agent can never corrupt the session through this channel.
+ */
+function validateConflicts(
+  raw: Record<string, unknown>,
+  base: DetectionResult,
+): DetectionConflict[] {
+  const list = raw.__conflicts;
+  if (!Array.isArray(list)) return [];
+  const known = base.answers as Answers;
+  const out: DetectionConflict[] = [];
+  const seen = new Set<string>();
+  for (const item of list) {
+    if (out.length >= MAX_CONFLICTS) break;
+    if (item === null || typeof item !== 'object') continue;
+    const { id, suggested, evidence } = item as Record<string, unknown>;
+    if (typeof id !== 'string' || typeof suggested !== 'string' || seen.has(id)) continue;
+    if (!(id in base.answers) || base.answers[id] === suggested) continue;
+    if (!new Set(optionValuesFor(id, known)).has(suggested)) continue;
+    seen.add(id);
+    out.push({
+      id,
+      suggested,
+      evidence: typeof evidence === 'string' ? evidence.slice(0, MAX_EVIDENCE) : '',
+    });
+  }
+  return out;
 }
 
 /** Keep only ids with a valid, in-vocab value; coerce list fields element-wise. */
@@ -204,7 +321,7 @@ export async function llmDetect(
   depth: DetectDepth,
   cwd: string = process.cwd(),
   deps: LlmDeps = defaultDeps,
-): Promise<DetectionResult> {
+): Promise<LlmDetection> {
   const runner = deps.resolveRunner(aiTool);
   if (!runner || !deps.isAvailable(runner)) return base;
 
@@ -222,12 +339,14 @@ export async function llmDetect(
     if (!raw) return base;
 
     const filled = validate(raw, idSet, base);
-    if (Object.keys(filled).length === 0) return base;
+    const conflicts = validateConflicts(raw, base);
+    if (Object.keys(filled).length === 0 && conflicts.length === 0) return base;
 
     const answers = { ...base.answers, ...filled };
     const sources = { ...base.sources };
     for (const id of Object.keys(filled)) sources[id] = 'llm';
-    return { answers, sources };
+    // Spread base so a monorepo's packages/secondary survive the Stage-2 merge.
+    return { ...base, answers, sources, ...(conflicts.length > 0 ? { conflicts } : {}) };
   } catch {
     return base;
   } finally {

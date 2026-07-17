@@ -11,6 +11,7 @@
 import fs from 'fs';
 import path from 'path';
 import { exists, readJson, readText } from './manifest';
+import { MONOREPO_MARKERS } from './signals';
 
 /** Cap the member count so a pathological repo can't blow up detection. */
 const MAX_MEMBERS = 50;
@@ -187,31 +188,125 @@ function gradleModules(cwd: string): string[] {
   return out;
 }
 
+/** All member globs declared by the workspace manifests living at `dir`. */
+function memberGlobsAt(dir: string): string[] {
+  return [
+    ...pnpmGlobs(dir),
+    ...pkgJsonGlobs(dir),
+    ...lernaGlobs(dir),
+    ...cargoMembers(dir),
+    ...goWorkMembers(dir),
+    ...mavenModules(dir),
+    ...gradleModules(dir),
+  ];
+}
+
 /**
- * All workspace-member directories declared at `cwd`, project-relative and
+ * Directories the nested scan never descends into, beyond IGNORE: codegen
+ * output and vendored sources are real manifests but must not drive detection.
+ * Declared literal members under these still resolve — `resolveGlob`'s literal
+ * branch does not consult this list.
+ */
+const SCAN_SKIP = new Set([...IGNORE, 'generated', 'vendor']);
+
+/** True when `abs` declares a workspace of its own (not at the repo root). */
+function isNestedWorkspaceRoot(abs: string): boolean {
+  if (exists(abs, 'go.work')) return true;
+  if (exists(abs, 'pnpm-workspace.yaml') || exists(abs, 'pnpm-workspace.yml')) return true;
+  const cargo = readText(abs, 'Cargo.toml');
+  return cargo !== undefined && /\[workspace\]/.test(cargo);
+}
+
+/**
+ * Depth-2 scan below `cwd` for workspace roots that are not declared as
+ * members of the root workspace (an npm-workspaces repo whose Rust backend is
+ * a Cargo workspace at `services/` never lists it), plus plain manifest-bearing
+ * dirs no declared glob covers. Declared members own their own subtree and a
+ * found package root is never descended into, so sub-packages stay theirs.
+ */
+function scanNested(
+  cwd: string,
+  declared: Set<string>,
+): { nestedRoots: string[]; undeclared: string[] } {
+  const nestedRoots: string[] = [];
+  const undeclared: string[] = [];
+  const scanDir = (rel: string, depth: number): void => {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(rel === '' ? cwd : path.join(cwd, rel), { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (!e.isDirectory() || SCAN_SKIP.has(e.name) || e.name.startsWith('.')) continue;
+      const childRel = rel === '' ? e.name : `${rel}/${e.name}`;
+      if (declared.has(childRel)) continue;
+      const childAbs = path.join(cwd, childRel);
+      if (isNestedWorkspaceRoot(childAbs)) {
+        nestedRoots.push(childRel);
+        continue;
+      }
+      if (hasManifest(childAbs)) {
+        undeclared.push(childRel);
+        continue;
+      }
+      if (depth < 2) scanDir(childRel, depth + 1);
+    }
+  };
+  scanDir('', 1);
+  return { nestedRoots, undeclared };
+}
+
+/**
+ * All workspace-member directories of the repo at `cwd`, project-relative and
  * de-duplicated, or `[]` when the repo is not a monorepo. Members are only
- * included when they actually hold a manifest, so stray glob matches are dropped.
+ * included when they actually hold a manifest, so stray glob matches are
+ * dropped. Beyond the root manifests' declared globs, nested workspace roots
+ * (and their members) are enumerated, and — once the repo has shown any
+ * monorepo evidence — so are undeclared manifest-bearing dirs, so a hybrid
+ * repo's sibling backend is not invisible just because the root workspace
+ * never listed it. A single-package repo stays `[]`: undeclared dirs alone
+ * never turn a repo into a monorepo unless the root carries a workspace or
+ * monorepo marker.
  */
 export function enumerateWorkspaces(cwd: string): string[] {
-  const globs = [
-    ...pnpmGlobs(cwd),
-    ...pkgJsonGlobs(cwd),
-    ...lernaGlobs(cwd),
-    ...cargoMembers(cwd),
-    ...goWorkMembers(cwd),
-    ...mavenModules(cwd),
-    ...gradleModules(cwd),
-  ];
-
   const seen = new Set<string>();
   const members: string[] = [];
-  for (const glob of globs) {
-    for (const rel of resolveGlob(cwd, glob)) {
-      const norm = rel.replace(/^\.\//, '');
-      if (norm === '' || norm === '.' || seen.has(norm)) continue;
+  const add = (rel: string): boolean => {
+    const norm = rel.replace(/^\.\//, '');
+    if (norm !== '' && norm !== '.' && !seen.has(norm)) {
       seen.add(norm);
       members.push(norm);
-      if (members.length >= MAX_MEMBERS) return members;
+    }
+    return members.length < MAX_MEMBERS;
+  };
+
+  for (const glob of memberGlobsAt(cwd)) {
+    for (const rel of resolveGlob(cwd, glob)) {
+      if (!add(rel)) return members;
+    }
+  }
+  const declaredCount = members.length;
+
+  const { nestedRoots, undeclared } = scanNested(cwd, seen);
+  for (const rel of nestedRoots) {
+    const abs = path.join(cwd, rel);
+    if (hasManifest(abs) && !add(rel)) return members;
+    for (const glob of memberGlobsAt(abs)) {
+      for (const sub of resolveGlob(abs, glob)) {
+        if (!add(`${rel}/${sub}`)) return members;
+      }
+    }
+  }
+
+  // Undeclared plain packages count only when the repo already reads as a
+  // monorepo — otherwise an examples/ or website/ dir would reclassify every
+  // single-package repo.
+  const isMonorepo =
+    declaredCount > 0 || nestedRoots.length > 0 || MONOREPO_MARKERS.some((f) => exists(cwd, f));
+  if (isMonorepo) {
+    for (const rel of undeclared) {
+      if (!add(rel)) return members;
     }
   }
   return members;

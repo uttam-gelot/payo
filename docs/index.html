@@ -91,7 +91,7 @@
       {
         "@type": "Question",
         "name": "Does Payo support monorepos?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Payo enumerates workspace members across pnpm, npm, yarn, lerna, Cargo, go.work, and Maven / Gradle, detects each package's stack, and uses the real app stack (not the near-empty root manifest) as the primary answers. The generated AGENTS.md adds a Workspace Packages list naming each member and its stack, plus monorepo conventions." }
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Payo enumerates workspace members across pnpm, npm, yarn, lerna, Cargo, go.work, and Maven / Gradle — including nested workspaces the root never declared, like a Cargo workspace under services/ — detects each package's stack, and merges the real app stack with the root's shared tooling (package manager, runtime, formatter, test runner). Hybrid repos mixing a frontend and a backend language are classified as one full-stack project with the extra languages listed. The generated AGENTS.md adds a Workspace Packages list naming each member and its stack, plus monorepo conventions." }
       },
       {
         "@type": "Question",
@@ -476,8 +476,12 @@
           source of truth — recording exactly what it finds (including your branch-naming and commit conventions) and
           skipping anything it can't, with no question-by-question prompts. You land straight on the review screen and confirm.
           <strong>Monorepos</strong> are detected too: it enumerates workspace members (pnpm, Cargo, <code>go.work</code>,
-          Maven / Gradle…), reads each package's stack, and adds a Workspace Packages list plus monorepo conventions to the
-          generated guidance. You review a summary and tweak — no typing it all out.
+          Maven / Gradle…) — including nested workspaces the root never declared, like a Cargo workspace under
+          <code>services/</code> — reads each package's stack, and adds a Workspace Packages list plus monorepo conventions
+          to the generated guidance. <strong>Hybrid repos</strong> (a React frontend next to a Rust backend) are classified
+          as one full-stack project, with the extra languages listed alongside the dirs that carry them. The optional
+          AI pass also reads your <code>README</code> and project docs to fill gaps — never overriding what detection
+          found. You review a summary and tweak — no typing it all out.
         </p>
       </div>
     </section>
@@ -535,7 +539,7 @@
         </details>
         <details>
           <summary>Does Payo support monorepos?</summary>
-          <p>Yes. Payo enumerates workspace members across pnpm, npm, yarn, lerna, Cargo, <code>go.work</code>, and Maven / Gradle, detects each package's stack, and uses the real app stack — not the near-empty root manifest — as the primary answers. The generated <code>AGENTS.md</code> adds a <strong>Workspace Packages</strong> list naming each member and its stack, plus monorepo conventions.</p>
+          <p>Yes. Payo enumerates workspace members across pnpm, npm, yarn, lerna, Cargo, <code>go.work</code>, and Maven / Gradle — including nested workspaces the root never declared, like a Cargo workspace under <code>services/</code> — detects each package's stack, and merges the real app stack with the root's shared tooling (package manager, runtime, formatter, test runner). Hybrid repos mixing a frontend and a backend language are classified as one full-stack project, with the extra languages listed. The generated <code>AGENTS.md</code> adds a <strong>Workspace Packages</strong> list naming each member and its stack, plus monorepo conventions.</p>
         </details>
         <details>
           <summary>Can Payo audit my changes against the project rules?</summary>

@@ -61,3 +61,20 @@ export const isJava = (a: Answers): boolean => a.language === 'java';
 
 /** Ruby — gates Rails, Active Record, and other Ruby-ecosystem modules. */
 export const isRuby = (a: Answers): boolean => a.language === 'ruby';
+
+/**
+ * Whether the user actually chose a testing setup: at least one test type, or a
+ * real runner / e2e tool ('none' counts as declined). Mirrors the Testing-section
+ * gate in generator/rules.ts — anything test-flavored the generator or bootstrap
+ * prompt emits must hinge on this, so a project whose tests were skipped never
+ * gets test commands or test prose fabricated for it.
+ */
+export const hasTesting = (a: Answers): boolean => {
+  const chosen = (key: string): boolean =>
+    typeof a[key] === 'string' && a[key] !== '' && a[key] !== 'none';
+  return (
+    (Array.isArray(a.testTypes) && a.testTypes.length > 0) ||
+    chosen('testRunner') ||
+    chosen('e2eTool')
+  );
+};

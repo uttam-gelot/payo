@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Hybrid / polyglot project detection.** A monorepo mixing stacks (e.g. a
+  React frontend next to a Rust backend) is now detected as one: the repo's
+  `projectType` is aggregated across packages (frontend + backend members →
+  full-stack), extra languages are reported as **Additional languages** in the
+  generated Tech Stack (with the dirs that carry them) and as an "Also
+  detected" line in the detection summary, and root `package.json` scripts
+  (`cargo build`, a dedicated e2e vitest config, playwright/cypress) serve as
+  fill-only signals for stacks the manifests hide.
+- **Nested workspace enumeration.** Workspace roots that are not declared as
+  members of the root workspace — a Cargo `[workspace]` at `services/`, a
+  nested `go.work` or `pnpm-workspace.yaml` — are found by a depth-2 scan and
+  their members enumerated, along with undeclared manifest-bearing dirs once
+  the repo already reads as a monorepo. Large same-language workspaces render
+  collapsed (`services — rust workspace (8 packages)`).
+- **Stage 2 reads your docs and every manifest.** The optional LLM pass now
+  receives every root manifest (labeled, size-capped) plus the manifest of
+  each distinct-language workspace root, and capped excerpts of `README.md`,
+  `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, and
+  `docs/*.md` — fenced as untrusted project data. When the evidence
+  contradicts a deterministic answer, the agent reports it on a validated
+  `__conflicts` channel instead of overriding: the CLI shows the conflict and
+  (in stack-only mode) re-asks that question with the suggestion pre-selected.
+
+### Fixed
+
+- A monorepo whose primary stack came from a workspace member discarded the
+  root detection wholesale, losing repo-level facts — `packageManager: bun`,
+  `runtime: bun`, `testRunner`, `formatter` — that live at the root of a
+  hoisted monorepo (Stage 2 would then guess `npm`). Root repo-level facts now
+  survive the merge, and a TypeScript root corrects a hoisted member that
+  reads as javascript.
+- A successful Stage-2 pass dropped the monorepo package list (and secondary
+  languages) from the detection result.
+- The bootstrap prompt, git-workflow skill, and generated rules mentioned
+  tests for projects whose testing was skipped ("run the formatter, linter,
+  and tests…"). All test commands and test prose are now gated on testing
+  actually being selected, and only the chosen tools are named.
+
 ### Changed
 
 - **Universal output layout (breaking).** Payo now emits one tool-agnostic

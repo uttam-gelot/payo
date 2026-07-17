@@ -9,7 +9,7 @@ import type { RuleSection } from './types';
 import type { PackageSummary } from '../detect/types';
 import type { TechModule } from '../stack/types';
 import { resolveGuidance } from './guidance';
-import { dbFamily } from '../stack/predicates';
+import { dbFamily, hasTesting as testingSelected } from '../stack/predicates';
 import { getModule, modulesFor } from '../stack/registry';
 import '../stack/modules/index'; // side-effect: ensure modules are registered for renderer-only calls
 
@@ -132,6 +132,8 @@ function packageLine(p: PackageSummary): string {
   if (p.framework && p.framework !== 'none') stack.push(p.framework);
   let line = `- \`${p.path}\``;
   if (stack.length) line += ` — ${stack.join(' / ')}`;
+  // A collapsed nested workspace renders as one line for all its members.
+  if (typeof p.memberCount === 'number') line += ` workspace (${p.memberCount} packages)`;
   if (p.projectType) line += ` (${p.projectType})`;
   if (p.database && p.database !== 'none') line += `, ${p.database}`;
   return line;
@@ -184,6 +186,21 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
   };
   push('Project type', 'projectType');
   push('Language', 'language');
+  // A hybrid repo's other stacks (React app + Rust backend) — rendered with the
+  // member dirs that carry each language so the doc says where they live.
+  const secondary = answers.secondaryLanguages;
+  if (Array.isArray(secondary) && secondary.length > 0) {
+    const pkgs = Array.isArray(answers.monorepoPackages)
+      ? (answers.monorepoPackages as PackageSummary[])
+      : [];
+    const labels = secondary
+      .filter((s): s is string => typeof s === 'string')
+      .map((lang) => {
+        const where = pkgs.filter((p) => p?.language === lang).map((p) => p.path);
+        return where.length > 0 ? `${lang} (${where.join(', ')})` : lang;
+      });
+    if (labels.length > 0) stack.push(`- Additional languages: ${labels.join(', ')}`);
+  }
   push('Runtime', 'runtime');
   push('Package manager', 'packageManager');
   push('Framework', 'framework');
@@ -304,8 +321,7 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
   const testTypes = answers.testTypes;
   const runner = str(answers, 'testRunner');
   const e2e = str(answers, 'e2eTool');
-  const hasTesting = (Array.isArray(testTypes) && testTypes.length > 0) || !!runner || !!e2e;
-  if (hasTesting) {
+  if (testingSelected(answers)) {
     const testLines = [
       '- Keep a separate testing setup: dedicated test config and directory layout; use fixtures/factories.',
     ];
@@ -370,14 +386,23 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
       );
     if (answers.confirmPush === true)
       lines.push('- Never push to a remote without explicit confirmation.');
+    // Name only the verification tools the user actually selected — a project
+    // whose tests were skipped must never be told to run tests.
+    const verifyTools = [
+      str(answers, 'formatter') && 'formatter',
+      str(answers, 'linter') && 'linter',
+      testingSelected(answers) && 'tests',
+    ].filter((t): t is string => typeof t === 'string');
+    const verifyPhrase =
+      verifyTools.length === 0
+        ? "the project's checks"
+        : verifyTools.length === 1
+          ? `the ${verifyTools[0]}`
+          : `the ${verifyTools.slice(0, -1).join(', ')}, and ${verifyTools[verifyTools.length - 1]}`;
     if (answers.verifyTiming === 'commit')
-      lines.push(
-        '- Run the formatter, linter, and tests before committing; only commit when they pass.',
-      );
+      lines.push(`- Run ${verifyPhrase} before committing; only commit when they pass.`);
     if (answers.verifyTiming === 'push')
-      lines.push(
-        '- Run the formatter, linter, and tests before pushing; only push when they pass.',
-      );
+      lines.push(`- Run ${verifyPhrase} before pushing; only push when they pass.`);
     if (answers.atomicCommits === true)
       lines.push('- Keep commits small and atomic — one logical change per commit.');
     sections.push({ title: 'Git Workflow', body: lines.join('\n') });
