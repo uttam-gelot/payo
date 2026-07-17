@@ -810,8 +810,7 @@ describe('detectStack — hybrid monorepo (root tooling + frontend member + Rust
   it('collapses >4 same-language members under their nested workspace root', () => {
     const many = {
       ...files,
-      'services/Cargo.toml':
-        '[workspace]\nmembers = ["a", "b", "c", "d", "e"]\n',
+      'services/Cargo.toml': '[workspace]\nmembers = ["a", "b", "c", "d", "e"]\n',
       'services/a/Cargo.toml': '[package]\nname = "a"\n',
       'services/b/Cargo.toml': '[package]\nname = "b"\n',
       'services/c/Cargo.toml': '[package]\nname = "c"\n',

@@ -187,9 +187,7 @@ function collapsePackages(pkgs: PackageSummary[]): PackageSummary[] {
   for (const parent of pkgs) {
     const children = pkgs.filter(
       (c) =>
-        c.path.startsWith(`${parent.path}/`) &&
-        c.language === parent.language &&
-        !drop.has(c.path),
+        c.path.startsWith(`${parent.path}/`) && c.language === parent.language && !drop.has(c.path),
     );
     if (children.length > 4) {
       counts.set(parent.path, children.length);

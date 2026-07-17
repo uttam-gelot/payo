@@ -251,7 +251,13 @@ describe('llmDetect — __conflicts channel', () => {
       packages: [{ path: 'services', language: 'rust' }],
       secondary: ['rust'],
     };
-    const res = await llmDetect(mono, 'claude', 'partial', '/tmp', deps({ database: 'postgresql' }));
+    const res = await llmDetect(
+      mono,
+      'claude',
+      'partial',
+      '/tmp',
+      deps({ database: 'postgresql' }),
+    );
     expect(res.answers.database).toBe('postgresql');
     expect(res.packages).toEqual([{ path: 'services', language: 'rust' }]);
     expect(res.secondary).toEqual(['rust']);

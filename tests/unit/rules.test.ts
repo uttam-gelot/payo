@@ -287,7 +287,7 @@ describe('hybrid repo rendering', () => {
   });
 
   it('omits the additional-languages line when there are none', () => {
-    const md = renderMarkdown('Rules', buildBaseRules({ language: 'typescript' } as Answers));
+    const md = renderMarkdown('Rules', buildBaseRules({ language: 'typescript' }));
     expect(md).not.toContain('Additional languages');
   });
 });

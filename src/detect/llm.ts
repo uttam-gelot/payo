@@ -262,7 +262,10 @@ const MAX_EVIDENCE = 200;
  * suggestion in-vocab and actually different. Everything else is dropped —
  * a noisy agent can never corrupt the session through this channel.
  */
-function validateConflicts(raw: Record<string, unknown>, base: DetectionResult): DetectionConflict[] {
+function validateConflicts(
+  raw: Record<string, unknown>,
+  base: DetectionResult,
+): DetectionConflict[] {
   const list = raw.__conflicts;
   if (!Array.isArray(list)) return [];
   const known = base.answers as Answers;

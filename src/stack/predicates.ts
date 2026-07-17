@@ -73,6 +73,8 @@ export const hasTesting = (a: Answers): boolean => {
   const chosen = (key: string): boolean =>
     typeof a[key] === 'string' && a[key] !== '' && a[key] !== 'none';
   return (
-    (Array.isArray(a.testTypes) && a.testTypes.length > 0) || chosen('testRunner') || chosen('e2eTool')
+    (Array.isArray(a.testTypes) && a.testTypes.length > 0) ||
+    chosen('testRunner') ||
+    chosen('e2eTool')
   );
 };
