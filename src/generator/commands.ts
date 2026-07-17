@@ -10,7 +10,7 @@
  */
 import type { Answers } from '../questions/types';
 import { getModule } from '../stack/registry';
-import { dbFamily } from '../stack/predicates';
+import { dbFamily, hasTesting } from '../stack/predicates';
 
 export interface StackCommands {
   /** Official generator/init command, or undefined when the stack has none. */
@@ -34,7 +34,9 @@ export function resolveCommands(a: Answers): StackCommands {
   return {
     scaffold: framework?.scaffold?.(a),
     dev: framework?.devCommand?.(a),
-    test: framework?.testCommand?.(a),
+    // No test command for a project whose testing was skipped — the bootstrap
+    // prompt must not tell the user to run tests they chose not to have.
+    test: hasTesting(a) ? framework?.testCommand?.(a) : undefined,
     build: framework?.buildCommand?.(a),
     migrate: orm?.migrateCommand?.(a) ?? db?.migrateCommand?.(a),
   };

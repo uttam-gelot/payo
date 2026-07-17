@@ -106,3 +106,43 @@ describe('writeBootstrapPrompt', () => {
     });
   });
 });
+
+describe('skipped answers stay out of the prompt', () => {
+  it('never mentions tests when the user skipped testing', () => {
+    const noTests = buildBootstrapPrompt(
+      {
+        language: 'typescript',
+        framework: 'nextjs',
+        packageManager: 'pnpm',
+        formatter: 'prettier',
+        linter: 'eslint',
+      },
+      files,
+      'Claude (Anthropic)',
+    );
+    for (const line of noTests.split('\n')) {
+      expect(line.toLowerCase()).not.toContain('test');
+    }
+  });
+
+  it('mentions tests when testing was selected', () => {
+    const withTests = buildBootstrapPrompt(
+      { language: 'typescript', framework: 'nextjs', packageManager: 'pnpm', testTypes: ['unit'] },
+      files,
+      'Claude (Anthropic)',
+    );
+    expect(withTests).toContain('run tests with `pnpm test`');
+  });
+
+  it('the meta-prompt drops the test step for a no-tests project', () => {
+    const meta = buildBootstrapMetaPrompt(
+      { language: 'typescript', framework: 'nextjs', packageManager: 'pnpm' },
+      files,
+      'Claude (Anthropic)',
+      resolveCommands({ language: 'typescript', framework: 'nextjs', packageManager: 'pnpm' }),
+    );
+    expect(meta).toContain('exact run/build commands');
+    expect(meta).not.toContain('run/build/test');
+    expect(meta).toContain('must not tell the reader to add or run tests');
+  });
+});

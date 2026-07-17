@@ -16,6 +16,7 @@ import type { Answers } from '../questions/types';
 import { writeFileAtomic } from '../fsutil';
 import { buildBaseRules, fenceProjectData, renderMarkdown } from './rules';
 import { resolveCommands, type StackCommands } from './commands';
+import { hasTesting } from '../stack/predicates';
 
 /** Read a string answer, treating empty / 'none' as unset (mirrors rules.ts). */
 function str(a: Answers, key: string): string | undefined {
@@ -87,11 +88,15 @@ function taskSteps(answers: Answers): string {
     cmds.test && `run tests with \`${cmds.test}\``,
     cmds.migrate && `run migrations with \`${cmds.migrate}\``,
   ].filter(Boolean);
+  // Only promise verification commands the user actually selected — a project
+  // whose testing was skipped must not be told to run tests.
+  const verifyCmds = ['typecheck', lint && 'lint', hasTesting(answers) && 'test']
+    .filter(Boolean)
+    .join(' / ');
   steps.push(
     'Give me the precise install and run commands' +
       (runParts.length ? ` (${runParts.join(', ')})` : '') +
-      ', plus the exact typecheck / lint / test commands so I can confirm the skeleton is ' +
-      'green.',
+      `, plus the exact ${verifyCmds} commands so I can confirm the skeleton is green.`,
   );
   steps.push('Then wait for me to run it and report back; fix issues until it runs.');
 
@@ -156,8 +161,9 @@ export function buildBootstrapMetaPrompt(
     'Compose a focused, paste-ready prompt that: opens with the engineer role and goal; ' +
       'restates the spec concisely; points at the source-of-truth files as canonical; and ' +
       'gives a short numbered task list (scaffold → structure → runnable skeleton → install ' +
-      '→ wire formatter/linter → `.env.example` → exact run/build/test commands → iterate). ' +
-      'Keep it tight and runnable; no filler.',
+      `→ wire formatter/linter → \`.env.example\` → exact run/build${hasTesting(answers) ? '/test' : ''} commands → iterate). ` +
+      'Keep it tight and runnable; no filler. Mention ONLY what the specification names — ' +
+      'if it lists no testing setup, the prompt must not tell the reader to add or run tests.',
     'Requirements:',
     [
       '- Write the result to the project-local file ./bootstrap-prompt.md (relative to the ' +
