@@ -226,6 +226,13 @@ export function findQuestion(
   return undefined;
 }
 
+/**
+ * Derived facts the CLI records that are not flow questions (detection carries
+ * them to the generator). Reconcile prunes by flow reachability, so without an
+ * exemption these would be silently dropped before generation.
+ */
+const SYNTHETIC_IDS = new Set(['monorepoPackages', 'secondaryLanguages', 'detectEverything']);
+
 /** Ids reachable under the given answers: askable questions + active gate decisions. */
 function reachableIds(flow: FlowSection[], answers: Answers): Set<string> {
   const ids = new Set<string>();
@@ -271,7 +278,10 @@ export function reconcile(flow: FlowSection[], session: Session): Session {
   let s = session;
   for (;;) {
     const reachable = reachableIds(flow, s.answers);
-    const stale = [...s.answered.filter((id) => !reachable.has(id)), ...outOfRangeIds(flow, s)];
+    const stale = [
+      ...s.answered.filter((id) => !reachable.has(id) && !SYNTHETIC_IDS.has(id)),
+      ...outOfRangeIds(flow, s),
+    ];
     if (stale.length === 0) return s;
     s = forgetAnswers(s, stale);
   }
