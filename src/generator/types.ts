@@ -64,10 +64,10 @@ export interface GenerateHooks {
   onSkill?(title: string, index: number, total: number): void;
   /** Called when a skill was reused from a prior run instead of regenerated. */
   onSkillSkip?(title: string): void;
-  /** Called when a skill's run failed and another attempt is about to start. */
-  onSkillRetry?(title: string, attempt: number): void;
-  /** Called after each skill's agent run completes. */
-  onSkillResult?(title: string, ok: boolean): void;
+  /** Called when a skill's run failed and another attempt is about to start. `reason` is the agent's stderr/diagnostic. */
+  onSkillRetry?(title: string, attempt: number, reason?: string): void;
+  /** Called after each skill's agent run completes. On failure, `reason` is the agent's stderr/diagnostic. */
+  onSkillResult?(title: string, ok: boolean, reason?: string): void;
 }
 
 /**
@@ -92,4 +92,6 @@ export interface GenerationResult {
   skills?: string[];
   /** AI mode: skill titles whose agent run failed. */
   failures?: string[];
+  /** AI mode: per-failure diagnostic (agent stderr / exit reason) for surfacing to the user. */
+  failureDetails?: { title: string; reason?: string }[];
 }

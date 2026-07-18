@@ -237,6 +237,8 @@ interface SkillRun {
   /** Project-relative path the skill was directed to write. */
   path: string;
   wrote: boolean;
+  /** When wrote is false: the agent's stderr / exit diagnostic, for surfacing. */
+  reason?: string;
 }
 
 /** Run every skill's agent concurrently (bounded), reporting progress per skill. */
@@ -263,17 +265,22 @@ function runParallel(
     // a pre-existing file left untouched by a no-op run must not pass.
     const before = snapshotTarget(rel);
     let wrote = false;
+    let reason: string | undefined;
     for (let attempt = 1; attempt <= attempts && !wrote; attempt++) {
       const result = await runAgent(runner, prompt);
       wrote = result.ok && verifiedWrite(rel, before);
       if (!wrote) {
+        // Distinguish a hard agent failure (stderr) from a clean exit that wrote nothing.
+        reason = result.ok
+          ? 'agent exited 0 but wrote no file'
+          : result.stderr || 'agent run failed';
         cleanupFailedAttempt(rel, before);
-        if (attempt < attempts) hooks.onSkillRetry?.(skill.title, attempt);
+        if (attempt < attempts) hooks.onSkillRetry?.(skill.title, attempt, reason);
       }
     }
     if (wrote) resume?.mark(skill.id);
-    hooks.onSkillResult?.(skill.title, wrote);
-    return { skill, path: rel, wrote };
+    hooks.onSkillResult?.(skill.title, wrote, wrote ? undefined : reason);
+    return { skill, path: rel, wrote, reason: wrote ? undefined : reason };
   });
 }
 
@@ -305,12 +312,14 @@ async function runUniversal(
 
   const generated: SkillRun[] = [];
   const failures: string[] = [];
+  const failureDetails: { title: string; reason?: string }[] = [];
   for (const r of runs) {
     if (r.wrote) {
       ensureFrontmatter(r.skill, r.path);
       generated.push(r);
     } else {
       failures.push(r.skill.title);
+      failureDetails.push({ title: r.skill.title, reason: r.reason });
     }
   }
   if (generated.length === 0) return null;
@@ -342,6 +351,7 @@ async function runUniversal(
     files,
     skills: generated.map((r) => r.skill.title),
     failures: failures.length ? failures : undefined,
+    failureDetails: failureDetails.length ? failureDetails : undefined,
   };
 }
 
