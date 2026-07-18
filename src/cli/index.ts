@@ -302,16 +302,27 @@ export async function run(): Promise<void> {
       },
       onSkill: (title, index, total) => log.step(`(${index}/${total}) Generating ${title}…`),
       onSkillSkip: (title) => log.info(`${title} already generated — skipping.`),
-      onSkillRetry: (title, attempt) => log.warn(`${title} failed (attempt ${attempt}); retrying…`),
-      onSkillResult: (title, ok) => {
-        if (!ok) log.warn(`${title} failed (will fall back to templates if all fail).`);
+      onSkillRetry: (title, attempt, reason) =>
+        log.warn(`${title} failed (attempt ${attempt})${reason ? `: ${reason}` : ''}; retrying…`),
+      onSkillResult: (title, ok, reason) => {
+        if (!ok)
+          log.warn(
+            `${title} failed${reason ? `: ${reason}` : ''} (will fall back to templates if all fail).`,
+          );
       },
     },
     resume,
   );
   if (result.mode === 'ai') {
     const lines = result.files.map((f) => `• ${f}`);
-    if (result.failures?.length) lines.push(`(failed: ${result.failures.join(', ')})`);
+    if (result.failureDetails?.length) {
+      lines.push('Failed:');
+      for (const f of result.failureDetails) {
+        lines.push(`  ✗ ${f.title}${f.reason ? ` — ${f.reason}` : ''}`);
+      }
+    } else if (result.failures?.length) {
+      lines.push(`(failed: ${result.failures.join(', ')})`);
+    }
     note(lines.join('\n'), `Generated via ${result.providerName} (AI) in ${process.cwd()}`);
   } else {
     note(
