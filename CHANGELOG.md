@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-07-18
+
+### Changed
+
+- AI skill generation now surfaces the agent's own failure reason when a run
+  fails. Instead of a generic "generation failed", the CLI reports the
+  underlying cause reported by the agent CLI (timeout, permission denial,
+  non-zero exit, empty output), so a failed file is easier to diagnose and
+  retry. (#49)
+
+## [2.1.1] - 2026-07-18
+
+### Fixed
+
+- Synthetic detection facts (values inferred rather than read verbatim from a
+  manifest) were dropped when the detection result was reconciled with the
+  questionnaire answers. They now survive reconcile, so a detected-but-inferred
+  stack fact is no longer silently lost before generation. (#48)
+
+## [2.1.0] - 2026-07-17
+
 ### Added
 
 - **Hybrid / polyglot project detection.** A monorepo mixing stacks (e.g. a
@@ -42,10 +63,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reads as javascript.
 - A successful Stage-2 pass dropped the monorepo package list (and secondary
   languages) from the detection result.
+
+## [2.0.2] - 2026-07-17
+
+### Changed
+
+- **"Detect everything" is now recommended** as the default path for existing
+  projects, and the change-audit skill defaults to running **before push**.
+  Both are still shown up front and editable — the recommendation just matches
+  what most existing-project runs want. (#46)
+
+## [2.0.1] - 2026-07-15
+
+### Added
+
+- **Git convention detection.** Payo now infers your branch-naming and
+  commit-message conventions by parsing recent **local** git history (branch
+  names and commit subjects) — Conventional Commits, gitmoji, ticket-prefixed, or
+  free-form; `feature/`-style, ticket-keyed, or kebab-case branches. The parse
+  stays on your machine and is never placed in any AI prompt. New
+  `branchNaming` / `commitConvention` questions carry it into the generated
+  git-workflow guidance, each with an "Other" option for a custom format.
+
+### Changed
+
+- **"Detect everything" now treats the existing code as the source of truth.**
+  It records exactly what it detects (stack, conventions, and git branch/commit
+  style) and **skips anything it can't find** — no skill is created for it and it
+  is not mentioned. Undetected topics are no longer filled with recommended
+  defaults, so it no longer fabricates testing, API versioning, folder structure,
+  or auth the project doesn't have. Only a small set of safe assistant policies
+  (no AI attribution, task-scoped/atomic commits, confirm-before-push,
+  verify-before-push, `.env.example`-only, DRY/modular standards) are applied
+  without detection — shown explicitly up front and editable on the review screen.
+  The generated skills document the conventions actually present in the code
+  (e.g. no `/v1` versioning is prescribed unless the API is versioned). "Just the
+  high-level stack" is unchanged (conventions still interviewed). (#45)
+
+### Fixed
+
 - The bootstrap prompt, git-workflow skill, and generated rules mentioned
   tests for projects whose testing was skipped ("run the formatter, linter,
   and tests…"). All test commands and test prose are now gated on testing
   actually being selected, and only the chosen tools are named.
+
+## [2.0.0] - 2026-07-14
 
 ### Changed
 
@@ -58,25 +120,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.windsurfrules`, `AI_RULES.md`, and the single-file `AGENTS.md` merge) are
   retired. Claude Code and Windsurf are covered by `.claude/skills` and
   `.windsurf/skills` shims (relative symlinks; recursive directory copies where
-  symlinks are unavailable, e.g. Windows without Developer Mode).
+  symlinks are unavailable, e.g. Windows without Developer Mode). (#41)
 - The AI-tool question is reframed and rephrased ("Which AI CLI should Payo use
   to write your skills?"): it picks which agent CLI authors the content (the
   output works with every skills-compatible tool). Its options list only
   providers with a CLI runner, with no "recommended" tag.
 - The welcome banner now describes the universal Agent Skills layout and the
   8-language stack detection.
-- **"Detect everything" now treats the existing code as the source of truth.**
-  It records exactly what it detects (stack, conventions, and git branch/commit
-  style) and **skips anything it can't find** — no skill is created for it and it
-  is not mentioned. Undetected topics are no longer filled with recommended
-  defaults, so it no longer fabricates testing, API versioning, folder structure,
-  or auth the project doesn't have. Only a small set of safe assistant policies
-  (no AI attribution, task-scoped/atomic commits, confirm-before-push,
-  verify-before-push, `.env.example`-only, DRY/modular standards) are applied
-  without detection — shown explicitly up front and editable on the review screen.
-  The generated skills document the conventions actually present in the code
-  (e.g. no `/v1` versioning is prescribed unless the API is versioned). "Just the
-  high-level stack" is unchanged (conventions still interviewed).
 - Providers shrank to identity, `knownArtifacts` (kept for detection and the
   overwrite guard), and an optional CLI runner (`binary` + `buildArgs`); output
   paths and per-tool frontmatter are gone. `buildArgs` — the agent permission
@@ -84,71 +134,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Git convention detection.** Payo now infers your branch-naming and
-  commit-message conventions by parsing recent **local** git history (branch
-  names and commit subjects) — Conventional Commits, gitmoji, ticket-prefixed, or
-  free-form; `feature/`-style, ticket-keyed, or kebab-case branches. The parse
-  stays on your machine and is never placed in any AI prompt. New
-  `branchNaming` / `commitConvention` questions carry it into the generated
-  git-workflow guidance, each with an "Other" option for a custom format.
 - `AGENTS.md` now opens its skills index with a directive telling the agent to
   consult and follow the applicable skills before writing or changing code — so
   the generated guidance is used, not merely listed. Written on both the
-  AI-authored and static-template paths.
+  AI-authored and static-template paths. (#44)
 - Opt-in **change-audit** skill. The questionnaire (every project) asks whether
   to add it and, if so, when it runs — before every commit or before pushing.
   When enabled, Payo writes `.agents/skills/change-audit/SKILL.md`: a minimal,
   token-frugal skill the agent invokes at that point to read the pending change,
   smartly select only the relevant project skills (not every skill), and report
-  anything that conflicts. Model-invoked only — no git hooks or runtime tooling.
+  anything that conflicts. Model-invoked only — no git hooks or runtime tooling. (#44)
 - Monorepo workspace detection. On existing projects Payo now enumerates
   workspace members across pnpm / npm / yarn / lerna, Cargo, `go.work`, and
   Maven / Gradle, detects each package's stack, and surfaces the real app stack
   as the primary answers (the root manifest is usually just workspace config +
   shared tooling). The generated `AGENTS.md` gains a **Monorepo Structure**
   guidance section plus a **Workspace Packages** list naming each member and its
-  stack. Single-package repos are unaffected.
+  stack. Single-package repos are unaffected. (#43)
 - A "which AI tools should the skills support?" multiselect scopes shim output
   to the tools you actually use: only Claude Code (`.claude/skills` + `CLAUDE.md`)
   and Windsurf (`.windsurf/skills`) produce shim artifacts; tools that read
   `.agents/skills` natively (Codex, Cursor, Copilot, Antigravity) add nothing
   extra. It defaults to the generator CLI's own tool. `AGENTS.md` and
-  `.agents/skills/**` are always written.
+  `.agents/skills/**` are always written. (#41)
 - On regeneration, Payo offers to remove retired per-tool config the universal
   layout supersedes (`.cursorrules`, `.windsurfrules`, `.cursor/rules`,
   `.github/instructions`, `.github/copilot-instructions.md`, `AI_RULES.md`) —
-  opt-in, only after a successful write.
-- Koa support on both paths: the questionnaire offers Koa (framework) with
-  follow-ups for routing (`@koa/router`), body parsing, and security middleware,
-  and detection reads `package.json` to recognize the `koa` dependency.
-- PHP / Laravel support on both paths: the questionnaire offers Laravel
-  (framework), Eloquent (ORM), Laravel Sanctum / Breeze / Passport (auth), and
-  PHP-ecosystem tooling (Pint, PHPStan/Psalm, Monolog, PHPUnit/Pest, Symfony
-  Console), and detection reads `composer.json` to pre-fill them.
-- C# / .NET support on both paths: the questionnaire offers ASP.NET Core
-  (framework), Entity Framework Core and Dapper (ORMs), SQL Server (database),
-  and .NET-ecosystem tooling (dotnet format / CSharpier, Roslynator / StyleCop,
-  Serilog / NLog, xUnit / NUnit / MSTest, FluentValidation, ASP.NET Core
-  Identity / JWT Bearer, System.CommandLine / Spectre.Console), and detection
-  reads `*.csproj` package references to pre-fill them.
+  opt-in, only after a successful write. (#41)
+
+### Fixed
+
+- Bootstrap generation is skipped on existing projects (there's already a
+  project to bootstrap), and the questionnaire lets you choose when the
+  verify/change-audit step runs. (#42)
+- The Antigravity provider wrote skills as flat `.agents/skills/<id>.md` files,
+  which the Agent Skills spec — and every `.agents/skills` reader — cannot
+  discover (it requires a `<id>/SKILL.md` directory whose name matches the
+  `name` frontmatter). The universal layout fixes this by construction. (#41)
+
+## [1.4.0] - 2026-07-11
+
+### Added
+
+- Ruby / Rails support on both paths: the questionnaire offers Ruby on Rails
+  (framework, Hotwire / jsbundling / API-only), Active Record (ORM), Devise /
+  OmniAuth (auth), and Ruby-ecosystem tooling (RuboCop / StandardRB, Lograge /
+  Semantic Logger, RSpec / Minitest, dry-validation, Thor / GLI), and detection
+  reads the `Gemfile` to pre-fill them. (#40)
 - Java / Spring Boot support on both paths: the questionnaire offers Spring Boot
   (framework, Spring MVC / WebFlux), Spring Data JPA / Hibernate (ORM), Maven /
   Gradle build tools, and JVM-ecosystem tooling (Spotless / google-java-format,
   Checkstyle / PMD / SpotBugs, SLF4J+Logback / Log4j2, JUnit 5 / TestNG,
   Hibernate Validator, Spring Security / OAuth2, Picocli / Spring Shell), and
-  detection reads `pom.xml` and `build.gradle(.kts)` to pre-fill them.
-- Ruby / Rails support on both paths: the questionnaire offers Ruby on Rails
-  (framework, Hotwire / jsbundling / API-only), Active Record (ORM), Devise /
-  OmniAuth (auth), and Ruby-ecosystem tooling (RuboCop / StandardRB, Lograge /
-  Semantic Logger, RSpec / Minitest, dry-validation, Thor / GLI), and detection
-  reads the `Gemfile` to pre-fill them.
+  detection reads `pom.xml` and `build.gradle(.kts)` to pre-fill them. (#39)
+- Koa support on both paths: the questionnaire offers Koa (framework) with
+  follow-ups for routing (`@koa/router`), body parsing, and security middleware,
+  and detection reads `package.json` to recognize the `koa` dependency. (#38)
+- C# / .NET support on both paths: the questionnaire offers ASP.NET Core
+  (framework), Entity Framework Core and Dapper (ORMs), SQL Server (database),
+  and .NET-ecosystem tooling (dotnet format / CSharpier, Roslynator / StyleCop,
+  Serilog / NLog, xUnit / NUnit / MSTest, FluentValidation, ASP.NET Core
+  Identity / JWT Bearer, System.CommandLine / Spectre.Console), and detection
+  reads `*.csproj` package references to pre-fill them. (#37)
 
-### Fixed
+## [1.3.0] - 2026-07-09
 
-- The Antigravity provider wrote skills as flat `.agents/skills/<id>.md` files,
-  which the Agent Skills spec — and every `.agents/skills` reader — cannot
-  discover (it requires a `<id>/SKILL.md` directory whose name matches the
-  `name` frontmatter). The universal layout fixes this by construction.
+### Added
+
+- PHP / Laravel support on both paths: the questionnaire offers Laravel
+  (framework), Eloquent (ORM), Laravel Sanctum / Breeze / Passport (auth), and
+  PHP-ecosystem tooling (Pint, PHPStan/Psalm, Monolog, PHPUnit/Pest, Symfony
+  Console), and detection reads `composer.json` to pre-fill them. (#36)
 
 ## [1.2.0] - 2026-07-03
 
@@ -240,7 +296,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pre-existing `CLAUDE.md` can no longer be clobbered outside the overwrite
   prompt. (#28)
 
-[Unreleased]: https://github.com/uttam-gelot/payo/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/uttam-gelot/payo/compare/v2.1.2...HEAD
+[2.1.2]: https://github.com/uttam-gelot/payo/compare/v2.1.1...v2.1.2
+[2.1.1]: https://github.com/uttam-gelot/payo/compare/v2.1.0...v2.1.1
+[2.1.0]: https://github.com/uttam-gelot/payo/compare/v2.0.2...v2.1.0
+[2.0.2]: https://github.com/uttam-gelot/payo/compare/v2.0.1...v2.0.2
+[2.0.1]: https://github.com/uttam-gelot/payo/compare/v2.0.0...v2.0.1
+[2.0.0]: https://github.com/uttam-gelot/payo/compare/v1.4.0...v2.0.0
+[1.4.0]: https://github.com/uttam-gelot/payo/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/uttam-gelot/payo/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/uttam-gelot/payo/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/uttam-gelot/payo/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/uttam-gelot/payo/compare/v1.1.0...v1.1.1

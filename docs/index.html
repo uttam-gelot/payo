@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <title>Payo — CLAUDE.md, .cursorrules &amp; AGENTS.md generator CLI</title>
-  <meta name="description" content="Payo is a free CLI that generates project-tailored AI assistant rules — CLAUDE.md, .cursorrules, Copilot instructions, and AGENTS.md — in minutes. Works with Claude, Cursor, Copilot, Codex, Windsurf, and Antigravity." />
-  <meta name="keywords" content="CLAUDE.md generator, cursor rules generator, .cursorrules generator, copilot instructions generator, AGENTS.md generator, AI coding assistant rules, project context generator" />
+  <title>Payo — CLAUDE.md, AGENTS.md &amp; Agent Skills generator CLI</title>
+  <meta name="description" content="Payo is a free CLI that generates project-tailored AI assistant rules — CLAUDE.md, AGENTS.md, and universal Agent Skills — in minutes. Works with Claude, Cursor, Copilot, Codex, Windsurf, and Antigravity." />
+  <meta name="keywords" content="CLAUDE.md generator, AGENTS.md generator, Agent Skills generator, cursor rules generator, copilot instructions generator, AI coding assistant rules, project context generator" />
   <meta name="author" content="Payo" />
   <meta name="robots" content="index, follow, max-image-preview:large" />
   <meta name="theme-color" content="#046f73" />
@@ -20,21 +20,21 @@
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Payo" />
   <meta property="og:url" content="https://payo.uttamgelot.com/" />
-  <meta property="og:title" content="Payo — CLAUDE.md, .cursorrules &amp; AGENTS.md generator CLI" />
-  <meta property="og:description" content="Generate project-tailored AI assistant rules — CLAUDE.md, .cursorrules, Copilot instructions, AGENTS.md — in minutes. Works with Claude, Cursor, Copilot, Codex, Windsurf, and Antigravity." />
+  <meta property="og:title" content="Payo — CLAUDE.md, AGENTS.md &amp; Agent Skills generator CLI" />
+  <meta property="og:description" content="Generate project-tailored AI assistant rules — CLAUDE.md, AGENTS.md, and universal Agent Skills — in minutes. Works with Claude, Cursor, Copilot, Codex, Windsurf, and Antigravity." />
   <meta property="og:image" content="https://payo.uttamgelot.com/og.png" />
   <meta property="og:image:secure_url" content="https://payo.uttamgelot.com/og.png" />
   <meta property="og:image:type" content="image/png" />
   <meta property="og:image:width" content="2400" />
   <meta property="og:image:height" content="1260" />
-  <meta property="og:image:alt" content="Payo — generate CLAUDE.md, .cursorrules, Copilot instructions, and AGENTS.md in minutes." />
+  <meta property="og:image:alt" content="Payo — generate CLAUDE.md, AGENTS.md, and universal Agent Skills in minutes." />
   <meta property="og:locale" content="en_US" />
 
   <meta name="google-site-verification" content="_yiJtrJdbV0s8nQ2owfdkDHGfmy1tE7IVs1xbc-GPOo" />
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Payo — CLAUDE.md, .cursorrules &amp; AGENTS.md generator CLI" />
+  <meta name="twitter:title" content="Payo — CLAUDE.md, AGENTS.md &amp; Agent Skills generator CLI" />
   <meta name="twitter:description" content="Generate project-tailored AI assistant rules in minutes. Works with Claude, Cursor, Copilot, Codex, Windsurf, Antigravity." />
   <meta name="twitter:image" content="https://payo.uttamgelot.com/og.png" />
   <meta name="twitter:image:alt" content="Payo — generate AI assistant rules in minutes." />
@@ -47,11 +47,11 @@
     "name": "Payo",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "Windows, macOS, Linux",
-    "description": "CLI that generates project-tailored AI assistant rules — CLAUDE.md, .cursorrules, Copilot instructions, AGENTS.md — in minutes.",
+    "description": "CLI that generates project-tailored AI assistant rules — CLAUDE.md, AGENTS.md, and universal Agent Skills — in minutes.",
     "url": "https://payo.uttamgelot.com/",
     "image": "https://payo.uttamgelot.com/og.png",
     "downloadUrl": "https://www.npmjs.com/package/@uge/payo",
-    "softwareVersion": "1.0.0",
+    "softwareVersion": "2.1.2",
     "license": "https://opensource.org/licenses/MIT",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
   }
@@ -293,9 +293,9 @@
       <h1>AI assistant rules for your project, in <span class="accent">minutes</span>.</h1>
       <p class="lede">
         Payo is a free CLI that writes the guidance files your AI coding assistant reads —
-        <strong>CLAUDE.md</strong>, <strong>.cursorrules</strong>,
-        <strong>Copilot instructions</strong>, and <strong>AGENTS.md</strong> — tailored to your
-        actual stack.
+        an <strong>AGENTS.md</strong> entrypoint, a <strong>CLAUDE.md</strong> shim, and
+        universal <strong>Agent Skills</strong> — tailored to your actual stack, read natively
+        by Cursor, Copilot, Codex, and friends.
       </p>
 
       <div class="hero-cta">
@@ -311,7 +311,7 @@
       <p class="cmd-note">Prefer Bun? <code>bunx @uge/payo</code> works too. No install required — needs only Node.js 20.12+.</p>
 
       <div class="demo-wrap">
-        <img class="demo" src="https://raw.githubusercontent.com/uttam-gelot/payo/main/assets/demo.gif" alt="Payo CLI generating CLAUDE.md, .cursorrules, and AGENTS.md from a short questionnaire" loading="lazy" />
+        <img class="demo" src="https://raw.githubusercontent.com/uttam-gelot/payo/main/assets/demo.gif" alt="Payo CLI generating CLAUDE.md, AGENTS.md, and Agent Skills from a short questionnaire" loading="lazy" />
       </div>
     </div>
   </header>
@@ -346,8 +346,9 @@
         <h2>Knows your stack, not just generic advice</h2>
         <p>
           Payo understands <strong>30 frameworks</strong>, <strong>29 ORMs</strong>, and
-          <strong>17 databases</strong> across eight languages — and tailors its questions and the
-          generated rules to whatever you pick. Choose Next.js and you get Next.js follow-ups;
+          <strong>17 databases</strong> across eight languages — backed by a bank of
+          <strong>200+ stack-tailored questions</strong> it draws from, asking only the handful
+          your stack needs. Choose Next.js and you get Next.js follow-ups;
           choose Postgres and you're asked about migrations and naming; pick Tailwind or Clerk
           and you get provider-specific conventions in the generated rules.
         </p>
@@ -509,7 +510,7 @@
             <li><b>Get tailored guidance files.</b> <span>Rich AI-written docs when the tool's CLI is present, solid templates otherwise.</span></li>
             <li><b>Optional bootstrap prompt.</b> <span>A paste-ready prompt to scaffold a runnable project honoring the rules.</span></li>
           </ol>
-          <p class="stat">Understands <b>30 frameworks</b>, <b>29 ORMs</b>, and <b>17 databases</b> across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby.</p>
+          <p class="stat">Understands <b>30 frameworks</b>, <b>29 ORMs</b>, and <b>17 databases</b> across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby — from a bank of <b>200+ stack-tailored questions</b>.</p>
         </div>
       </div>
     </section>
