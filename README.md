@@ -246,8 +246,9 @@ every skills-compatible tool regardless of that choice.
 ## What it asks about
 
 Payo understands **30 frameworks, 29 ORMs, and 17 databases** across
-**TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby** — and tailors its follow-up
-questions to whatever you pick. Dimensions covered:
+**TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby** — backed by a
+bank of **200+ stack-tailored questions** it draws from, asking only the handful
+your stack needs. Dimensions covered:
 
 - **Project** — type (frontend / backend / full-stack / CLI / script) and a short description
 - **Language & framework** — plus framework-specific conventions
