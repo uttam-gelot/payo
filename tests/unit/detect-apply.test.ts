@@ -131,6 +131,28 @@ describe('detection apply policy', () => {
       expect(s.answered).toContain('packageManager');
     }));
 
+  it('reconcile keeps synthetic derived facts (not flow questions)', () =>
+    inTempProject((dir) => {
+      // The CLI records these from detection for the generator; they have no
+      // Question, so flow reachability must not treat them as stale.
+      writeMonorepo(dir);
+      let s = createSession();
+      s = recordAnswer(s, 'language', 'typescript');
+      s = recordAnswer(s, 'monorepoPackages', [{ path: 'services', language: 'rust' }]);
+      s = recordAnswer(s, 'secondaryLanguages', ['rust']);
+      s = recordAnswer(s, 'detectEverything', true);
+      s = reconcile(flow, s);
+
+      expect(s.answers.secondaryLanguages).toEqual(['rust']);
+      expect(s.answers.monorepoPackages).toEqual([{ path: 'services', language: 'rust' }]);
+      expect(s.answers.detectEverything).toBe(true);
+
+      // A genuinely stale question answer is still pruned.
+      s = recordAnswer(s, 'mysteryField', 'x');
+      s = reconcile(flow, s);
+      expect('mysteryField' in s.answers).toBe(false);
+    }));
+
   it('drops unknown ids — only classified ids are ever applied', () => {
     const { tier1, tier2 } = splitByTier({ framework: 'nextjs', mysteryField: 'x' });
     expect(tier1.framework).toBe('nextjs');
