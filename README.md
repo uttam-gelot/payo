@@ -161,7 +161,8 @@ When detection finds a manifest, you get two quick choices:
     **skips anything it can't find**: no skill is created for it and it isn't
     mentioned. The only things applied without detection are a few safe assistant
     policies (no AI attribution in commits, task-scoped atomic commits, confirm
-    before push, verify before push, work from `.env.example`, and DRY/modular
+    before push, verify before push, gitleaks secret scan before push, confirm
+    before destructive SQL / migrations, work from `.env.example`, and DRY/modular
     coding standards) — all shown up front and editable on the review screen. You
     land straight on that review screen and confirm once.
   - **Just the high-level stack** fills in the stack facts only and interviews you
@@ -255,15 +256,18 @@ your stack needs. Dimensions covered:
 - **API** — REST, GraphQL, gRPC, tRPC
 - **Frontend** — styling and state management, with provider-specific
   conventions for Tailwind, shadcn/ui, and CSS Modules
-- **Data** — database and ORM/data-layer, with naming & migration conventions
+- **Data** — database and ORM/data-layer, with naming & migration conventions,
+  plus a guardrail requiring confirmation before destructive SQL or migrations
 - **Auth** — approach, session strategy, RBAC, plus provider-specific
   conventions for Clerk, Auth.js, Better Auth, and Supabase Auth
 - **Validation & logging** — stack-appropriate libraries
 - **Testing** — unit / integration / component / E2E and runners
 - **Tooling** — package manager, runtime, formatter, linter
 - **TypeScript** — `tsconfig` strictness, target, module resolution, path aliases
-- **Conventions** — folder structure, coding standards, docs, git workflow, and
-  branch-naming / commit-message style (inferred from local git history)
+- **Conventions** — folder structure, coding standards, docs, git workflow,
+  branch-naming / commit-message style (inferred from local git history), and an
+  option to add a gitleaks secret-scan convention (scan for leaked secrets before
+  every push)
 - **Change audit** _(optional)_ — opt into a skill that checks your pending
   change against the project skills before commit or push
 

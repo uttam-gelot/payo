@@ -97,6 +97,11 @@
         "@type": "Question",
         "name": "Can Payo audit my changes against the project rules?",
         "acceptedAnswer": { "@type": "Answer", "text": "Yes, optionally. Payo can add a change-audit skill: opt in during the questionnaire and choose when it runs — before every commit or before pushing. At that point your AI assistant reads the pending change, picks only the relevant project skills, and reports anything that conflicts before you commit or push. It's a model-invoked skill, so there are no git hooks to install. The generated AGENTS.md also tells the assistant to consult and follow the applicable skills before writing code." }
+      },
+      {
+        "@type": "Question",
+        "name": "Does Payo add safety guardrails for databases and secrets?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Payo asks whether the assistant must get explicit confirmation before running destructive SQL or database migrations, and whether to add a gitleaks secret-scan convention that scans for leaked secrets before every push. Payo installs nothing — it just writes the skills. Both are recommended on and applied as safe policies in Detect everything — the destructive-SQL guardrail lands in the generated data-layer skill, and the gitleaks scan lands in the git-workflow guidance." }
       }
     ]
   }
@@ -545,6 +550,10 @@
         <details>
           <summary>Can Payo audit my changes against the project rules?</summary>
           <p>Yes, optionally. Opt into the <strong>change-audit</strong> skill during the questionnaire and pick when it runs — before every commit or before pushing. At that point your assistant reads the pending change, selects only the relevant project skills, and reports anything that conflicts. It's a model-invoked skill, so there are no git hooks to install. The generated <code>AGENTS.md</code> also tells the assistant to consult and follow the applicable skills before writing code.</p>
+        </details>
+        <details>
+          <summary>Does Payo add safety guardrails for databases and secrets?</summary>
+          <p>Yes. Payo asks whether the assistant must get explicit confirmation before running destructive SQL or database migrations, and whether to add a <strong>gitleaks</strong> secret-scan convention that scans for leaked secrets before every push. Payo installs nothing — it just writes the skills. Both are recommended on and applied as safe policies in <strong>Detect everything</strong> — the destructive-SQL guardrail lands in the generated data-layer skill, and the gitleaks scan lands in the git-workflow guidance.</p>
         </details>
         <details>
           <summary>Is Payo free and open source?</summary>

@@ -16,6 +16,13 @@ describe('tiers — classification', () => {
     expect(isTier1('structure')).toBe(false);
   });
 
+  it('treats dbSafety and gitleaks as Tier-2 safe policies', () => {
+    expect(isTier2('dbSafety')).toBe(true);
+    expect(isTier2('gitleaks')).toBe(true);
+    expect(isTier1('dbSafety')).toBe(false);
+    expect(isTier1('gitleaks')).toBe(false);
+  });
+
   it('treats tsconfig.* as Tier-1 by prefix', () => {
     expect(isTier1('tsconfig.strict')).toBe(true);
     expect(isTier1('tsconfig.target')).toBe(true);

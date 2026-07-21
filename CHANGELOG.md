@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Database safety guardrail.** A new confirm question (asked whenever a database
+  is selected) has the assistant require explicit confirmation before running any
+  destructive SQL or database migration. It's a safe policy — recommended on and
+  applied in "Detect everything" — and surfaces in the generated data-layer skill
+  and the static AGENTS.md Data section.
+- **Gitleaks secret-scan convention.** A new git-workflow confirm question adds a
+  convention to the generated skills that scans for leaked secrets with gitleaks
+  before every push. Payo installs nothing — when enabled, the generated
+  git-workflow guidance tells the assistant to run gitleaks before pushing (and to
+  install it if missing). Recommended on and carried through "Detect everything".
+
 ## [2.1.2] - 2026-07-18
 
 ### Changed

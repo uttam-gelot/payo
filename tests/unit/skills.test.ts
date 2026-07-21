@@ -122,6 +122,31 @@ describe('selectSkills', () => {
     expect(prompt).toContain('Conventional Commits');
   });
 
+  it('adds the destructive-SQL/migration guard to data-layer only when dbSafety is set', () => {
+    const on: Answers = { ...contexts.tsBackend, dbSafety: true };
+    const withGuard = selectSkills(on).find((s) => s.id === 'data-layer');
+    expect(withGuard?.buildPrompt(on)).toContain('without explicit');
+
+    const without = selectSkills(contexts.tsBackend).find((s) => s.id === 'data-layer');
+    expect(without?.buildPrompt(contexts.tsBackend)).not.toContain('without explicit');
+  });
+
+  it('applies git-workflow and adds gitleaks guidance when gitleaks is set', () => {
+    expect(ids({ ...contexts.tsBackend, gitleaks: true })).toContain('git-workflow');
+
+    const a: Answers = { ...contexts.tsBackend, gitWorkflow: 'standard', gitleaks: true };
+    const prompt = selectSkills(a)
+      .find((s) => s.id === 'git-workflow')!
+      .buildPrompt(a);
+    expect(prompt).toContain('gitleaks');
+
+    const off: Answers = { ...contexts.tsBackend, gitWorkflow: 'standard' };
+    const offPrompt = selectSkills(off)
+      .find((s) => s.id === 'git-workflow')!
+      .buildPrompt(off);
+    expect(offPrompt).not.toContain('gitleaks');
+  });
+
   it('adds .env-read guidance to coding-standards when envExampleOnly is set', () => {
     const a: Answers = { ...contexts.tsBackend, envExampleOnly: true };
     const skill = selectSkills(a).find((s) => s.id === 'coding-standards');
