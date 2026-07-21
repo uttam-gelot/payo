@@ -214,6 +214,10 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
     const lines = [`- Database: ${db}`];
     const orm = str(answers, 'orm');
     if (orm) lines.push(`- Data layer: ${orm}`);
+    if (answers.dbSafety === true)
+      lines.push(
+        '- Never run destructive SQL or database migrations without explicit confirmation.',
+      );
     sections.push({ title: 'Data', body: lines.join('\n') });
   }
 
@@ -355,6 +359,7 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
     answers.commitScope === true ||
     answers.commitScratchGuard === true ||
     answers.confirmPush === true ||
+    answers.gitleaks === true ||
     answers.verifyTiming === 'commit' ||
     answers.verifyTiming === 'push' ||
     answers.atomicCommits === true;
@@ -386,6 +391,10 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
       );
     if (answers.confirmPush === true)
       lines.push('- Never push to a remote without explicit confirmation.');
+    if (answers.gitleaks === true)
+      lines.push(
+        '- Scan for secrets with gitleaks before every push; offer to install it if missing.',
+      );
     // Name only the verification tools the user actually selected — a project
     // whose tests were skipped must never be told to run tests.
     const verifyTools = [

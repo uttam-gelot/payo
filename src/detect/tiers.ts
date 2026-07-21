@@ -50,9 +50,11 @@ export const TIER2: ReadonlySet<string> = new Set([
   'commitScope',
   'commitScratchGuard',
   'confirmPush',
+  'gitleaks',
   'verifyTiming',
   'atomicCommits',
   'envExampleOnly',
+  'dbSafety',
   'rbac',
 ]);
 

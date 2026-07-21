@@ -171,12 +171,16 @@ const skills: SkillSpec[] = [
       const via = orm
         ? `the selected ORM / data-access layer (${orm})`
         : 'the selected database and ORM';
-      return (
+      let prompt =
         'Write data-layer guidance: how to model schemas, write queries/migrations, and ' +
         `use ${via} safely and consistently, following its idioms and the migration/schema ` +
         'choices in the Tech Details context. Include naming conventions for tables, columns, ' +
-        'indexes, and foreign keys, following the chosen conventions (see the Tech Details context).'
-      );
+        'indexes, and foreign keys, following the chosen conventions (see the Tech Details context).';
+      if (a.dbSafety === true)
+        prompt +=
+          ' Never run destructive SQL statements or database migrations without explicit ' +
+          'confirmation from the user.';
+      return prompt;
     },
   },
   {
@@ -355,6 +359,7 @@ const skills: SkillSpec[] = [
       a.commitScope === true ||
       a.commitScratchGuard === true ||
       a.confirmPush === true ||
+      a.gitleaks === true ||
       a.verifyTiming === 'commit' ||
       a.verifyTiming === 'push' ||
       a.atomicCommits === true,
@@ -378,6 +383,10 @@ const skills: SkillSpec[] = [
         base +=
           ' Ask before committing scratch/planning files (e.g. .md or .html notes created only for planning, R&D, or local use).';
       if (a.confirmPush === true) base += ' Never push to a remote without explicit confirmation.';
+      if (a.gitleaks === true)
+        base +=
+          ' Use gitleaks to scan for committed secrets and run it before every push; if it is ' +
+          'not installed, offer to install it first.';
       if (a.verifyTiming === 'commit')
         base += ` Run ${verifyToolsPhrase(a)} before committing, and only commit when they pass.`;
       if (a.verifyTiming === 'push')
