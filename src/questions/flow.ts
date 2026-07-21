@@ -224,7 +224,7 @@ const core: Record<string, Question> = {
     id: 'gitleaks',
     type: 'confirm',
     summary: 'Gitleaks secret scan',
-    message: 'Install gitleaks to scan for leaked secrets, and run it before every push?',
+    message: 'Add a gitleaks secret-scan convention (scan for leaked secrets before every push)?',
     recommended: true,
     policyDefault: true,
   },

@@ -266,7 +266,8 @@ your stack needs. Dimensions covered:
 - **TypeScript** — `tsconfig` strictness, target, module resolution, path aliases
 - **Conventions** — folder structure, coding standards, docs, git workflow,
   branch-naming / commit-message style (inferred from local git history), and an
-  option to install gitleaks and scan for leaked secrets before every push
+  option to add a gitleaks secret-scan convention (scan for leaked secrets before
+  every push)
 - **Change audit** _(optional)_ — opt into a skill that checks your pending
   change against the project skills before commit or push
 

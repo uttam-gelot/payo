@@ -14,11 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   destructive SQL or database migration. It's a safe policy — recommended on and
   applied in "Detect everything" — and surfaces in the generated data-layer skill
   and the static AGENTS.md Data section.
-- **Gitleaks secret scanning.** A new git-workflow confirm question offers to
-  install gitleaks and run it before every push to catch leaked secrets. When
-  enabled, the generated git-workflow guidance tells the assistant to scan with
-  gitleaks before pushing and to offer to install it if missing. Recommended on
-  and carried through "Detect everything".
+- **Gitleaks secret-scan convention.** A new git-workflow confirm question adds a
+  convention to the generated skills that scans for leaked secrets with gitleaks
+  before every push. Payo installs nothing — when enabled, the generated
+  git-workflow guidance tells the assistant to run gitleaks before pushing (and to
+  install it if missing). Recommended on and carried through "Detect everything".
 
 ## [2.1.2] - 2026-07-18
 

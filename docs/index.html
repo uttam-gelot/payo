@@ -101,7 +101,7 @@
       {
         "@type": "Question",
         "name": "Does Payo add safety guardrails for databases and secrets?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Payo asks whether the assistant must get explicit confirmation before running destructive SQL or database migrations, and whether to install gitleaks and scan for leaked secrets before every push. Both are recommended on and applied as safe policies in Detect everything — the destructive-SQL guardrail lands in the generated data-layer skill, and the gitleaks scan lands in the git-workflow guidance." }
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Payo asks whether the assistant must get explicit confirmation before running destructive SQL or database migrations, and whether to add a gitleaks secret-scan convention that scans for leaked secrets before every push. Payo installs nothing — it just writes the skills. Both are recommended on and applied as safe policies in Detect everything — the destructive-SQL guardrail lands in the generated data-layer skill, and the gitleaks scan lands in the git-workflow guidance." }
       }
     ]
   }
@@ -553,7 +553,7 @@
         </details>
         <details>
           <summary>Does Payo add safety guardrails for databases and secrets?</summary>
-          <p>Yes. Payo asks whether the assistant must get explicit confirmation before running destructive SQL or database migrations, and whether to install <strong>gitleaks</strong> and scan for leaked secrets before every push. Both are recommended on and applied as safe policies in <strong>Detect everything</strong> — the destructive-SQL guardrail lands in the generated data-layer skill, and the gitleaks scan lands in the git-workflow guidance.</p>
+          <p>Yes. Payo asks whether the assistant must get explicit confirmation before running destructive SQL or database migrations, and whether to add a <strong>gitleaks</strong> secret-scan convention that scans for leaked secrets before every push. Payo installs nothing — it just writes the skills. Both are recommended on and applied as safe policies in <strong>Detect everything</strong> — the destructive-SQL guardrail lands in the generated data-layer skill, and the gitleaks scan lands in the git-workflow guidance.</p>
         </details>
         <details>
           <summary>Is Payo free and open source?</summary>
