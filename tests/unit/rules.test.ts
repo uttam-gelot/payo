@@ -108,6 +108,29 @@ describe('buildBaseRules', () => {
     expect(off).not.toContain('Scope each commit');
   });
 
+  it('adds the destructive-SQL/migration guard line only when dbSafety is set', () => {
+    const guard = 'Never run destructive SQL or database migrations without explicit confirmation';
+    const on = renderMarkdown('G', buildBaseRules({ ...contexts.tsBackend, dbSafety: true }));
+    expect(on).toContain(guard);
+
+    const off = renderMarkdown('G', buildBaseRules(contexts.tsBackend));
+    expect(off).not.toContain(guard);
+  });
+
+  it('emits the gitleaks line in the Git Workflow section only when enabled', () => {
+    const on = renderMarkdown(
+      'G',
+      buildBaseRules({ ...contexts.tsBackend, gitWorkflow: 'standard', gitleaks: true }),
+    );
+    expect(on).toContain('gitleaks');
+
+    const off = renderMarkdown(
+      'G',
+      buildBaseRules({ ...contexts.tsBackend, gitWorkflow: 'standard' }),
+    );
+    expect(off).not.toContain('gitleaks');
+  });
+
   it('backend omits State Management', () => {
     const a: Answers = {
       ...contexts.tsBackend,
