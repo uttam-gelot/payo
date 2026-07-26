@@ -24,6 +24,7 @@ import type { SkillSpec } from './skills';
 import { buildBaseRules, fenceProjectData } from './rules';
 import { selectSkills } from './skills';
 import { isAvailable, runAgent } from './agent';
+import { writeAgentLog } from './agentlog';
 import { resolveCommands } from './commands';
 import { buildBootstrapMetaPrompt, writeBootstrapPrompt } from './bootstrap';
 import { getProvider } from '../providers/index';
@@ -255,6 +256,14 @@ interface SkillRun {
   reason?: string;
 }
 
+/**
+ * Failures that every remaining run would hit too: the account is out of quota,
+ * rate-limited, or not authenticated. Retrying or starting the next skill just
+ * spends more time (and, for a rate limit, makes it worse), so the batch stops.
+ */
+const FATAL_AGENT_ERROR =
+  /usage limit|rate limit|quota|too many requests|insufficient_quota|not logged in|please (log|sign) in|unauthoriz|authentication failed|invalid api key|\b(401|429)\b/i;
+
 /** Run every skill's agent concurrently (bounded), reporting progress per skill. */
 function runParallel(
   runner: AgentRunner,
@@ -265,8 +274,14 @@ function runParallel(
   resume?: ResumeStore,
 ): Promise<SkillRun[]> {
   const attempts = config.generation.retries() + 1;
+  // Set once an account-level failure is seen; short-circuits the rest of the batch.
+  let fatal: string | undefined;
   return mapPool(specs, poolSize(specs.length), async (skill, i) => {
     const rel = pathFor(skill);
+    if (fatal) {
+      hooks.onSkillResult?.(skill.title, false, fatal);
+      return { skill, path: rel, wrote: false, reason: fatal };
+    }
     // Resume: a skill confirmed done in a prior run whose output is still on
     // disk is reused as-is — no model call. A missing file self-heals (re-runs).
     if (resume?.done.has(skill.id) && wroteFile(rel)) {
@@ -274,6 +289,9 @@ function runParallel(
       return { skill, path: rel, wrote: true };
     }
     hooks.onSkill?.(skill.title, i + 1, specs.length);
+    // Create the target directory up front: sandboxed agents are routinely
+    // allowed to write a file but not to create the dot-directory holding it.
+    fs.mkdirSync(path.dirname(resolveContained(rel)), { recursive: true });
     const prompt = promptFor(skill, rel);
     // Retry transient agent failures; success = exit 0 AND a verified write —
     // a pre-existing file left untouched by a no-op run must not pass.
@@ -285,10 +303,21 @@ function runParallel(
       wrote = result.ok && verifiedWrite(rel, before);
       if (!wrote) {
         // Distinguish a hard agent failure (stderr) from a clean exit that wrote nothing.
+        // The agent's own last words explain a silent no-write (sandbox denial,
+        // untrusted directory, refusal) — without them the report is a dead end.
+        const said = result.stdout ? `: ${result.stdout}` : '';
         reason = result.ok
-          ? 'agent exited 0 but wrote no file'
-          : result.stderr || 'agent run failed';
+          ? `agent exited 0 but wrote no file${said}`
+          : `${result.stderr || 'agent run failed'}${said}`;
+        // The inline tail is truncated by design; the full transcript lands in
+        // .payo/logs so the actual cause is recoverable after the run.
+        const log = writeAgentLog(skill.id, attempt, reason, prompt, result.transcript);
+        if (log) reason += ` [log: ${log}]`;
         cleanupFailedAttempt(rel, before);
+        if (FATAL_AGENT_ERROR.test(reason)) {
+          fatal = reason;
+          break; // every other run would fail the same way
+        }
         if (attempt < attempts) hooks.onSkillRetry?.(skill.title, attempt, reason);
       }
     }
