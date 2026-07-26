@@ -85,6 +85,69 @@ describe('emitHooks — native soft-ask', () => {
     }));
 });
 
+describe('emitHooks — content-aware dedup (existing runner)', () => {
+  it('does not re-add gitleaks when the existing lefthook.yml already runs it', () =>
+    inTempProject((dir) => {
+      writeFileSync(
+        join(dir, 'lefthook.yml'),
+        'pre-push:\n  commands:\n    secrets:\n      run: gitleaks detect\n',
+      );
+      const files = emitHooks({ gitleaks: true }, ['claude']);
+      expect(files).toEqual([]); // nothing to add
+      const yml = readFileSync(join(dir, 'lefthook.yml'), 'utf8');
+      expect(yml.match(/gitleaks/g)?.length).toBe(1); // no duplicate
+      expect(yml).not.toContain('payo-secret-scan');
+    }));
+
+  it('does not re-add a verify check when husky already runs tests', () =>
+    inTempProject((dir) => {
+      mkdirSync(join(dir, '.husky'));
+      writeFileSync(join(dir, '.husky/pre-push'), '#!/usr/bin/env sh\nnpm test\n');
+      const files = emitHooks(
+        { verifyTiming: 'push', testRunner: 'vitest', packageManager: 'npm' },
+        ['claude'],
+      );
+      expect(files).toEqual([]);
+      const hook = readFileSync(join(dir, '.husky/pre-push'), 'utf8');
+      expect(hook).not.toContain('payo-verify');
+    }));
+
+  it('adds only the uncovered check, leaving the covered one alone', () =>
+    inTempProject((dir) => {
+      // Repo already scans secrets, but has no test hook.
+      writeFileSync(
+        join(dir, 'lefthook.yml'),
+        'pre-push:\n  commands:\n    secrets:\n      run: gitleaks detect\n',
+      );
+      emitHooks(
+        { gitleaks: true, verifyTiming: 'push', testRunner: 'vitest', packageManager: 'npm' },
+        ['claude'],
+      );
+      const yml = readFileSync(join(dir, 'lefthook.yml'), 'utf8');
+      expect(yml.match(/gitleaks/g)?.length).toBe(1); // secret scan not duplicated
+      expect(yml).toContain('payo-verify'); // verify was missing → added
+    }));
+});
+
+describe('emitHooks — test-command fallback for frameworkless stacks', () => {
+  it('uses the package-manager test script when no framework provides one', () =>
+    inTempProject((dir) => {
+      emitHooks({ verifyTiming: 'commit', testRunner: 'bun-test', packageManager: 'bun' }, [
+        'claude',
+      ]);
+      const yml = readFileSync(join(dir, 'lefthook.yml'), 'utf8');
+      expect(yml).toContain('pre-commit:');
+      expect(yml).toContain('payo-verify');
+      expect(yml).toContain('bun run test');
+    }));
+
+  it('omits the verify check when the user declined testing', () =>
+    inTempProject(() => {
+      const files = emitHooks({ verifyTiming: 'commit', packageManager: 'bun' }, ['claude']);
+      expect(files).toEqual([]); // no test setup → no verify → nothing written
+    }));
+});
+
 describe('mergeLefthook', () => {
   const check = [
     { name: 'payo-secret-scan', run: 'gitleaks detect --redact', stage: 'pre-push' as const },

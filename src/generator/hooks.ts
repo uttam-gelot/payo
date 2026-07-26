@@ -20,6 +20,8 @@ import path from 'path';
 import { spawnSync } from 'child_process';
 import type { Answers } from '../questions/types';
 import { resolveCommands } from './commands';
+import { pmRun } from '../stack/commands';
+import { hasTesting } from '../stack/predicates';
 import { writeArtifact, resolveContained } from './paths';
 import { writeFileAtomic } from '../fsutil';
 import { probeCommand } from './agent';
@@ -49,7 +51,10 @@ function mechanicalChecks(a: Answers): Check[] {
   }
   const stage =
     a.verifyTiming === 'commit' ? 'pre-commit' : a.verifyTiming === 'push' ? 'pre-push' : undefined;
-  const test = resolveCommands(a).test;
+  // Prefer the framework's own test command; fall back to the package manager's
+  // `test` script for stacks without a framework module (e.g. a plain CLI), but
+  // only when the user actually chose a testing setup.
+  const test = resolveCommands(a).test ?? (hasTesting(a) ? pmRun(a, 'test') : undefined);
   if (stage && test) checks.push({ name: 'payo-verify', run: test, stage });
   return checks;
 }
@@ -57,6 +62,39 @@ function mechanicalChecks(a: Answers): Check[] {
 // ---------------------------------------------------------------------------
 // Mechanical layer — lefthook (greenfield) or merge into the existing runner
 // ---------------------------------------------------------------------------
+
+/**
+ * A word-boundary regex that recognises a check the repo ALREADY runs, even when
+ * it was set up by hand (not by Payo). Lets a re-run skip a capability the
+ * existing runner already covers instead of appending a duplicate command.
+ */
+function coveragePattern(check: Check): RegExp {
+  if (check.name === 'payo-secret-scan') return /\bgitleaks\b/i;
+  // verify → any recognised test runner (the exact command varies by stack).
+  return /\b(test|vitest|jest|mocha|pytest|ava|tap|phpunit)\b/i;
+}
+
+/** True when `existing` hook config already runs this check (by Payo or by hand). */
+function alreadyCovered(check: Check, existing: string): boolean {
+  return coveragePattern(check).test(existing);
+}
+
+/** Drop the checks the existing runner content already covers. */
+function uncoveredChecks(checks: Check[], existing: string): Check[] {
+  return checks.filter((c) => !alreadyCovered(c, existing));
+}
+
+/** The `lefthook install` guidance banner shared by fresh and merged configs. */
+const LEFTHOOK_BANNER =
+  '# Created by Payo — git hooks that enforce the generated guardrail skills.\n' +
+  '#\n' +
+  '# Requires the lefthook binary. Install it once with any of:\n' +
+  '#   brew install lefthook            # macOS / Linux (Homebrew)\n' +
+  '#   npm  install -D lefthook         # Node projects\n' +
+  '#   go   install github.com/evilmartians/lefthook@latest\n' +
+  '# Then wire it into this repo:\n' +
+  '#   lefthook install\n' +
+  '# Docs: https://github.com/evilmartians/lefthook\n';
 
 /** Render a fresh `lefthook.yml` for the given checks. */
 function renderLefthook(checks: Check[]): string {
@@ -70,9 +108,7 @@ function renderLefthook(checks: Check[]): string {
     return `${stage}:\n  commands:\n${lines}\n`;
   };
   return (
-    '# Managed by Payo — git hooks that enforce the generated guardrail skills.\n' +
-    '# Install once: `lefthook install`.\n' +
-    [block('pre-commit'), block('pre-push')].filter(Boolean).join('\n')
+    LEFTHOOK_BANNER + '\n' + [block('pre-commit'), block('pre-push')].filter(Boolean).join('\n')
   );
 }
 
@@ -172,18 +208,27 @@ function emitMechanical(a: Answers, cwd: string): string[] {
     case 'lefthook': {
       const rel = detected!.configPath;
       const abs = resolveContained(rel);
-      const merged = mergeLefthook(fs.readFileSync(abs, 'utf8'), checks);
-      if (merged === fs.readFileSync(abs, 'utf8')) return [];
+      const current = fs.readFileSync(abs, 'utf8');
+      // Skip any check this lefthook.yml already runs (Payo's or hand-written).
+      const needed = uncoveredChecks(checks, current);
+      if (needed.length === 0) return [];
+      const merged = mergeLefthook(current, needed);
+      if (merged === current) return [];
       writeFileAtomic(abs, merged);
       return [rel];
     }
     case 'husky': {
       const touched: string[] = [];
       for (const stage of ['pre-commit', 'pre-push'] as const) {
-        const staged = checks.filter((c) => c.stage === stage);
-        if (staged.length === 0) continue;
         const rel = `.husky/${stage}`;
-        if (appendShellHook(resolveContained(rel), staged)) touched.push(rel);
+        const abs = resolveContained(rel);
+        const existing = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : '';
+        const staged = uncoveredChecks(
+          checks.filter((c) => c.stage === stage),
+          existing,
+        );
+        if (staged.length === 0) continue;
+        if (appendShellHook(abs, staged)) touched.push(rel);
       }
       return touched;
     }
@@ -191,19 +236,26 @@ function emitMechanical(a: Answers, cwd: string): string[] {
       const base = detected!.configPath === '.git/hooks' ? '.git/hooks' : detected!.configPath;
       const touched: string[] = [];
       for (const stage of ['pre-commit', 'pre-push'] as const) {
-        const staged = checks.filter((c) => c.stage === stage);
-        if (staged.length === 0) continue;
         const rel = path.join(base, stage);
         // Native hooks may sit outside cwd only via an absolute hooksPath; keep
         // writes contained to the project.
         const abs = path.isAbsolute(base) ? path.join(base, stage) : resolveContained(rel);
+        const existing = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : '';
+        const staged = uncoveredChecks(
+          checks.filter((c) => c.stage === stage),
+          existing,
+        );
+        if (staged.length === 0) continue;
         if (appendShellHook(abs, staged)) touched.push(rel);
       }
       return touched;
     }
     case 'pre-commit': {
       const rel = detected!.configPath;
-      return appendPreCommit(resolveContained(rel), checks) ? [rel] : [];
+      const abs = resolveContained(rel);
+      const needed = uncoveredChecks(checks, fs.readFileSync(abs, 'utf8'));
+      if (needed.length === 0) return [];
+      return appendPreCommit(abs, needed) ? [rel] : [];
     }
   }
 }
