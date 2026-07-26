@@ -23,14 +23,22 @@ export const config = {
 
   /** Headless CLI-agent execution. */
   agent: {
-    /** Hard wall-clock cap per run (ms). Env: PAYO_AGENT_TIMEOUT_MS. */
-    timeoutMs: (): number => intEnv('PAYO_AGENT_TIMEOUT_MS', 120_000, 1),
+    /**
+     * Hard wall-clock cap per run (ms). Env: PAYO_AGENT_TIMEOUT_MS.
+     * Authoring one SKILL.md routinely takes minutes on a loaded machine — with
+     * several agents in flight at once, 2 minutes killed healthy runs.
+     */
+    timeoutMs: (): number => intEnv('PAYO_AGENT_TIMEOUT_MS', 420_000, 1),
     /** Timeout for the `which <binary>` availability probe (ms). */
     availabilityProbeMs: 5_000,
-    /** Max stderr bytes retained from a failing run. */
-    stderrCapBytes: 4_000,
-    /** Chars of stderr surfaced in the failure diagnostic. */
-    stderrDetailChars: 500,
+    /** Timeout for the `<binary> --help` flag-support probe (ms). */
+    helpProbeMs: 10_000,
+    /** Max bytes of help output read by the flag-support probe. */
+    helpMaxBytes: 1_000_000,
+    /** Max bytes retained (tail) per output stream of a run. */
+    outputCapBytes: 32_000,
+    /** Chars of that tail surfaced inline in the failure diagnostic. */
+    outputDetailChars: 300,
   },
 
   /** Project-local working dir for all payo state (session, staging). */
