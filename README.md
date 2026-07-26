@@ -233,6 +233,28 @@ if you opt in, it asks when to run — before every commit or before pushing —
 agent uses it at that point to check your pending change against the relevant project
 skills and flag anything that conflicts.
 
+### Guardrails enforced by hooks, not just prose
+
+Skills are guidance the assistant _should_ follow — but an agent can skip prose. So
+when you enable a guardrail, Payo also writes the hook that makes it fire regardless:
+
+- **A git hook (mechanical, hard block).** When you turn on the gitleaks scan or the
+  verify-before-commit/push step, Payo writes a **`lefthook.yml`** (or, if your repo
+  already uses **husky**, **pre-commit**, or native `.git/hooks`, merges into _that_
+  runner instead — never clobbering your setup). It runs `gitleaks` and your test
+  command at the stage you chose and **blocks the commit/push on failure** — for every
+  tool, and for a human typing `git`. Payo writes the config; you wire it up once with
+  `lefthook install` (Payo tells you the command; it installs nothing itself).
+- **A native tool hook (soft confirm).** For **Claude, Cursor, and Copilot**, Payo
+  writes a `PreToolUse` hook that pops a **confirm prompt** right when the agent runs
+  `git commit` / `git push` (to run change-audit or confirm the push) or a destructive
+  query (DB-safety). It stores no state and runs no model — it just makes the prompt
+  appear so the guardrail isn't silently skipped. Tools without a soft-confirm hook
+  (Codex, Antigravity, Windsurf) are covered by the git hook above.
+
+Both are **idempotent** — re-running Payo never duplicates a hook — and are written
+only for the guardrails you actually enabled.
+
 The question Payo asks — _"Which agent CLI should Payo use to generate content?"_ —
 picks only **which installed CLI authors the content**. The output above works with
 every skills-compatible tool regardless of that choice.
