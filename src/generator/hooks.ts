@@ -17,10 +17,12 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { spawnSync } from 'child_process';
 import type { Answers } from '../questions/types';
 import { resolveCommands } from './commands';
 import { writeArtifact, resolveContained } from './paths';
 import { writeFileAtomic } from '../fsutil';
+import { probeCommand } from './agent';
 import { detectHookRunner, type HookRunner } from '../detect/hooks';
 
 /** Marker that tags every Payo-written hook block, for idempotent re-runs. */
@@ -384,4 +386,35 @@ function emitNativeAsk(a: Answers, tools: string[] | undefined): string[] {
  */
 export function emitHooks(a: Answers, tools?: string[], cwd: string = process.cwd()): string[] {
   return [...new Set([...emitMechanical(a, cwd), ...emitNativeAsk(a, tools)])];
+}
+
+/** True when `bin` resolves on PATH. */
+function onPath(bin: string): boolean {
+  try {
+    return spawnSync(probeCommand(), [bin]).status === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * One-time setup commands the user must run for the freshly written hooks to
+ * take effect — surfaced by the CLI after generation. A fresh `lefthook.yml`
+ * needs `lefthook install` to wire `.git/hooks` (and lefthook itself if it is
+ * not on PATH); a merged runner is already active. gitleaks is flagged only when
+ * a hook that uses it was written and the binary is missing. Empty when there is
+ * nothing to do.
+ */
+export function hookSetupHints(files: string[], a: Answers): string[] {
+  const hints: string[] = [];
+  if (files.includes('lefthook.yml')) {
+    if (!onPath('lefthook')) {
+      hints.push('Install lefthook:  brew install lefthook   (or: npm i -D lefthook)');
+    }
+    hints.push('Enable the git hooks:  lefthook install');
+  }
+  if (a.gitleaks === true && files.length > 0 && !onPath('gitleaks')) {
+    hints.push('Install gitleaks (the secret-scan hook needs it):  brew install gitleaks');
+  }
+  return hints;
 }

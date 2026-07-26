@@ -34,6 +34,7 @@ import {
   predictedExisting,
   backupFiles,
 } from '../generator/index';
+import { hookSetupHints } from '../generator/hooks';
 import type { ResumeStore } from '../generator/types';
 import { printBanner } from './banner';
 
@@ -330,6 +331,14 @@ export async function run(): Promise<void> {
       `Generated via ${result.providerName} (static) in ${process.cwd()}`,
     );
   }
+
+  // Skill-enforcement hooks were written — tell the user the one-time commands to
+  // activate them (install the runner / gitleaks, then wire the git hooks).
+  const hookHints = hookSetupHints(result.files, session.answers);
+  if (hookHints.length > 0) {
+    note(hookHints.map((h) => `• ${h}`).join('\n'), 'Activate your new git hooks');
+  }
+
   // Offer to remove retired per-tool config the universal layout supersedes.
   // Only after a successful write, so we never delete the old files before the
   // replacement exists. Default off — the user opts into deletion.

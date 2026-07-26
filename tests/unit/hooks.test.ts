@@ -2,7 +2,7 @@ import { describe, it, expect } from 'bun:test';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { inTempProject } from '../helpers/tmpProject';
-import { emitHooks, mergeLefthook } from '../../src/generator/hooks';
+import { emitHooks, mergeLefthook, hookSetupHints } from '../../src/generator/hooks';
 import { detectHookRunner } from '../../src/detect/hooks';
 
 type ClaudeCfg = {
@@ -110,6 +110,22 @@ describe('mergeLefthook', () => {
     const already =
       'pre-push:\n  commands:\n    payo-secret-scan:\n      run: x  # payo:payo-secret-scan\n';
     expect(mergeLefthook(already, check)).toBe(already);
+  });
+});
+
+describe('hookSetupHints', () => {
+  it('tells the user to run lefthook install when lefthook.yml was written', () => {
+    const hints = hookSetupHints(['lefthook.yml'], { gitleaks: true });
+    expect(hints.some((h) => h.includes('lefthook install'))).toBe(true);
+  });
+
+  it('is empty when no hooks were written', () => {
+    expect(hookSetupHints([], { gitleaks: true })).toEqual([]);
+  });
+
+  it('does not ask to run lefthook install for a merged runner', () => {
+    const hints = hookSetupHints(['.husky/pre-push'], { gitleaks: false });
+    expect(hints.some((h) => h.includes('lefthook install'))).toBe(false);
   });
 });
 
