@@ -26,12 +26,24 @@ export interface GeneratedArtifact {
 export interface AgentRunner {
   /** Executable on PATH, e.g. 'claude' | 'codex' | 'cursor-agent'. */
   binary: string;
-  /** Headless + write-permission flags for one prompt. */
-  buildArgs(prompt: string): string[];
+  /**
+   * Headless + write-permission flags for one prompt. `caps` reports which flags
+   * the *installed* CLI actually accepts, so a runner can require a flag that
+   * newer versions need without breaking older ones that would reject it.
+   */
+  buildArgs(prompt: string, caps?: AgentCaps): string[];
+  /** Argv for the help probe backing `caps` (default `['--help']`). */
+  helpArgs?: string[];
   /** Pass the prompt on stdin instead of as an argv (default false). */
   promptViaStdin?: boolean;
-  /** Hard wall-clock cap; defaults to 120s. Guards CLI hang bugs. */
+  /** Hard wall-clock cap; defaults to config.agent.timeoutMs(). Guards CLI hang bugs. */
   timeoutMs?: number;
+}
+
+/** Flag support of the installed CLI, read from its own help output. */
+export interface AgentCaps {
+  /** True when `flag` (e.g. '--add-dir') appears in the CLI's help text. */
+  supports(flag: string): boolean;
 }
 
 /**

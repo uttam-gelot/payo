@@ -30,6 +30,11 @@ export function resetAgentOverride(): void {
 }
 
 void mock.module('../../src/generator/agent', () => ({
+  // Non-overridable exports pass through, so mocking the runner does not hide
+  // the rest of the module from anything that imports it.
+  capsFor: realAgent.capsFor,
+  clearCapsCache: realAgent.clearCapsCache,
+  probeCommand: realAgent.probeCommand,
   isAvailable: (runner: AgentRunner): boolean => override?.isAvailable ?? realIsAvailable(runner),
   runAgent: (runner: AgentRunner, prompt: string): AgentResult | Promise<AgentResult> =>
     override?.runAgent ? override.runAgent(runner, prompt) : realRunAgent(runner, prompt),
