@@ -41,8 +41,22 @@ import {
   writeStaticSkill,
 } from './universal';
 import { createSkillShims, shimRootsForTools } from './shims';
+import { emitHooks } from './hooks';
 
 export { resolveContained };
+
+/**
+ * Append the skill-enforcement hook artifacts (mechanical git floor + native
+ * soft-`ask` gates) to a completed run's file list. One call site shared by both
+ * the AI and static paths, so the hooks are emitted exactly once. Hooks are
+ * merged into any existing runner rather than overwritten, so they are handled
+ * here — outside the `predictTargets` overwrite/backup guard.
+ */
+function withHooks(result: GenerationResult, answers: Answers): GenerationResult {
+  const hookFiles = emitHooks(answers, shimToolsFrom(answers));
+  if (hookFiles.length === 0) return result;
+  return { ...result, files: [...new Set([...result.files, ...hookFiles])] };
+}
 
 /**
  * Provider-agnostic rule sections rendered as the prompt's project context.
@@ -448,11 +462,11 @@ export async function generate(
     if (specs.length > 0) {
       const result = await runUniversal(provider, runner, specs, answers, sections, hooks, resume);
       // null ⇒ the agent wrote nothing usable; fall through to the static floor.
-      if (result) return result;
+      if (result) return withHooks(result, answers);
     }
   }
 
-  return runStatic(provider, answers, sections, hooks);
+  return withHooks(runStatic(provider, answers, sections, hooks), answers);
 }
 
 /**
