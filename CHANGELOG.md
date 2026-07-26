@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Skill-enforcement hooks.** Guardrail skills are markdown an agent can skip,
+  so Payo now writes the hooks that make them fire. When you enable the gitleaks
+  scan or verify-before-commit/push, Payo writes a **`lefthook.yml`** — or, if the
+  repo already uses **husky**, **pre-commit**, or native `.git/hooks`, merges into
+  that runner instead of clobbering it — that runs gitleaks and your test command
+  at the stage you chose and **hard-blocks** the commit/push on failure (covering
+  humans too). For **Claude, Cursor, and Copilot**, it also writes a native
+  `PreToolUse` **soft-confirm** hook that prompts right when the agent runs
+  `git commit` / `git push` (change-audit, confirm-push) or a destructive query
+  (DB-safety); Codex, Antigravity, and Windsurf are covered by the git hook. Every
+  edit is idempotent, and hooks are written only for the guardrails you enabled.
+  Payo writes config only — you run `lefthook install` once (it installs nothing).
+  This reverses the earlier "model-invoked skill, no git hooks" stance
+  (see [2.0.0]) in favor of an enforcement guarantee.
 - **Database safety guardrail.** A new confirm question (asked whenever a database
   is selected) has the assistant require explicit confirmation before running any
   destructive SQL or database migration. It's a safe policy — recommended on and
