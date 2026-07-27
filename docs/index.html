@@ -71,12 +71,12 @@
       {
         "@type": "Question",
         "name": "How do I generate Cursor rules?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Run npx @uge/payo in your project, answer a short questionnaire about your stack, and Payo writes universal Agent Skills in .agents/skills/ plus an AGENTS.md entrypoint — which Cursor reads natively — tailored to your framework, database, testing, and git conventions." }
+        "acceptedAnswer": { "@type": "Answer", "text": "Install Payo with curl -fsSL https://payo.uttamgelot.com/install.sh | sh (or run npx @uge/payo if you already have Node), run payo in your project, answer a short questionnaire about your stack, and Payo writes universal Agent Skills in .agents/skills/ plus an AGENTS.md entrypoint — which Cursor reads natively — tailored to your framework, database, testing, and git conventions." }
       },
       {
         "@type": "Question",
-        "name": "Do I need Bun to run Payo?",
-        "acceptedAnswer": { "@type": "Answer", "text": "No. Running Payo only needs Node.js 20.12 or newer — npx @uge/payo runs the published Node-targeted binary. Bun is only required if you build Payo from source." }
+        "name": "Do I need Node.js or Bun to run Payo?",
+        "acceptedAnswer": { "@type": "Answer", "text": "No. The one-line installer at payo.uttamgelot.com/install.sh gives you a self-contained binary that needs no JavaScript runtime, which is why Payo works for Rust, Go, C#, Python and Java developers. If you already have Node.js 20.12+ or Bun, the installer uses the smaller npm package instead, and npx @uge/payo still works. Bun is only required to build Payo from source." }
       },
       {
         "@type": "Question",
@@ -294,7 +294,7 @@
 
   <header class="hero">
     <div class="wrap">
-      <span class="pill"><b>npx @uge/payo</b> · zero config</span>
+      <span class="pill"><b>one-line install</b> · zero config</span>
       <h1>AI assistant rules for your project, in <span class="accent">minutes</span>.</h1>
       <p class="lede">
         Payo is a free CLI that writes the guidance files your AI coding assistant reads —
@@ -305,7 +305,7 @@
 
       <div class="hero-cta">
         <div class="cmd">
-          <code><span class="sigil">$ </span>npx @uge/payo</code>
+          <code><span class="sigil">$ </span>curl -fsSL https://payo.uttamgelot.com/install.sh | sh</code>
           <button id="copy" aria-label="Copy command">Copy</button>
         </div>
         <a class="btn-ghost" href="https://github.com/uttam-gelot/payo">
@@ -313,7 +313,7 @@
           Star on GitHub
         </a>
       </div>
-      <p class="cmd-note">Prefer Bun? <code>bunx @uge/payo</code> works too. No install required — needs only Node.js 20.12+.</p>
+      <p class="cmd-note">Windows: <code>irm https://payo.uttamgelot.com/install.ps1 | iex</code>. No Node.js needed. Already have it? <code>npx @uge/payo</code> works too.</p>
 
       <div class="demo-wrap">
         <img class="demo" src="https://raw.githubusercontent.com/uttam-gelot/payo/main/assets/demo.gif" alt="Payo CLI generating CLAUDE.md, AGENTS.md, and Agent Skills from a short questionnaire" loading="lazy" />
@@ -510,7 +510,7 @@
         <div>
           <h2 style="margin-bottom:28px">How it works</h2>
           <ol class="steps">
-            <li><b>Run it in your repo.</b> <span>npx @uge/payo — no install, no signup, no config.</span></li>
+            <li><b>Run it in your repo.</b> <span>payo — no signup, no config, no Node.js required.</span></li>
             <li><b>Answer a short questionnaire.</b> <span>Questions adapt to your stack; most have sensible defaults.</span></li>
             <li><b>Get tailored guidance files.</b> <span>Rich AI-written docs when the tool's CLI is present, solid templates otherwise.</span></li>
             <li><b>Optional bootstrap prompt.</b> <span>A paste-ready prompt to scaffold a runnable project honoring the rules.</span></li>
@@ -529,11 +529,11 @@
         </details>
         <details>
           <summary>How do I generate Cursor rules?</summary>
-          <p>Run <code>npx @uge/payo</code>, answer a short questionnaire, and Payo writes universal Agent Skills in <code>.agents/skills/</code> plus an <code>AGENTS.md</code> — which Cursor reads natively — tailored to your framework, database, testing, and git conventions.</p>
+          <p>Install it with the one-liner above, run <code>payo</code>, answer a short questionnaire, and Payo writes universal Agent Skills in <code>.agents/skills/</code> plus an <code>AGENTS.md</code> — which Cursor reads natively — tailored to your framework, database, testing, and git conventions.</p>
         </details>
         <details>
-          <summary>Do I need Bun to run Payo?</summary>
-          <p>No. Running Payo only needs <strong>Node.js 20.12+</strong> — <code>npx @uge/payo</code> runs the published Node-targeted binary. Bun is only needed to build from source.</p>
+          <summary>Do I need Node.js or Bun to run Payo?</summary>
+          <p>No. The one-line installer gives you a <strong>self-contained binary</strong> — no JavaScript runtime at all, which is what makes Payo usable from Rust, Go, C#, Python and Java projects. If you already have <strong>Node.js 20.12+</strong> or Bun, the installer quietly uses the smaller npm package instead, and <code>npx @uge/payo</code> still works. Bun is only needed to build from source.</p>
         </details>
         <details>
           <summary>Which AI coding tools does Payo support?</summary>
@@ -580,7 +580,7 @@
       var btn = document.getElementById(id);
       if (!btn) return;
       btn.addEventListener('click', function () {
-        navigator.clipboard.writeText('npx @uge/payo').then(function () {
+        navigator.clipboard.writeText('curl -fsSL https://payo.uttamgelot.com/install.sh | sh').then(function () {
           var t = btn.textContent; btn.textContent = 'Copied';
           setTimeout(function () { btn.textContent = t; }, 1400);
         });

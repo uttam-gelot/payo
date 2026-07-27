@@ -43,6 +43,29 @@ src/
 | `bun run test:watch`   | Run tests in watch mode               |
 | `bun run test:coverage`| Run tests with coverage               |
 | `bun run build`        | Bundle to `dist/`                     |
+| `bun run build:binaries`| Cross-compile the standalone binaries to `release/` |
+| `bun run embed:assets` | Regenerate `src/cli/logo.data.ts` from `assets/` |
+
+### Distribution
+
+Payo ships two ways, from the same source:
+
+- **npm** (`@uge/payo`) — `bun run build` produces the Node-targeted
+  `dist/index.js`. This is what `npx @uge/payo` runs.
+- **Standalone binaries** — `bun run build:binaries` compiles macOS
+  (arm64/x64), Linux (x64/arm64) and Windows x64 executables into `release/`
+  with a `SHA256SUMS`. The release workflow uploads them as GitHub Release
+  assets, and `docs/install.sh` / `docs/install.ps1` download them. Pass a
+  target name to build just one, e.g. `bun run build:binaries linux-x64`.
+
+Because the binaries embed everything, the CLI must never read a file that
+ships alongside it. The logo is handled by `scripts/embed-assets.ts`, which
+bakes `assets/logo.ans` and `assets/logo.inline.png` into the committed
+`src/cli/logo.data.ts`. Change either asset and you must re-run
+`bun run embed:assets` — CI fails if that file is stale.
+
+The install scripts accept `PAYO_API_URL` and `PAYO_RELEASE_BASE` overrides so
+you can point them at a local server and test without cutting a release.
 
 ## How to add a stack module
 
