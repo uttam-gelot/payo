@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Install without Node.js.** Payo can now be installed with a one-line script
+  on macOS, Linux, and Windows — `curl -fsSL https://payo.uttamgelot.com/install.sh | sh`
+  or `irm https://payo.uttamgelot.com/install.ps1 | iex` — so developers in
+  ecosystems Payo supports but that don't ship a JavaScript runtime (Rust, C#,
+  Go, Java, PHP, Ruby, Python) no longer need `npx`/`bunx`. The installer prefers
+  a runtime you already have (`bun`, then `npm` with node >= 20.12, a ~300 KB
+  download) and only falls back to a self-contained binary when there is none.
+  It is safe to re-run: it reports when you are already current, upgrades when
+  you are not, verifies every download against the release `SHA256SUMS`, removes
+  older copies left in other install locations so nothing shadows the new one on
+  `PATH`, and never invokes `sudo`. Override with `PAYO_VERSION`,
+  `PAYO_INSTALL_DIR`, `PAYO_INSTALL_METHOD`, or `PAYO_FORCE`. `npx @uge/payo`
+  and `bunx @uge/payo` are unchanged.
+- **Standalone binaries on every release.** Self-contained executables for
+  macOS (arm64/x64), Linux (x64/arm64), and Windows x64 are built with
+  `bun build --compile` and published as GitHub Release assets alongside a
+  `SHA256SUMS`. They embed the runtime and need nothing installed. Alpine/musl
+  and Windows on ARM have no binary; the installer detects both and points at
+  npm rather than producing something that cannot start.
 - **Skill-enforcement hooks.** Guardrail skills are markdown an agent can skip,
   so Payo now writes the hooks that make them fire. When you enable the gitleaks
   scan or verify-before-commit/push, Payo writes a **`lefthook.yml`** — or, if the
@@ -23,6 +42,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Payo writes config only — you run `lefthook install` once (it installs nothing).
   This reverses the earlier "model-invoked skill, no git hooks" stance
   (see [2.0.0]) in favor of an enforcement guarantee.
+
+### Changed
+
+- `payo --help` now shows `payo` in its usage lines instead of `npx @uge/payo`,
+  matching how the CLI is invoked once installed by any method.
+- The logo assets are baked into the bundle at build time
+  (`bun run embed:assets` → `src/cli/logo.data.ts`) rather than read from disk
+  at startup, which is what allows a single-file binary. The banner renders
+  identically; the npm tarball no longer ships `assets/`.
 - **Database safety guardrail.** A new confirm question (asked whenever a database
   is selected) has the assistant require explicit confirmation before running any
   destructive SQL or database migration. It's a safe policy — recommended on and
