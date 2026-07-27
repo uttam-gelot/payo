@@ -9,6 +9,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Install without Node.js.** Payo can now be installed with a one-line script
+  on macOS, Linux, and Windows — `curl -fsSL https://payo.uttamgelot.com/install.sh | sh`
+  or `irm https://payo.uttamgelot.com/install.ps1 | iex` — so developers in
+  ecosystems Payo supports but that don't ship a JavaScript runtime (Rust, C#,
+  Go, Java, PHP, Ruby, Python) no longer need `npx`/`bunx`. The installer prefers
+  a runtime you already have (`bun`, then `npm` with node >= 20.12, a ~300 KB
+  download) and only falls back to a self-contained binary when there is none.
+  It is safe to re-run: it reports when you are already current, upgrades when
+  you are not, verifies every download against the release `SHA256SUMS`, removes
+  older copies left in other install locations so nothing shadows the new one on
+  `PATH`, and never invokes `sudo`. Override with `PAYO_VERSION`,
+  `PAYO_INSTALL_DIR`, `PAYO_INSTALL_METHOD`, or `PAYO_FORCE`. `npx @uge/payo`
+  and `bunx @uge/payo` are unchanged.
+- **Standalone binaries on every release.** Self-contained executables for
+  macOS (arm64/x64), Linux (x64/arm64), and Windows x64 are built with
+  `bun build --compile` and published as GitHub Release assets alongside a
+  `SHA256SUMS`. They embed the runtime and need nothing installed. Alpine/musl
+  and Windows on ARM have no binary; the installer detects both and points at
+  npm rather than producing something that cannot start.
+### Changed
+
+- `payo --help` now shows `payo` in its usage lines instead of `npx @uge/payo`,
+  matching how the CLI is invoked once installed by any method.
+- The logo assets are baked into the bundle at build time
+  (`bun run embed:assets` → `src/cli/logo.data.ts`) rather than read from disk
+  at startup, which is what allows a single-file binary. The banner renders
+  identically; the npm tarball no longer ships `assets/`.
+
+## [2.2.1] - 2026-07-26
+
+### Fixed
+
+- **Headless skill generation on current Codex and Antigravity CLIs.** Both
+  CLIs changed under Payo's frozen argv and both failure modes ended in exit 0,
+  so generation silently produced nothing. `codex exec` now runs with
+  `--sandbox workspace-write --skip-git-repo-check` and a writable-root override
+  for `.agents` (its sandbox denies writes to dot-directories, where every
+  `SKILL.md` lives), and `agy` is pinned to the project with `--add-dir <cwd>`
+  instead of writing into its own scratch dir. Both flag sets are gated on the
+  installed CLI's own help output, so older versions keep their previous
+  invocation. (#53)
+- Every failed skill attempt now writes the full transcript (argv, prompt,
+  stdout, stderr) to `.payo/logs/<skill>-attempt<N>.log` and the reported reason
+  cites the path — enough to tell a sandbox denial from a quota error from a
+  refusal. Output streams are retained as tails rather than heads, because these
+  CLIs open with a session banner and report the real failure last. (#53)
+- Account-level failures (usage limit, rate limit, 401/429, not logged in) now
+  short-circuit the batch instead of every remaining skill burning its retries
+  against a limit that is already exhausted. (#53)
+- Each skill's target directory is created before the run, since sandboxed
+  agents are routinely allowed to write a file but not to create the
+  dot-directory holding it. (#53)
+- Hook writing dedupes against the runner already in the repo, matching on
+  capability rather than Payo's own marker, so re-running into a configured
+  husky/lefthook/pre-commit repo adds nothing. A frameworkless stack now falls
+  back to the package manager's test script, so `lefthook.yml` gets a verify
+  check instead of none. (#53)
+
+### Changed
+
+- The per-run agent timeout goes from 120s to 420s. Prompts have grown and
+  several agents run at once, which was killing healthy runs. (#53)
+- The lefthook banner reads "Created by Payo" and spells out how to install the
+  lefthook binary (brew/npm/go) before `lefthook install`. (#53)
+
+## [2.2.0] - 2026-07-26
+
+### Added
+
 - **Skill-enforcement hooks.** Guardrail skills are markdown an agent can skip,
   so Payo now writes the hooks that make them fire. When you enable the gitleaks
   scan or verify-before-commit/push, Payo writes a **`lefthook.yml`** — or, if the
@@ -23,6 +92,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Payo writes config only — you run `lefthook install` once (it installs nothing).
   This reverses the earlier "model-invoked skill, no git hooks" stance
   (see [2.0.0]) in favor of an enforcement guarantee.
+
+## [2.1.3] - 2026-07-21
+
+### Added
+
 - **Database safety guardrail.** A new confirm question (asked whenever a database
   is selected) has the assistant require explicit confirmation before running any
   destructive SQL or database migration. It's a safe policy — recommended on and
@@ -323,7 +397,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pre-existing `CLAUDE.md` can no longer be clobbered outside the overwrite
   prompt. (#28)
 
-[Unreleased]: https://github.com/uttam-gelot/payo/compare/v2.1.2...HEAD
+[Unreleased]: https://github.com/uttam-gelot/payo/compare/v2.2.1...HEAD
+[2.2.1]: https://github.com/uttam-gelot/payo/compare/v2.2.0...v2.2.1
+[2.2.0]: https://github.com/uttam-gelot/payo/compare/v2.1.3...v2.2.0
+[2.1.3]: https://github.com/uttam-gelot/payo/compare/v2.1.2...v2.1.3
 [2.1.2]: https://github.com/uttam-gelot/payo/compare/v2.1.1...v2.1.2
 [2.1.1]: https://github.com/uttam-gelot/payo/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/uttam-gelot/payo/compare/v2.0.2...v2.1.0

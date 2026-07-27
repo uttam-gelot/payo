@@ -101,7 +101,28 @@ chat for the third time, Payo is for you.
 
 ## Quick Start
 
-No install required — run it in any project directory:
+**macOS / Linux** (and Windows via Git Bash or WSL):
+
+```bash
+curl -fsSL https://payo.uttamgelot.com/install.sh | sh
+```
+
+**Windows** (PowerShell):
+
+```powershell
+irm https://payo.uttamgelot.com/install.ps1 | iex
+```
+
+Then run `payo` in any project directory.
+
+The installer needs **no Node.js**. If you already have `bun` or Node >= 20.12
+it installs the npm package (a much smaller download you can update with tools
+you already know); otherwise it downloads a standalone binary. Set
+`PAYO_INSTALL_METHOD=binary` to always get the binary. Re-running the installer
+upgrades in place and cleans up the older copy.
+
+<details>
+<summary>Already have Node? You can skip the installer</summary>
 
 ```bash
 npx @uge/payo
@@ -109,15 +130,16 @@ npx @uge/payo
 bunx @uge/payo
 ```
 
-> The command you run after install is still `payo`. Install globally with
-> `npm i -g @uge/payo` (or `bun add -g @uge/payo`), then just run `payo`.
+Or install it globally with `npm i -g @uge/payo` / `bun add -g @uge/payo`.
+
+</details>
 
 Answer a short questionnaire about your stack, and Payo drops tailored AI
 guidance files straight into your repo.
 
 ## How to use — a walkthrough
 
-1. **Run Payo from your project root.** `npx @uge/payo` — it writes into the
+1. **Run Payo from your project root.** `payo` — it writes into the
    current directory, so `cd` into the repo first.
 2. **Existing repo? It's auto-detected.** If Payo finds a manifest, it reads your
    stack and pre-fills the questionnaire, so most stack questions become a quick
@@ -355,12 +377,37 @@ Have a stack you want supported or an idea to make the flow better?
 
 ## Requirements
 
-**To run Payo:** [Node.js](https://nodejs.org) **>= 20.12**. That's it — `npx @uge/payo`
-runs the published, Node-targeted binary, so **you do not need Bun to use Payo.**
-If you prefer Bun, `bunx @uge/payo` works too.
+**To run Payo:** nothing. The standalone binary from
+[the installer](#quick-start) is self-contained — no Node, no Bun. `git` is used
+if present (to detect your repo) but is not required.
+
+**Via npm instead:** [Node.js](https://nodejs.org) **>= 20.12** for
+`npx @uge/payo`. Bun is optional — `bunx @uge/payo` works, but is never
+required to *use* Payo.
+
+**Supported by the binary:** macOS (Apple Silicon and Intel), Linux
+(x64 and arm64, glibc) and Windows x64. On Alpine/musl or Windows on ARM the
+installer tells you to use npm instead.
 
 **To develop Payo:** [Bun](https://bun.sh) **>= 1.1.0** (the project builds, tests,
 and runs from source with Bun — see [Run locally](#run-locally)).
+
+## Uninstalling
+
+Payo writes nothing outside the project you run it in, so removing the CLI is
+all there is to it:
+
+```bash
+rm ~/.local/bin/payo      # standalone binary
+npm rm -g @uge/payo       # npm install
+bun remove -g @uge/payo   # bun install
+```
+
+The installer prints which of the three it used.
+
+> **macOS:** binaries fetched by the installer run fine. If you instead
+> download an archive from the Releases page in a browser, macOS quarantines
+> it — clear that with `xattr -d com.apple.quarantine payo`.
 
 ## Run locally
 

@@ -17,8 +17,10 @@
 	},
 	"scripts": {
 		"dev": "bun run src/index.ts",
+		"embed:assets": "bun run scripts/embed-assets.ts",
 		"build": "bun build src/index.ts --outdir dist --target node --minify",
 		"postbuild": "chmod +x dist/index.js",
+		"build:binaries": "bun run scripts/build-binaries.ts",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
 		"test:watch": "bun test --watch",
@@ -32,9 +34,7 @@
 		"node": ">=20.12.0"
 	},
 	"files": [
-		"dist",
-		"assets/logo.inline.png",
-		"assets/logo.ans"
+		"dist"
 	],
 	"keywords": [
 		"cli",

@@ -53,3 +53,32 @@ jobs:
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+
+  # Standalone binaries for people without Node — what install.sh downloads.
+  # Runs after npm so a failed publish never leaves binaries advertising a
+  # version npm does not have.
+  binaries:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # required to upload release assets
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.1
+
+      - run: bun install --frozen-lockfile
+
+      # Bun cross-compiles every target from this one runner — no build matrix.
+      - run: bun run build:binaries
+
+      - name: Upload binaries to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }} # persist-credentials:false leaves no auth on the remote
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" release/* --clobber

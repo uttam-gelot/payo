@@ -18,6 +18,15 @@ jobs:
         with:
           node-version: 20.12
       - run: bun install --frozen-lockfile
+
+      # src/cli/logo.data.ts is generated and committed; a stale copy would ship
+      # the wrong logo in every binary.
+      - name: Assert embedded assets are current
+        run: |
+          bun run embed:assets
+          git diff --exit-code src/cli/logo.data.ts \
+            || { echo "::error::src/cli/logo.data.ts is stale — run 'bun run embed:assets'"; exit 1; }
+
       - run: bun run typecheck
       - run: bun run lint
       - run: bun run format:check
@@ -29,6 +38,16 @@ jobs:
         run: |
           node dist/index.js --version
           node dist/index.js --help > /dev/null
+
+      # The standalone binary is the install path for people without Node, so it
+      # has to keep compiling. Host target only — the other four are built at
+      # release time and would add minutes here for little extra signal.
+      - name: Smoke-test the standalone binary
+        run: |
+          bun run build:binaries linux-x64
+          tar -xzf release/payo-linux-x64.tar.gz -C release
+          release/payo --version
+          release/payo --help > /dev/null
 
       # The tarball must stay lean — a stray asset (e.g. a demo GIF) once pushed
       # it to 8 MB. Fail fast if it regresses past 1 MB.

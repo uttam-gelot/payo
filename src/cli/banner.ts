@@ -6,31 +6,18 @@
  * graphics protocol (iTerm2 / WezTerm / VS Code / Kitty / Ghostty), and falls
  * back to pre-rendered terminal art (chafa block symbols) everywhere else.
  * Dependency-free.
+ *
+ * Both logos are baked into logo.data.ts rather than read from assets/ at
+ * runtime, so a `bun build --compile` binary carries them with it.
  */
-import { readFileSync, existsSync } from 'fs';
-import { fileURLToPath } from 'url';
-import path from 'path';
 import { note } from '@clack/prompts';
 import pkg from '../../package.json';
+import { LOGO_ANS, LOGO_PNG_BASE64, LOGO_PNG_BYTES } from './logo.data';
 
 const useColor = process.stdout.isTTY && process.env.NO_COLOR === undefined;
 
 /** Width the inline logo occupies, in terminal cells. */
 const LOGO_COLS = 16;
-
-/**
- * Resolve an asset file. Built (dist/index.js) and dev (src/cli/banner.ts) sit
- * at different depths, so try the candidates and return the first that exists,
- * falling back to the built layout.
- */
-function assetPath(file: string): string {
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  const candidates = [
-    path.join(here, '..', 'assets', file), // dist/index.js
-    path.join(here, '..', '..', 'assets', file), // src/cli/banner.ts
-  ];
-  return candidates.find((c) => existsSync(c)) ?? candidates[0];
-}
 
 /** Which inline-image protocol the current terminal speaks, if any. */
 type ImageProtocol = 'iterm' | 'kitty' | null;
@@ -58,9 +45,8 @@ function detectImageProtocol(): ImageProtocol {
 }
 
 /** Encode the logo for iTerm2's OSC 1337 inline-image protocol. */
-function itermImage(png: Buffer): string {
-  const b64 = png.toString('base64');
-  const args = `inline=1;width=${LOGO_COLS};preserveAspectRatio=1;size=${png.length}`;
+function itermImage(b64: string): string {
+  const args = `inline=1;width=${LOGO_COLS};preserveAspectRatio=1;size=${LOGO_PNG_BYTES}`;
   return `\x1b]1337;File=${args}:${b64}\x07`;
 }
 
@@ -69,8 +55,7 @@ function itermImage(png: Buffer): string {
  * and displayed (a=T) as a PNG (f=100), scaled to LOGO_COLS columns, in 4096-byte
  * base64 chunks. Trailing newlines move the cursor below the image.
  */
-function kittyImage(png: Buffer): string {
-  const b64 = png.toString('base64');
+function kittyImage(b64: string): string {
   const chunkSize = 4096;
   const chunks: string[] = [];
   for (let i = 0; i < b64.length; i += chunkSize) {
@@ -89,30 +74,21 @@ function kittyImage(png: Buffer): string {
   return out + '\n'.repeat(rows);
 }
 
-/** Render the logo as a real inline image, or null if unsupported / missing. */
+/** Render the logo as a real inline image, or null if unsupported. */
 function imageLogo(): string | null {
   const proto = detectImageProtocol();
   if (!proto) return null;
-  try {
-    const png = readFileSync(assetPath('logo.inline.png'));
-    return proto === 'kitty' ? kittyImage(png) : itermImage(png);
-  } catch {
-    return null;
-  }
+  return proto === 'kitty' ? kittyImage(LOGO_PNG_BASE64) : itermImage(LOGO_PNG_BASE64);
 }
 
 /**
  * Pre-rendered terminal art of the logo (truecolor block symbols, generated
- * from logo.png via chafa). Returns null if the asset is missing.
+ * from logo.png via chafa).
  */
-function asciiLogo(): string | null {
-  try {
-    // Collapse the asset's trailing blank line(s) so the logo sits flush
-    // against the welcome note (console.log adds the one separating newline).
-    return readFileSync(assetPath('logo.ans'), 'utf8').replace(/\s*$/, '');
-  } catch {
-    return null;
-  }
+function asciiLogo(): string {
+  // Collapse the asset's trailing blank line(s) so the logo sits flush
+  // against the welcome note (console.log adds the one separating newline).
+  return LOGO_ANS.replace(/\s*$/, '');
 }
 
 /** One-line summary plus the controls the user can rely on during a run. */
