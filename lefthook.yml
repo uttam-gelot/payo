@@ -1,0 +1,21 @@
+# Managed by Payo — git hooks that enforce the generated guardrail skills.
+#
+# Install once:
+#   brew install lefthook   (or: bun add -d lefthook)
+#   lefthook install
+#
+# pre-push mirrors what CI runs, so a red pipeline is caught before the push
+# rather than after it.
+pre-push:
+  parallel: true
+  commands:
+    payo-secret-scan:
+      run: gitleaks detect --redact # payo:payo-secret-scan
+    payo-verify:
+      run: bun test # payo:payo-verify
+    payo-typecheck:
+      run: bun run typecheck # payo:payo-typecheck
+    payo-lint:
+      run: bun run lint # payo:payo-lint
+    payo-format:
+      run: bun run format:check # payo:payo-format
