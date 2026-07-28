@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { selectSkills } from '../../src/generator/skills';
+import { planHooks } from '../../src/generator/hookplan';
 import { contexts } from '../fixtures';
 import type { Answers } from '../../src/questions/types';
 
@@ -56,6 +57,34 @@ describe('selectSkills', () => {
     expect(prompt).toContain('centralized logger');
     expect(prompt).toContain('no third-party logging library');
     expect(prompt).not.toContain('selected logger (centralized)');
+  });
+
+  it('git-workflow names the hook rather than re-ordering the same checks', () => {
+    const base: Answers = {
+      ...contexts.tsBackend,
+      gitWorkflow: 'standard',
+      gitleaks: true,
+      verifyTiming: 'push',
+      formatter: 'prettier',
+      linter: 'eslint',
+      testRunner: 'vitest',
+      testTypes: ['unit'],
+    };
+    const prompt = (a: Answers): string =>
+      selectSkills(a)
+        .find((s) => s.id === 'git-workflow')!
+        .buildPrompt(a);
+
+    const hooked = prompt({ ...base, hookPlan: planHooks(base, '/nonexistent-greenfield') });
+    expect(hooked).toContain('enforces its checks with git hooks');
+    expect(hooked).toContain('NOT to run those checks manually');
+    expect(hooked).not.toContain('Use gitleaks to scan');
+    expect(hooked).not.toContain('before pushing, and only push when they pass');
+
+    // No plan at all (a caller that never computed one) keeps every instruction.
+    const plain = prompt(base);
+    expect(plain).toContain('Use gitleaks to scan');
+    expect(plain).toContain('before pushing, and only push when they pass');
   });
 
   it('includes change-audit only when opted in', () => {

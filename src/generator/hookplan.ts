@@ -216,8 +216,13 @@ export function planHooks(a: Answers, cwd: string = process.cwd()): HookPlan {
 
   for (const check of desired) {
     // Stage-agnostic: a repo running its tests at pre-commit does not also need
-    // them at pre-push, and adding them there would just double the wait.
-    if (coversCapability(existing.coverage, check.capability)) covered.push(check);
+    // them at pre-push, and adding them there would just double the wait. The
+    // covered entry is re-pinned to the stage the runner ACTUALLY uses, so prose
+    // built from the plan cannot claim the wrong one. Its `run` still holds the
+    // command Payo would have written — the repo's own may differ, which is why
+    // covered checks are only ever described by capability.
+    const at = HOOK_STAGES.find((s) => existing.coverage[s].includes(check.capability));
+    if (at) covered.push({ ...check, stage: at });
     else if (merge) write.push(check);
     else deferred.push(check);
   }
@@ -268,4 +273,59 @@ export function isAutomated(plan: HookPlan | undefined, cap: HookCapability): bo
 /** The runner name to use in prose, e.g. "lefthook" for a fresh greenfield config. */
 export function runnerLabel(plan: HookPlan): string {
   return plan.runner === 'greenfield' ? 'lefthook' : plan.runner;
+}
+
+/**
+ * How a capability reads in prose. Capabilities, not commands: a `covered` check
+ * carries the command Payo WOULD have written, while the repo's own hook may run
+ * a different tool for the same job — naming the class is the only phrasing that
+ * is true for both buckets.
+ */
+const CAPABILITY_PHRASE: Record<HookCapability, string> = {
+  'secret-scan': 'a secret scan',
+  verify: 'the tests',
+  lint: 'the linter',
+  format: 'a format check',
+};
+
+/** "a" / "a and b" / "a, b, and c" */
+function joinList(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? '';
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+}
+
+/**
+ * One sentence naming what runs automatically, e.g. "`lefthook` runs the linter
+ * and the tests at pre-commit, and a secret scan at pre-push". Undefined when no
+ * hook covers anything — callers then keep their manual instructions.
+ */
+export function automatedSummary(plan: HookPlan | undefined): string | undefined {
+  const checks = automatedChecks(plan);
+  if (!plan || checks.length === 0) return undefined;
+  const perStage = HOOK_STAGES.map((stage) => {
+    const caps = checks
+      .filter((c) => c.stage === stage)
+      .map((c) => CAPABILITY_PHRASE[c.capability]);
+    return caps.length > 0 ? `${joinList(caps)} at ${stage}` : undefined;
+  }).filter((p): p is string => p !== undefined);
+  return `\`${runnerLabel(plan)}\` runs ${perStage.join(', and ')}`;
+}
+
+/**
+ * The verification tools the agent still has to run by hand — the selected ones
+ * minus whatever a hook already covers. Empty means the agent should run none of
+ * them, which is the whole point: the hook will.
+ */
+export function manualVerifyTools(a: Answers, plan: HookPlan | undefined): string[] {
+  return [
+    val(a, 'formatter') && !isAutomated(plan, 'format') ? 'formatter' : undefined,
+    val(a, 'linter') && !isAutomated(plan, 'lint') ? 'linter' : undefined,
+    hasTesting(a) && !isAutomated(plan, 'verify') ? 'tests' : undefined,
+  ].filter((t): t is string => t !== undefined);
+}
+
+/** Those tools as prose: "the formatter, linter, and tests". */
+export function verifyToolsPhrase(tools: string[]): string {
+  return tools.length === 0 ? "the project's checks" : `the ${joinList(tools)}`;
 }
