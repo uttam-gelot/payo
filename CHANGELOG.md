@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `payo --help` advertised a 120000 ms agent timeout two releases after the real
+  default moved to 420000, and still described the retired per-tool output
+  formats (`.cursorrules`, …) instead of the universal layout. Both corrected,
+  and a test now asserts the printed defaults against `src/config.ts`.
+
+## [2.3.1] - 2026-07-28
+
+### Added
+
+- **Payo now reads what your existing git hooks already cover.** Hook detection
+  returns a per-stage capability map (secret scan / verify / lint / format)
+  instead of matching one regex over the whole file, so a repo already running
+  trufflehog counts as having a secret scan and lint-staged counts as lint.
+  Three runners that were previously missed are recognized: lefthook configured
+  inside `package.json`, **simple-git-hooks**, and a committed `.githooks/`
+  directory. What was found is shown in the detection summary. (#55)
+- **A new question decides what happens to an existing hook runner — and the
+  default flipped to leaving it alone.** Payo used to append to your
+  husky/lefthook/pre-commit setup without asking. It now **leaves it completely
+  untouched** unless you explicitly choose to merge, and only asks at all when
+  the repo has an extendable runner *and* a check you enabled that nothing
+  covers. `simple-git-hooks` is never written to (its config maps a stage to a
+  single command string, so appending would clobber yours). (#55)
+- **The linter and a format check are now actually enforced.** The
+  verify-before-commit/push guardrail promised "the formatter, linter, and
+  tests" but only ever wrote the test command. All three are emitted now, with
+  formatters always in **check-only** form so a hook never rewrites files behind
+  you. Tools with no standalone hook command (Checkstyle, PMD, SpotBugs) are
+  deliberately left out rather than faked. (#55)
+
+### Fixed
+
+- **The agent and the git hook no longer do the same work twice.** The hook
+  writer emitted commands while the generated prose separately told the
+  assistant to run the same ones by hand — so the agent scanned, linted and
+  tested, then the hook ran everything again on push. A single hook plan is now
+  computed once per run and every check lands in exactly one bucket: written
+  into the hook, covered by a hook already in the repo, or deferred to the
+  agent. `AGENTS.md`, the git-workflow skill and change-audit all read that plan
+  and tell the assistant **not** to re-run what a hook runs — commit or push,
+  and fix what the hook reports. (#55)
+- **The change-audit gate denies once instead of asking.** A confirm prompt goes
+  to the *human*, and its reason never reaches the model — approving it simply
+  skipped the audit. The gate now **denies the command once per change set**
+  (keyed on HEAD / the staged-tree hash, stored inside the git dir) with an
+  instruction back to the agent; the retry for that same change goes through.
+  Confirm-push and DB-safety still raise a prompt for you. Also fixes a second
+  gate on `git push` being dropped entirely, and shell-quotes the interpolated
+  message. (#55)
+- **Hook edits are idempotent per check, not per file.** Any `payo:` marker
+  anywhere in the config used to make Payo skip the whole merge, so enabling
+  gitleaks on one run and verify-before-push on the next silently dropped the
+  second. Matching is now per `payo:<name>` marker. Native gates **upsert** —
+  earlier Payo entries are replaced, yours are preserved — and are compared on
+  the command rather than the serialized file, so a differently indented config
+  is never reformatted. (#55)
+
+### Changed
+
+- The post-generation report now names the checks you enabled that **nothing**
+  runs — the real outcome of keeping an existing hook setup — instead of
+  implying coverage Payo didn't write. (#55)
+
+## [2.3.0] - 2026-07-27
+
 ### Added
 
 - **Install without Node.js.** Payo can now be installed with a one-line script
@@ -27,7 +94,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `bun build --compile` and published as GitHub Release assets alongside a
   `SHA256SUMS`. They embed the runtime and need nothing installed. Alpine/musl
   and Windows on ARM have no binary; the installer detects both and points at
-  npm rather than producing something that cannot start.
+  npm rather than producing something that cannot start. Two new scripts back
+  this: `bun run build:binaries` cross-compiles the five targets and writes the
+  checksums, and `bun run embed:assets` inlines the logo before the build.
+
 ### Changed
 
 - `payo --help` now shows `payo` in its usage lines instead of `npx @uge/payo`,
@@ -397,7 +467,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pre-existing `CLAUDE.md` can no longer be clobbered outside the overwrite
   prompt. (#28)
 
-[Unreleased]: https://github.com/uttam-gelot/payo/compare/v2.2.1...HEAD
+[Unreleased]: https://github.com/uttam-gelot/payo/compare/v2.3.1...HEAD
+[2.3.1]: https://github.com/uttam-gelot/payo/compare/v2.3.0...v2.3.1
+[2.3.0]: https://github.com/uttam-gelot/payo/compare/v2.2.1...v2.3.0
 [2.2.1]: https://github.com/uttam-gelot/payo/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/uttam-gelot/payo/compare/v2.1.3...v2.2.0
 [2.1.3]: https://github.com/uttam-gelot/payo/compare/v2.1.2...v2.1.3
