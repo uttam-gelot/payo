@@ -191,7 +191,12 @@ describe('emitHooks — test-command fallback for frameworkless stacks', () => {
 
 describe('mergeLefthook', () => {
   const check = [
-    { name: 'payo-secret-scan', run: 'gitleaks detect --redact', stage: 'pre-push' as const },
+    {
+      name: 'payo-secret-scan',
+      run: 'gitleaks detect --redact',
+      stage: 'pre-push' as const,
+      capability: 'secret-scan' as const,
+    },
   ];
 
   it('appends under an existing pre-push commands map, keeping the custom entry', () => {
@@ -222,7 +227,12 @@ describe('mergeLefthook', () => {
       'pre-push:\n  commands:\n    payo-secret-scan:\n      run: x  # payo:payo-secret-scan\n';
     const merged = mergeLefthook(already, [
       ...check,
-      { name: 'payo-verify', run: 'bun test', stage: 'pre-commit' as const },
+      {
+        name: 'payo-verify',
+        run: 'bun test',
+        stage: 'pre-commit' as const,
+        capability: 'verify' as const,
+      },
     ]);
     expect(merged).toContain('payo-verify:');
     expect(merged).toContain('pre-commit:');

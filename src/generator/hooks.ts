@@ -19,70 +19,24 @@ import fs from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import type { Answers } from '../questions/types';
-import { resolveCommands } from './commands';
-import { pmRun } from '../stack/commands';
-import { hasTesting } from '../stack/predicates';
 import { writeArtifact, resolveContained } from './paths';
 import { writeFileAtomic } from '../fsutil';
 import { probeCommand } from './agent';
-import { detectHookRunner, type HookRunner } from '../detect/hooks';
+import { planHooks, type HookPlan, type PlannedCheck } from './hookplan';
 
 /** Marker that tags every Payo-written hook block, for idempotent re-runs. */
 const MARK = 'payo:';
 
-/** A mechanical check: a command that hard-blocks the given git stage on failure. */
-interface Check {
-  /** Stable hook-entry name; also the idempotency key. */
-  name: string;
-  /** Shell command to run. */
-  run: string;
-  stage: 'pre-commit' | 'pre-push';
-}
-
 /**
- * The mechanical checks implied by the answers, each pinned to the stage the
- * user chose (timing fidelity). gitleaks scans before push (its convention);
- * the verify command lands at commit or push per `verifyTiming`.
+ * A mechanical check: a command that hard-blocks the given git stage on failure.
+ * Which checks exist and whether the repo's own runner already covers them is
+ * decided by `planHooks`; this module only writes what the plan hands it.
  */
-function mechanicalChecks(a: Answers): Check[] {
-  const checks: Check[] = [];
-  if (a.gitleaks === true) {
-    checks.push({ name: 'payo-secret-scan', run: 'gitleaks detect --redact', stage: 'pre-push' });
-  }
-  const stage =
-    a.verifyTiming === 'commit' ? 'pre-commit' : a.verifyTiming === 'push' ? 'pre-push' : undefined;
-  // Prefer the framework's own test command; fall back to the package manager's
-  // `test` script for stacks without a framework module (e.g. a plain CLI), but
-  // only when the user actually chose a testing setup.
-  const test = resolveCommands(a).test ?? (hasTesting(a) ? pmRun(a, 'test') : undefined);
-  if (stage && test) checks.push({ name: 'payo-verify', run: test, stage });
-  return checks;
-}
+type Check = PlannedCheck;
 
 // ---------------------------------------------------------------------------
 // Mechanical layer — lefthook (greenfield) or merge into the existing runner
 // ---------------------------------------------------------------------------
-
-/**
- * A word-boundary regex that recognises a check the repo ALREADY runs, even when
- * it was set up by hand (not by Payo). Lets a re-run skip a capability the
- * existing runner already covers instead of appending a duplicate command.
- */
-function coveragePattern(check: Check): RegExp {
-  if (check.name === 'payo-secret-scan') return /\bgitleaks\b/i;
-  // verify → any recognised test runner (the exact command varies by stack).
-  return /\b(test|vitest|jest|mocha|pytest|ava|tap|phpunit)\b/i;
-}
-
-/** True when `existing` hook config already runs this check (by Payo or by hand). */
-function alreadyCovered(check: Check, existing: string): boolean {
-  return coveragePattern(check).test(existing);
-}
-
-/** Drop the checks the existing runner content already covers. */
-function uncoveredChecks(checks: Check[], existing: string): Check[] {
-  return checks.filter((c) => !alreadyCovered(c, existing));
-}
 
 /** The `lefthook install` guidance banner shared by fresh and merged configs. */
 const LEFTHOOK_BANNER =
@@ -195,29 +149,26 @@ function appendPreCommit(absPath: string, checks: Check[]): boolean {
 }
 
 /**
- * Emit the mechanical git hook. Greenfield → write `lefthook.yml`. Existing
- * runner → merge Payo's checks into it (idempotent). Returns the paths touched.
+ * Write the plan's checks into the repo's hook config. Greenfield → a fresh
+ * `lefthook.yml`. Existing runner → append into it, never rewriting a line the
+ * developer wrote. Whether anything is written at all was already decided by
+ * `planHooks`, which is what respects the user's "leave my hooks alone" choice.
+ * Returns the paths touched.
  */
-function emitMechanical(a: Answers, cwd: string): string[] {
-  const checks = mechanicalChecks(a);
+function emitMechanical(plan: HookPlan): string[] {
+  const checks = plan.write;
   if (checks.length === 0) return [];
 
-  const detected = detectHookRunner(cwd);
-  const runner: HookRunner | 'greenfield' = detected?.runner ?? 'greenfield';
-
-  switch (runner) {
+  switch (plan.runner) {
     case 'greenfield': {
       writeArtifact({ path: 'lefthook.yml', content: renderLefthook(checks) });
       return ['lefthook.yml'];
     }
     case 'lefthook': {
-      const rel = detected!.configPath;
+      const rel = plan.configPath!;
       const abs = resolveContained(rel);
       const current = fs.readFileSync(abs, 'utf8');
-      // Skip any check this lefthook.yml already runs (Payo's or hand-written).
-      const needed = uncoveredChecks(checks, current);
-      if (needed.length === 0) return [];
-      const merged = mergeLefthook(current, needed);
+      const merged = mergeLefthook(current, checks);
       if (merged === current) return [];
       writeFileAtomic(abs, merged);
       return [rel];
@@ -226,47 +177,34 @@ function emitMechanical(a: Answers, cwd: string): string[] {
       const touched: string[] = [];
       for (const stage of ['pre-commit', 'pre-push'] as const) {
         const rel = `.husky/${stage}`;
-        const abs = resolveContained(rel);
-        const existing = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : '';
-        const staged = uncoveredChecks(
-          checks.filter((c) => c.stage === stage),
-          existing,
-        );
+        const staged = checks.filter((c) => c.stage === stage);
         if (staged.length === 0) continue;
-        if (appendShellHook(abs, staged)) touched.push(rel);
+        if (appendShellHook(resolveContained(rel), staged)) touched.push(rel);
       }
       return touched;
     }
     case 'native': {
-      const base = detected!.configPath === '.git/hooks' ? '.git/hooks' : detected!.configPath;
+      const base = plan.configPath!;
       const touched: string[] = [];
       for (const stage of ['pre-commit', 'pre-push'] as const) {
         const rel = path.join(base, stage);
+        const staged = checks.filter((c) => c.stage === stage);
+        if (staged.length === 0) continue;
         // Native hooks may sit outside cwd only via an absolute hooksPath; keep
         // writes contained to the project.
         const abs = path.isAbsolute(base) ? path.join(base, stage) : resolveContained(rel);
-        const existing = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : '';
-        const staged = uncoveredChecks(
-          checks.filter((c) => c.stage === stage),
-          existing,
-        );
-        if (staged.length === 0) continue;
         if (appendShellHook(abs, staged)) touched.push(rel);
       }
       return touched;
     }
     case 'pre-commit': {
-      const rel = detected!.configPath;
+      const rel = plan.configPath!;
       const abs = resolveContained(rel);
-      const needed = uncoveredChecks(checks, fs.readFileSync(abs, 'utf8'));
-      if (needed.length === 0) return [];
-      return appendPreCommit(abs, needed) ? [rel] : [];
+      return appendPreCommit(abs, checks) ? [rel] : [];
     }
     case 'simple-git-hooks':
-      // Its config is a stage → single-command-string map, so the only way in is
-      // to rewrite the user's command line (`x && y`), which changes their
-      // failure semantics. Leave it alone; the guidance keeps asking the agent to
-      // run whatever this runner does not cover.
+      // planHooks never routes writes here — its config maps a stage to ONE
+      // command string, so adding a check means rewriting the user's own line.
       return [];
   }
 }
@@ -461,12 +399,18 @@ function emitNativeAsk(a: Answers, tools: string[] | undefined): string[] {
 /**
  * Emit every skill-enforcement hook implied by the answers: the mechanical git
  * floor plus the per-tool soft-`ask` gates. `tools` is the set the user chose to
- * support (falls back to the selected AI tool). Returns the project-relative
- * paths written, for the CLI report. Writes nothing when no hook-bearing flag is
- * set.
+ * support (falls back to the selected AI tool). `plan` is the hook plan the
+ * generator already computed — passing it keeps the written hooks identical to
+ * what the generated guidance claims is automated; omitting it recomputes the
+ * same plan. Returns the project-relative paths written, for the CLI report.
  */
-export function emitHooks(a: Answers, tools?: string[], cwd: string = process.cwd()): string[] {
-  return [...new Set([...emitMechanical(a, cwd), ...emitNativeAsk(a, tools)])];
+export function emitHooks(
+  a: Answers,
+  tools?: string[],
+  cwd: string = process.cwd(),
+  plan: HookPlan = planHooks(a, cwd),
+): string[] {
+  return [...new Set([...emitMechanical(plan), ...emitNativeAsk(a, tools)])];
 }
 
 /** True when `bin` resolves on PATH. */

@@ -33,6 +33,23 @@ export function pmCreate(a: Answers, gen: string, args?: string): string {
 }
 
 /**
+ * Run a binary from node_modules with the chosen manager, e.g. `pnpm exec eslint .`.
+ * Used for tools invoked directly rather than through a package.json script.
+ */
+export function pmExec(a: Answers, cmd: string): string {
+  switch (pm(a)) {
+    case 'pnpm':
+      return `pnpm exec ${cmd}`;
+    case 'yarn':
+      return `yarn ${cmd}`;
+    case 'bun':
+      return `bunx ${cmd}`;
+    default:
+      return `npx ${cmd}`;
+  }
+}
+
+/**
  * Run a package.json script with the chosen manager, e.g. `pnpm dev`,
  * `npm run build`. pnpm/yarn invoke scripts bare; npm (and unset) and bun use
  * their `run` form.

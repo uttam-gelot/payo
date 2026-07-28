@@ -43,6 +43,7 @@ import {
 } from './universal';
 import { createSkillShims, shimRootsForTools } from './shims';
 import { emitHooks } from './hooks';
+import { HOOK_PLAN_KEY, hookPlanFrom, planHooks } from './hookplan';
 
 export { resolveContained };
 
@@ -54,7 +55,12 @@ export { resolveContained };
  * here — outside the `predictTargets` overwrite/backup guard.
  */
 function withHooks(result: GenerationResult, answers: Answers): GenerationResult {
-  const hookFiles = emitHooks(answers, shimToolsFrom(answers));
+  const hookFiles = emitHooks(
+    answers,
+    shimToolsFrom(answers),
+    process.cwd(),
+    hookPlanFrom(answers) ?? planHooks(answers),
+  );
   if (hookFiles.length === 0) return result;
   return { ...result, files: [...new Set([...result.files, ...hookFiles])] };
 }
@@ -483,19 +489,24 @@ export async function generate(
   resume?: ResumeStore,
 ): Promise<GenerationResult> {
   const provider = providerFor(answers);
-  const sections = buildBaseRules(answers);
+  // The hook plan is decided BEFORE any content is written, and stashed on the
+  // answers, so the rules and skills can say "the pre-push hook runs the tests"
+  // instead of telling the agent to run them itself. Both layers then read one
+  // partition — the agent and the hook can no longer duplicate each other's work.
+  const planned: Answers = { ...answers, [HOOK_PLAN_KEY]: planHooks(answers) };
+  const sections = buildBaseRules(planned);
 
   const runner = provider.agent;
   if (runner && isAvailable(runner)) {
-    const specs = selectSkills(answers);
+    const specs = selectSkills(planned);
     if (specs.length > 0) {
-      const result = await runUniversal(provider, runner, specs, answers, sections, hooks, resume);
+      const result = await runUniversal(provider, runner, specs, planned, sections, hooks, resume);
       // null ⇒ the agent wrote nothing usable; fall through to the static floor.
-      if (result) return withHooks(result, answers);
+      if (result) return withHooks(result, planned);
     }
   }
 
-  return withHooks(runStatic(provider, answers, sections, hooks), answers);
+  return withHooks(runStatic(provider, planned, sections, hooks), planned);
 }
 
 /**
