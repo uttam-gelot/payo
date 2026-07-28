@@ -139,6 +139,34 @@ describe('detectionSummaryLines', () => {
     expect(blob.indexOf('API architecture')).toBeLessThan(blob.indexOf('Auth'));
   });
 
+  it('names the existing hook runner and what each stage covers', () => {
+    // The hookPolicy question cannot name the runner (messages are static), so
+    // this line is the user's only chance to see what they are deciding about.
+    const line = detectionSummaryLines({
+      answers: { language: 'typescript' },
+      hooks: {
+        runner: 'husky',
+        configPath: '.husky',
+        coverage: { 'pre-commit': ['lint', 'format'], 'pre-push': ['verify'] },
+      },
+    }).find((l) => l.includes('Git hooks'))!;
+    expect(line).toContain('husky (.husky)');
+    expect(line).toContain('pre-commit: lint, format');
+    expect(line).toContain('pre-push: tests');
+  });
+
+  it('says so when a detected runner runs nothing recognisable', () => {
+    const line = detectionSummaryLines({
+      answers: { language: 'typescript' },
+      hooks: {
+        runner: 'native',
+        configPath: '.githooks',
+        coverage: { 'pre-commit': [], 'pre-push': [] },
+      },
+    }).find((l) => l.includes('Git hooks'))!;
+    expect(line).toContain('no recognised checks');
+  });
+
   it('returns no lines when nothing was detected', () => {
     expect(detectionSummaryLines({ answers: {} })).toEqual([]);
   });

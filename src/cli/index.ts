@@ -35,6 +35,7 @@ import {
   backupFiles,
 } from '../generator/index';
 import { hookSetupHints } from '../generator/hooks';
+import { planHooks } from '../generator/hookplan';
 import type { ResumeStore } from '../generator/types';
 import { printBanner } from './banner';
 
@@ -338,11 +339,13 @@ export async function run(): Promise<void> {
     );
   }
 
-  // Skill-enforcement hooks were written — tell the user the one-time commands to
-  // activate them (install the runner / gitleaks, then wire the git hooks).
-  const hookHints = hookSetupHints(result.files, session.answers);
+  // What the hook layer still needs from the user: the one-time commands to
+  // activate anything written, and an honest note about any check the user's
+  // "leave my hooks alone" choice means nothing will run.
+  const plan = planHooks(session.answers);
+  const hookHints = hookSetupHints(result.files, session.answers, plan);
   if (hookHints.length > 0) {
-    note(hookHints.map((h) => `• ${h}`).join('\n'), 'Activate your new git hooks');
+    note(hookHints.map((h) => `• ${h}`).join('\n'), 'Git hooks');
   }
 
   // Offer to remove retired per-tool config the universal layout supersedes.

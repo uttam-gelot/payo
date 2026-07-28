@@ -496,15 +496,24 @@ function onPath(bin: string): boolean {
   }
 }
 
+/** Human wording for a check class, for the post-generation report. */
+const CHECK_LABEL: Record<PlannedCheck['capability'], string> = {
+  'secret-scan': 'secret scanning',
+  verify: 'the tests',
+  lint: 'the linter',
+  format: 'the format check',
+};
+
 /**
- * One-time setup commands the user must run for the freshly written hooks to
- * take effect — surfaced by the CLI after generation. A fresh `lefthook.yml`
- * needs `lefthook install` to wire `.git/hooks` (and lefthook itself if it is
- * not on PATH); a merged runner is already active. gitleaks is flagged only when
- * a hook that uses it was written and the binary is missing. Empty when there is
- * nothing to do.
+ * What the user still has to do for the hooks to mean anything — surfaced by the
+ * CLI after generation. A fresh `lefthook.yml` needs `lefthook install` to wire
+ * `.git/hooks` (and lefthook itself if it is not on PATH); a runner that was
+ * merged into is already active, and one that was left alone needs nothing at
+ * all. A binary is flagged only when a check that needs it was actually written.
+ * Deferred checks get a line of their own: nothing runs them, and the user
+ * should know that before trusting the setup. Empty when there is nothing to do.
  */
-export function hookSetupHints(files: string[], a: Answers): string[] {
+export function hookSetupHints(files: string[], a: Answers, plan?: HookPlan): string[] {
   const hints: string[] = [];
   if (files.includes('lefthook.yml')) {
     if (!onPath('lefthook')) {
@@ -512,8 +521,18 @@ export function hookSetupHints(files: string[], a: Answers): string[] {
     }
     hints.push('Enable the git hooks:  lefthook install');
   }
-  if (a.gitleaks === true && files.length > 0 && !onPath('gitleaks')) {
+  const wroteSecretScan = plan
+    ? plan.write.some((c) => c.capability === 'secret-scan')
+    : a.gitleaks === true && files.length > 0;
+  if (wroteSecretScan && !onPath('gitleaks')) {
     hints.push('Install gitleaks (the secret-scan hook needs it):  brew install gitleaks');
+  }
+  if (plan && plan.deferred.length > 0) {
+    const what = [...new Set(plan.deferred.map((c) => CHECK_LABEL[c.capability]))].join(', ');
+    const where = plan.configPath ?? 'your hook runner';
+    hints.push(
+      `Left ${where} untouched — no hook runs ${what}. The generated skills ask the assistant to run them instead.`,
+    );
   }
   return hints;
 }

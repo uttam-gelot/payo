@@ -5,6 +5,7 @@ import { join } from 'path';
 import { inTempProject } from '../helpers/tmpProject';
 import { emitHooks, mergeLefthook, hookSetupHints } from '../../src/generator/hooks';
 import { detectHookRunner } from '../../src/detect/hooks';
+import { planHooks } from '../../src/generator/hookplan';
 
 type ClaudeCfg = {
   permissions?: { allow: string[] };
@@ -338,6 +339,20 @@ describe('hookSetupHints', () => {
     const hints = hookSetupHints(['.husky/pre-push'], { gitleaks: false });
     expect(hints.some((h) => h.includes('lefthook install'))).toBe(false);
   });
+
+  it('says plainly which checks nothing will run when the setup was left alone', () =>
+    inTempProject((dir) => {
+      mkdirSync(join(dir, '.husky'));
+      writeFileSync(join(dir, '.husky/pre-commit'), '#!/usr/bin/env sh\nnpx lint-staged\n');
+      const a = { gitleaks: true, hookPolicy: 'leave' };
+      const hints = hookSetupHints([], a, planHooks(a));
+      const deferred = hints.find((h) => h.includes('untouched'));
+      expect(deferred).toContain('.husky');
+      expect(deferred).toContain('secret scanning');
+      // Nothing was written, so there is no runner or binary to set up.
+      expect(hints.some((h) => h.includes('lefthook install'))).toBe(false);
+      expect(hints.some((h) => h.includes('Install gitleaks'))).toBe(false);
+    }));
 });
 
 describe('detectHookRunner', () => {
