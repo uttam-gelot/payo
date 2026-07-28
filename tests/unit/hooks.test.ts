@@ -7,7 +7,7 @@ import { detectHookRunner } from '../../src/detect/hooks';
 
 type ClaudeCfg = {
   permissions?: { allow: string[] };
-  hooks: { PreToolUse: { hooks: { command: string }[] }[] };
+  hooks: { PreToolUse: { matcher?: string; hooks: { command: string }[] }[] };
 };
 type CursorCfg = { hooks: { beforeShellExecution: { failClosed: boolean }[] } };
 type CopilotCfg = { event: string };
@@ -75,6 +75,44 @@ describe('emitHooks — native soft-ask', () => {
       expect(cursor.hooks.beforeShellExecution[0].failClosed).toBe(true);
       const copilot = readJson<CopilotCfg>(join(dir, '.github/hooks/payo-pretool.json'));
       expect(copilot.event).toBe('preToolUse');
+    }));
+
+  it('replaces a stale gate from an earlier run instead of appending a second one', () =>
+    inTempProject((dir) => {
+      mkdirSync(join(dir, '.claude'));
+      writeFileSync(
+        join(dir, '.claude/settings.json'),
+        JSON.stringify(
+          {
+            permissions: { allow: ['Read'] },
+            hooks: {
+              PreToolUse: [
+                { matcher: 'Bash', hooks: [{ type: 'command', command: '# payo:skill-gate\nOLD' }] },
+                { matcher: 'Bash', hooks: [{ type: 'command', command: 'my own hook' }] },
+              ],
+            },
+          },
+          null,
+          2,
+        ),
+      );
+      emitHooks({ auditSkill: true, auditTiming: 'push' }, ['claude']);
+      const cfg = readJson<ClaudeCfg>(join(dir, '.claude/settings.json'));
+      expect(cfg.permissions?.allow).toEqual(['Read']); // unrelated keys preserved
+      expect(cfg.hooks.PreToolUse.length).toBe(2); // stale gate replaced, not duplicated
+      const commands = cfg.hooks.PreToolUse.map((e) => e.hooks[0].command);
+      expect(commands).toContain('my own hook'); // the user's own hook survives
+      expect(commands.some((c) => c.includes('OLD'))).toBe(false);
+      expect(commands.some((c) => c.includes('change-audit'))).toBe(true);
+    }));
+
+  it('leaves a config carrying the current gate untouched', () =>
+    inTempProject((dir) => {
+      emitHooks({ auditSkill: true, auditTiming: 'push' }, ['claude']);
+      const first = readFileSync(join(dir, '.claude/settings.json'), 'utf8');
+      const second = emitHooks({ auditSkill: true, auditTiming: 'push' }, ['claude']);
+      expect(second).toEqual([]);
+      expect(readFileSync(join(dir, '.claude/settings.json'), 'utf8')).toBe(first);
     }));
 
   it('skips tools without a soft-ask hook (codex / windsurf)', () =>
@@ -173,6 +211,19 @@ describe('mergeLefthook', () => {
     const already =
       'pre-push:\n  commands:\n    payo-secret-scan:\n      run: x  # payo:payo-secret-scan\n';
     expect(mergeLefthook(already, check)).toBe(already);
+  });
+
+  it('adds a newly enabled check to a config Payo already wrote', () => {
+    // The marker guard is per-check: enabling verify on a later run must still land.
+    const already =
+      'pre-push:\n  commands:\n    payo-secret-scan:\n      run: x  # payo:payo-secret-scan\n';
+    const merged = mergeLefthook(already, [
+      ...check,
+      { name: 'payo-verify', run: 'bun test', stage: 'pre-commit' as const },
+    ]);
+    expect(merged).toContain('payo-verify:');
+    expect(merged).toContain('pre-commit:');
+    expect(merged.match(/payo-secret-scan:/g)?.length).toBe(1); // covered one not duplicated
   });
 });
 

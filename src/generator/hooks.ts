@@ -118,11 +118,14 @@ function renderLefthook(checks: Check[]): string {
  * not need a YAML parser; idempotent via the `payo:` marker.
  */
 export function mergeLefthook(text: string, checks: Check[]): string {
-  if (text.includes(MARK)) return text; // already ours — no-op
+  // Per-check, not per-file: a config we wrote earlier must still be able to
+  // receive a check the user enabled later.
+  const pending = checks.filter((c) => !text.includes(`${MARK}${c.name}`));
+  if (pending.length === 0) return text; // every check already ours — no-op
   let out = text.endsWith('\n') || text === '' ? text : text + '\n';
   const stages: Check['stage'][] = ['pre-commit', 'pre-push'];
   for (const stage of stages) {
-    const items = checks.filter((c) => c.stage === stage);
+    const items = pending.filter((c) => c.stage === stage);
     if (items.length === 0) continue;
     const entries = items
       .map((c) => `    ${c.name}:\n      run: ${c.run}  # ${MARK}${c.name}`)
@@ -155,8 +158,9 @@ export function mergeLefthook(text: string, checks: Check[]): string {
 /** Append a marked command line to a shell-script hook (husky / native). */
 function appendShellHook(absPath: string, checks: Check[]): boolean {
   const existing = fs.existsSync(absPath) ? fs.readFileSync(absPath, 'utf8') : '';
-  if (existing.includes(MARK)) return false;
-  const lines = checks.map((c) => `${c.run}  # ${MARK}${c.name}`).join('\n');
+  const pending = checks.filter((c) => !existing.includes(`${MARK}${c.name}`));
+  if (pending.length === 0) return false;
+  const lines = pending.map((c) => `${c.run}  # ${MARK}${c.name}`).join('\n');
   const header = existing ? '' : '#!/usr/bin/env sh\n';
   const body = `${header}${existing}${existing && !existing.endsWith('\n') ? '\n' : ''}${lines}\n`;
   writeFileAtomic(absPath, body);
@@ -171,8 +175,9 @@ function appendShellHook(absPath: string, checks: Check[]): boolean {
 /** Append a marked `repo: local` entry to a `.pre-commit-config.yaml`. */
 function appendPreCommit(absPath: string, checks: Check[]): boolean {
   const existing = fs.readFileSync(absPath, 'utf8');
-  if (existing.includes(MARK)) return false;
-  const hooks = checks
+  const pending = checks.filter((c) => !existing.includes(`${MARK}${c.name}`));
+  if (pending.length === 0) return false;
+  const hooks = pending
     .map(
       (c) =>
         `      - id: ${c.name}  # ${MARK}${c.name}\n` +
@@ -320,6 +325,14 @@ function askCommand(relevant: Gate[], jsonTemplate: string): string {
   );
 }
 
+/** The marker that identifies a Payo-written gate entry inside a tool config. */
+const GATE_MARK = `${MARK}skill-gate`;
+
+/** True when a parsed config entry is a gate Payo wrote on an earlier run. */
+function isPayoGate(entry: unknown): boolean {
+  return JSON.stringify(entry ?? null).includes(GATE_MARK);
+}
+
 /** Per-tool native `ask` config: where it lives and how to shape it. */
 interface AskTool {
   /** Config file path, project-relative. */
@@ -328,7 +341,11 @@ interface AskTool {
   jsonTemplate: string;
   /** Wrap the sh command into this tool's config object. */
   wrap(command: string): unknown;
-  /** Merge our entry into an existing parsed config; return the new config. */
+  /**
+   * Upsert our entry into an existing parsed config: drop any gate a previous
+   * Payo run left behind, then add the current one. Replacing rather than
+   * skipping is what lets a stale gate heal itself when the shape changes.
+   */
   merge(existing: unknown, command: string): unknown;
 }
 
@@ -349,7 +366,9 @@ const ASK_TOOLS: Record<string, AskTool> = {
         string,
         unknown
       >;
-      const pre = Array.isArray(hooks.PreToolUse) ? [...(hooks.PreToolUse as unknown[])] : [];
+      const pre = Array.isArray(hooks.PreToolUse)
+        ? (hooks.PreToolUse as unknown[]).filter((e) => !isPayoGate(e))
+        : [];
       pre.push({ matcher: 'Bash', hooks: [{ type: 'command', command }] });
       hooks.PreToolUse = pre;
       cfg.hooks = hooks;
@@ -370,7 +389,7 @@ const ASK_TOOLS: Record<string, AskTool> = {
         unknown
       >;
       const arr = Array.isArray(hooks.beforeShellExecution)
-        ? [...(hooks.beforeShellExecution as unknown[])]
+        ? (hooks.beforeShellExecution as unknown[]).filter((e) => !isPayoGate(e))
         : [];
       arr.push({ command, failClosed: true });
       hooks.beforeShellExecution = arr;
@@ -388,8 +407,10 @@ const ASK_TOOLS: Record<string, AskTool> = {
 };
 
 /**
- * Emit the soft-`ask` native hook for each supported tool that has one. Skips a
- * config that already carries our marker (idempotent). Returns paths touched.
+ * Emit the soft-`ask` native hook for each supported tool that has one. A config
+ * already carrying the exact current gate is left alone (idempotent); one
+ * carrying an older Payo gate has it replaced in place, so a stale gate from a
+ * previous Payo version heals instead of persisting forever. Returns paths touched.
  */
 function emitNativeAsk(a: Answers, tools: string[] | undefined): string[] {
   const relevant = gates(a);
@@ -410,13 +431,15 @@ function emitNativeAsk(a: Answers, tools: string[] | undefined): string[] {
     const abs = resolveContained(spec.configPath);
     if (fs.existsSync(abs)) {
       const raw = fs.readFileSync(abs, 'utf8');
-      if (raw.includes(`${MARK}skill-gate`)) continue; // already ours
       let parsed: unknown;
       try {
         parsed = JSON.parse(raw);
       } catch {
         continue; // don't corrupt an unparseable config
       }
+      // Compare the command itself, not the serialized file: re-formatting a
+      // config the user indents differently would be a spurious edit.
+      if (JSON.stringify(parsed).includes(JSON.stringify(command))) continue; // already current
       writeFileAtomic(abs, JSON.stringify(spec.merge(parsed, command), null, 2) + '\n');
     } else {
       writeArtifact({
