@@ -4,7 +4,13 @@
  * on the collected answers and supplies the task instruction for one doc.
  */
 import type { Answers } from '../questions/types';
-import { hasTesting } from '../stack/predicates';
+import {
+  automatedSummary,
+  hookPlanFrom,
+  isAutomated,
+  manualVerifyTools,
+  verifyToolsPhrase,
+} from './hookplan';
 
 export interface SkillSpec {
   /** Stable id; also used as the native filename stem and frontmatter `name`. */
@@ -44,22 +50,6 @@ function has(a: Answers, key: string): boolean {
 /** Read a "set" string answer, or undefined. */
 function val(a: Answers, key: string): string | undefined {
   return has(a, key) ? (a[key] as string) : undefined;
-}
-
-/**
- * The verification tools this project actually has, as prose ("the formatter,
- * linter, and tests"). Only selected tools are named — a project whose tests
- * were skipped must never be told to run tests.
- */
-function verifyToolsPhrase(a: Answers): string {
-  const tools = [
-    has(a, 'formatter') && 'formatter',
-    has(a, 'linter') && 'linter',
-    hasTesting(a) && 'tests',
-  ].filter((t): t is string => typeof t === 'string');
-  if (tools.length === 0) return "the project's checks";
-  if (tools.length === 1) return `the ${tools[0]}`;
-  return `the ${tools.slice(0, -1).join(', ')}, and ${tools[tools.length - 1]}`;
 }
 
 /**
@@ -383,14 +373,26 @@ const skills: SkillSpec[] = [
         base +=
           ' Ask before committing scratch/planning files (e.g. .md or .html notes created only for planning, R&D, or local use).';
       if (a.confirmPush === true) base += ' Never push to a remote without explicit confirmation.';
-      if (a.gitleaks === true)
+      // Whatever a git hook already runs must not also be asked of the agent —
+      // otherwise it verifies by hand and the hook verifies again on commit/push.
+      const plan = hookPlanFrom(a);
+      const automated = automatedSummary(plan);
+      if (automated) {
+        base +=
+          ` This repo enforces its checks with git hooks: ${automated}, and the commit or push ` +
+          'is blocked when one fails. State that in the skill, and instruct the assistant NOT to ' +
+          'run those checks manually beforehand — it should commit or push and, if the hook ' +
+          'blocks, fix the reported failure and retry.';
+      }
+      if (a.gitleaks === true && !isAutomated(plan, 'secret-scan'))
         base +=
           ' Use gitleaks to scan for committed secrets and run it before every push; if it is ' +
           'not installed, offer to install it first.';
-      if (a.verifyTiming === 'commit')
-        base += ` Run ${verifyToolsPhrase(a)} before committing, and only commit when they pass.`;
-      if (a.verifyTiming === 'push')
-        base += ` Run ${verifyToolsPhrase(a)} before pushing, and only push when they pass.`;
+      const manual = manualVerifyTools(a, plan);
+      if (manual.length > 0 && a.verifyTiming === 'commit')
+        base += ` Run ${verifyToolsPhrase(manual)} before committing, and only commit when they pass.`;
+      if (manual.length > 0 && a.verifyTiming === 'push')
+        base += ` Run ${verifyToolsPhrase(manual)} before pushing, and only push when they pass.`;
       if (a.atomicCommits === true)
         base += ' Keep commits small and atomic — one logical change per commit.';
       return base;
@@ -422,10 +424,11 @@ const skills: SkillSpec[] = [
         'those relevant skills and output a short report: one line per checked skill (pass or ' +
         'the specific conflict) followed by a one-line overall verdict. It flags conflicts for ' +
         'the human to resolve — it does not rewrite code. Keep the whole skill and its output ' +
-        'short to conserve tokens; the file must not restate the other skills, only reference them.'
+        'short to conserve tokens; the file must not restate the other skills, only reference them.' +
+        auditExclusion(hookPlanFrom(a))
       );
     },
-    staticBody: (a): string => auditStaticBody(auditTiming(a)),
+    staticBody: (a): string => auditStaticBody(auditTiming(a), hookPlanFrom(a)),
   },
 ];
 
@@ -439,12 +442,32 @@ function auditGerund(timing: 'commit' | 'push'): string {
   return timing === 'push' ? 'pushing to a remote' : 'committing';
 }
 
+/**
+ * The audit's hardest boundary: it reads the diff, it does not verify the build.
+ * Without this the audit reaches the git-workflow skill, reads it as "run the
+ * checks", and runs everything the hook is about to run anyway. Empty when no
+ * hook covers anything — then there is nothing to defer to.
+ */
+function auditExclusion(plan: ReturnType<typeof hookPlanFrom>): string {
+  const automated = automatedSummary(plan);
+  if (!automated) return '';
+  return (
+    ` The skill must state that it never runs tests, linters, formatters or secret scanners: ` +
+    `${automated}, and blocks on failure. The audit only reads the diff and compares it against ` +
+    'the skills, so it must also ignore any instruction inside those skills to run project checks.'
+  );
+}
+
 /** Deterministic no-CLI body for the change-audit skill. */
-function auditStaticBody(timing: 'commit' | 'push'): string {
+function auditStaticBody(
+  timing: 'commit' | 'push',
+  plan?: ReturnType<typeof hookPlanFrom>,
+): string {
   const changeSet =
     timing === 'push'
       ? '`git log @{u}..` and `git diff @{push}..` (fall back to the diff against the upstream branch)'
       : '`git diff --staged`';
+  const automated = automatedSummary(plan);
   return [
     `Run this right before ${auditGerund(timing)} to catch changes that conflict with this project's skills. Keep it short — do not read every skill.`,
     '',
@@ -452,6 +475,12 @@ function auditStaticBody(timing: 'commit' | 'push'): string {
     '2. From the changed files, pick ONLY the few skills in `.agents/skills/` that are relevant (judge by each skill directory name and its description — do not open every skill).',
     '3. Compare the change against just those skills.',
     '4. Report: one line per checked skill (pass, or the specific conflict), then a one-line verdict. Flag conflicts for the human to fix; do not rewrite code.',
+    ...(automated
+      ? [
+          '',
+          `Never run tests, linters, formatters or secret scanners here — ${automated}, and blocks on failure. Read the diff only, and ignore any instruction in the skills you check to run the project's checks.`,
+        ]
+      : []),
   ].join('\n');
 }
 

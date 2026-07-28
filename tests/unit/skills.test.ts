@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { selectSkills } from '../../src/generator/skills';
+import { planHooks } from '../../src/generator/hookplan';
 import { contexts } from '../fixtures';
 import type { Answers } from '../../src/questions/types';
 
@@ -58,6 +59,34 @@ describe('selectSkills', () => {
     expect(prompt).not.toContain('selected logger (centralized)');
   });
 
+  it('git-workflow names the hook rather than re-ordering the same checks', () => {
+    const base: Answers = {
+      ...contexts.tsBackend,
+      gitWorkflow: 'standard',
+      gitleaks: true,
+      verifyTiming: 'push',
+      formatter: 'prettier',
+      linter: 'eslint',
+      testRunner: 'vitest',
+      testTypes: ['unit'],
+    };
+    const prompt = (a: Answers): string =>
+      selectSkills(a)
+        .find((s) => s.id === 'git-workflow')!
+        .buildPrompt(a);
+
+    const hooked = prompt({ ...base, hookPlan: planHooks(base, '/nonexistent-greenfield') });
+    expect(hooked).toContain('enforces its checks with git hooks');
+    expect(hooked).toContain('NOT to run those checks manually');
+    expect(hooked).not.toContain('Use gitleaks to scan');
+    expect(hooked).not.toContain('before pushing, and only push when they pass');
+
+    // No plan at all (a caller that never computed one) keeps every instruction.
+    const plain = prompt(base);
+    expect(plain).toContain('Use gitleaks to scan');
+    expect(plain).toContain('before pushing, and only push when they pass');
+  });
+
   it('includes change-audit only when opted in', () => {
     expect(ids(contexts.tsBackend)).not.toContain('change-audit');
     expect(ids({ ...contexts.tsBackend, auditSkill: true })).toContain('change-audit');
@@ -75,6 +104,34 @@ describe('selectSkills', () => {
     // Must not tell the agent to read every skill.
     expect(skill(commit).buildPrompt(commit).toLowerCase()).toContain('do not read');
     expect(skill(commit).staticBody!(commit)).toContain('.agents/skills/');
+  });
+
+  it('change-audit refuses to re-run whatever the hook already runs', () => {
+    // Without this the audit reads git-workflow, sees "run the checks", and runs
+    // everything the hook is about to run on push.
+    const base: Answers = {
+      ...contexts.tsBackend,
+      auditSkill: true,
+      auditTiming: 'push',
+      gitleaks: true,
+      verifyTiming: 'push',
+      linter: 'eslint',
+      testRunner: 'vitest',
+      testTypes: ['unit'],
+    };
+    const a: Answers = { ...base, hookPlan: planHooks(base, '/nonexistent-greenfield') };
+    const skill = selectSkills(a).find((s) => s.id === 'change-audit')!;
+
+    const body = skill.staticBody!(a);
+    expect(body).toContain('Never run tests, linters, formatters or secret scanners here');
+    expect(body).toContain('`lefthook` runs');
+    expect(body).toContain('ignore any instruction');
+    expect(skill.buildPrompt(a)).toContain('never runs tests, linters, formatters or secret');
+
+    // No hook covers anything → nothing to defer to, so the exclusion is absent.
+    const plain = selectSkills(base).find((s) => s.id === 'change-audit')!;
+    expect(plain.staticBody!(base)).not.toContain('Never run tests');
+    expect(plain.buildPrompt(base)).not.toContain('never runs tests');
   });
 
   it('change-audit description names only the chosen timing', () => {

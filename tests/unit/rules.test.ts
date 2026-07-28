@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { buildBaseRules, renderMarkdown } from '../../src/generator/rules';
+import { planHooks } from '../../src/generator/hookplan';
 import { contexts } from '../fixtures';
 import type { Answers } from '../../src/questions/types';
 
@@ -129,6 +130,80 @@ describe('buildBaseRules', () => {
       buildBaseRules({ ...contexts.tsBackend, gitWorkflow: 'standard' }),
     );
     expect(off).not.toContain('gitleaks');
+  });
+
+  it('points at the git hook instead of asking the agent to repeat its checks', () => {
+    // The whole point of the plan: whatever the hook runs, the agent must not.
+    const base = {
+      ...contexts.tsBackend,
+      gitWorkflow: 'standard',
+      gitleaks: true,
+      verifyTiming: 'push',
+      formatter: 'prettier',
+      linter: 'eslint',
+      testRunner: 'vitest',
+      testTypes: ['unit'],
+    };
+    const md = renderMarkdown(
+      'G',
+      buildBaseRules({
+        ...base,
+        hookPlan: planHooks(base, '/nonexistent-greenfield'),
+      }),
+    );
+    expect(md).toContain('Git hooks: `lefthook` runs');
+    expect(md).toContain('Do not run those checks yourself first');
+    // Every wanted check is automated, so no manual instruction survives.
+    expect(md).not.toContain('Scan for secrets with gitleaks');
+    expect(md).not.toContain('before pushing; only push when they pass');
+  });
+
+  it('keeps the manual instruction for a check no hook runs', () => {
+    // A repo whose runner is left untouched: the hook covers nothing, so every
+    // instruction stays with the agent.
+    const base = {
+      ...contexts.tsBackend,
+      gitWorkflow: 'standard',
+      gitleaks: true,
+      verifyTiming: 'push',
+      formatter: 'prettier',
+      linter: 'eslint',
+      testRunner: 'vitest',
+      testTypes: ['unit'],
+      hookPolicy: 'leave',
+      existingHooks: {
+        runner: 'husky',
+        configPath: '.husky',
+        coverage: { 'pre-commit': [], 'pre-push': [] },
+      },
+    };
+    const md = renderMarkdown('G', buildBaseRules({ ...base, hookPlan: planHooks(base) }));
+    expect(md).not.toContain('Git hooks:');
+    expect(md).toContain('Scan for secrets with gitleaks');
+    expect(md).toContain('Run the formatter, linter, and tests before pushing');
+  });
+
+  it('names only the tools the hook does not already cover', () => {
+    // husky lints at pre-commit; Payo is allowed to add the rest.
+    const base = {
+      ...contexts.tsBackend,
+      gitWorkflow: 'standard',
+      verifyTiming: 'push',
+      formatter: 'prettier',
+      linter: 'eslint',
+      testRunner: 'vitest',
+      testTypes: ['unit'],
+      hookPolicy: 'leave',
+      existingHooks: {
+        runner: 'husky',
+        configPath: '.husky',
+        coverage: { 'pre-commit': ['lint'], 'pre-push': [] },
+      },
+    };
+    const md = renderMarkdown('G', buildBaseRules({ ...base, hookPlan: planHooks(base) }));
+    expect(md).toContain('`husky` runs the linter at pre-commit');
+    expect(md).toContain('Run the formatter and tests before pushing');
+    expect(md).not.toMatch(/Run the formatter, linter/);
   });
 
   it('backend omits State Management', () => {

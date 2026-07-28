@@ -1,13 +1,16 @@
 import { describe, it, expect } from 'bun:test';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { execSync } from 'child_process';
 import { join } from 'path';
 import { inTempProject } from '../helpers/tmpProject';
+import { initGitRepo, commitEmpty } from '../helpers/gitRepo';
 import { emitHooks, mergeLefthook, hookSetupHints } from '../../src/generator/hooks';
 import { detectHookRunner } from '../../src/detect/hooks';
+import { planHooks } from '../../src/generator/hookplan';
 
 type ClaudeCfg = {
   permissions?: { allow: string[] };
-  hooks: { PreToolUse: { hooks: { command: string }[] }[] };
+  hooks: { PreToolUse: { matcher?: string; hooks: { command: string }[] }[] };
 };
 type CursorCfg = { hooks: { beforeShellExecution: { failClosed: boolean }[] } };
 type CopilotCfg = { event: string };
@@ -42,17 +45,76 @@ describe('emitHooks — mechanical (lefthook, greenfield)', () => {
     }));
 });
 
-describe('emitHooks — native soft-ask', () => {
-  it('writes a Claude PreToolUse ask gate for change-audit', () =>
+describe('emitHooks — native pre-tool gate', () => {
+  it('denies for change-audit, so the reason reaches the agent rather than the user', () =>
     inTempProject((dir) => {
+      // `ask` only raises a human prompt; approving it runs the push and the
+      // audit never happens. Only `deny` feeds the instruction back to the agent.
       const files = emitHooks({ auditSkill: true, auditTiming: 'push' }, ['claude']);
       expect(files).toContain('.claude/settings.json');
-      const cfg = readJson<ClaudeCfg>(join(dir, '.claude/settings.json'));
-      const command = cfg.hooks.PreToolUse[0].hooks[0].command;
+      const command = readJson<ClaudeCfg>(join(dir, '.claude/settings.json')).hooks.PreToolUse[0]
+        .hooks[0].command;
       expect(command).toContain('payo:skill-gate');
-      expect(command).toContain('permissionDecision":"ask'); // template baked into the sh command
+      expect(command).toContain('permissionDecision":"deny');
+      expect(command).not.toContain('permissionDecision":"ask');
       expect(command).toContain('change-audit');
       expect(command).toContain('git[[:space:]]+push');
+    }));
+
+  it('keeps ask for the gates that are genuinely a human decision', () =>
+    inTempProject((dir) => {
+      emitHooks({ confirmPush: true, dbSafety: true }, ['claude']);
+      const command = readJson<ClaudeCfg>(join(dir, '.claude/settings.json')).hooks.PreToolUse[0]
+        .hooks[0].command;
+      expect(command).toContain('permissionDecision":"ask');
+      expect(command).not.toContain('permissionDecision":"deny');
+    }));
+
+  it('keeps both push gates so the audit retry still reaches confirm-push', () =>
+    inTempProject((dir) => {
+      emitHooks({ auditSkill: true, auditTiming: 'push', confirmPush: true }, ['claude']);
+      const command = readJson<ClaudeCfg>(join(dir, '.claude/settings.json')).hooks.PreToolUse[0]
+        .hooks[0].command;
+      expect(command).toContain('permissionDecision":"deny');
+      expect(command).toContain('permissionDecision":"ask');
+    }));
+
+  it('denies a change set once, then lets the retry through', () =>
+    inTempProject((dir) => {
+      initGitRepo(dir);
+      emitHooks({ auditSkill: true, auditTiming: 'push' }, ['claude']);
+      const command = readJson<ClaudeCfg>(join(dir, '.claude/settings.json')).hooks.PreToolUse[0]
+        .hooks[0].command;
+      const push = (): string =>
+        execSync(command, {
+          cwd: dir,
+          shell: '/bin/sh',
+          input: JSON.stringify({ tool_input: { command: 'git push origin main' } }),
+        }).toString();
+
+      expect(push()).toContain('"deny"');
+      expect(push()).toBe(''); // same change set — already asked for, so it proceeds
+
+      // A new commit is a new change set and must be audited on its own.
+      commitEmpty(dir, 'second');
+      expect(push()).toContain('"deny"');
+
+      // The stamp lives in the git dir, so it is never committed.
+      expect(existsSync(join(dir, '.git/payo-audit-gate'))).toBe(true);
+    }));
+
+  it('stays silent on a command it does not guard', () =>
+    inTempProject((dir) => {
+      initGitRepo(dir);
+      emitHooks({ auditSkill: true, auditTiming: 'push' }, ['claude']);
+      const command = readJson<ClaudeCfg>(join(dir, '.claude/settings.json')).hooks.PreToolUse[0]
+        .hooks[0].command;
+      const out = execSync(command, {
+        cwd: dir,
+        shell: '/bin/sh',
+        input: JSON.stringify({ tool_input: { command: 'ls -la' } }),
+      }).toString();
+      expect(out).toBe('');
     }));
 
   it('merges into an existing .claude/settings.json without dropping keys', () =>
@@ -75,6 +137,47 @@ describe('emitHooks — native soft-ask', () => {
       expect(cursor.hooks.beforeShellExecution[0].failClosed).toBe(true);
       const copilot = readJson<CopilotCfg>(join(dir, '.github/hooks/payo-pretool.json'));
       expect(copilot.event).toBe('preToolUse');
+    }));
+
+  it('replaces a stale gate from an earlier run instead of appending a second one', () =>
+    inTempProject((dir) => {
+      mkdirSync(join(dir, '.claude'));
+      writeFileSync(
+        join(dir, '.claude/settings.json'),
+        JSON.stringify(
+          {
+            permissions: { allow: ['Read'] },
+            hooks: {
+              PreToolUse: [
+                {
+                  matcher: 'Bash',
+                  hooks: [{ type: 'command', command: '# payo:skill-gate\nOLD' }],
+                },
+                { matcher: 'Bash', hooks: [{ type: 'command', command: 'my own hook' }] },
+              ],
+            },
+          },
+          null,
+          2,
+        ),
+      );
+      emitHooks({ auditSkill: true, auditTiming: 'push' }, ['claude']);
+      const cfg = readJson<ClaudeCfg>(join(dir, '.claude/settings.json'));
+      expect(cfg.permissions?.allow).toEqual(['Read']); // unrelated keys preserved
+      expect(cfg.hooks.PreToolUse.length).toBe(2); // stale gate replaced, not duplicated
+      const commands = cfg.hooks.PreToolUse.map((e) => e.hooks[0].command);
+      expect(commands).toContain('my own hook'); // the user's own hook survives
+      expect(commands.some((c) => c.includes('OLD'))).toBe(false);
+      expect(commands.some((c) => c.includes('change-audit'))).toBe(true);
+    }));
+
+  it('leaves a config carrying the current gate untouched', () =>
+    inTempProject((dir) => {
+      emitHooks({ auditSkill: true, auditTiming: 'push' }, ['claude']);
+      const first = readFileSync(join(dir, '.claude/settings.json'), 'utf8');
+      const second = emitHooks({ auditSkill: true, auditTiming: 'push' }, ['claude']);
+      expect(second).toEqual([]);
+      expect(readFileSync(join(dir, '.claude/settings.json'), 'utf8')).toBe(first);
     }));
 
   it('skips tools without a soft-ask hook (codex / windsurf)', () =>
@@ -120,12 +223,30 @@ describe('emitHooks — content-aware dedup (existing runner)', () => {
         'pre-push:\n  commands:\n    secrets:\n      run: gitleaks detect\n',
       );
       emitHooks(
-        { gitleaks: true, verifyTiming: 'push', testRunner: 'vitest', packageManager: 'npm' },
+        {
+          gitleaks: true,
+          verifyTiming: 'push',
+          testRunner: 'vitest',
+          packageManager: 'npm',
+          hookPolicy: 'merge',
+        },
         ['claude'],
       );
       const yml = readFileSync(join(dir, 'lefthook.yml'), 'utf8');
       expect(yml.match(/gitleaks/g)?.length).toBe(1); // secret scan not duplicated
       expect(yml).toContain('payo-verify'); // verify was missing → added
+    }));
+
+  it('leaves an existing runner byte-identical unless the user opted into merging', () =>
+    inTempProject((dir) => {
+      const before = 'pre-commit:\n  commands:\n    mine:\n      run: echo hi\n';
+      writeFileSync(join(dir, 'lefthook.yml'), before);
+      const files = emitHooks(
+        { gitleaks: true, verifyTiming: 'push', testRunner: 'vitest', packageManager: 'npm' },
+        ['claude'],
+      );
+      expect(files).toEqual([]);
+      expect(readFileSync(join(dir, 'lefthook.yml'), 'utf8')).toBe(before);
     }));
 });
 
@@ -150,7 +271,12 @@ describe('emitHooks — test-command fallback for frameworkless stacks', () => {
 
 describe('mergeLefthook', () => {
   const check = [
-    { name: 'payo-secret-scan', run: 'gitleaks detect --redact', stage: 'pre-push' as const },
+    {
+      name: 'payo-secret-scan',
+      run: 'gitleaks detect --redact',
+      stage: 'pre-push' as const,
+      capability: 'secret-scan' as const,
+    },
   ];
 
   it('appends under an existing pre-push commands map, keeping the custom entry', () => {
@@ -174,6 +300,24 @@ describe('mergeLefthook', () => {
       'pre-push:\n  commands:\n    payo-secret-scan:\n      run: x  # payo:payo-secret-scan\n';
     expect(mergeLefthook(already, check)).toBe(already);
   });
+
+  it('adds a newly enabled check to a config Payo already wrote', () => {
+    // The marker guard is per-check: enabling verify on a later run must still land.
+    const already =
+      'pre-push:\n  commands:\n    payo-secret-scan:\n      run: x  # payo:payo-secret-scan\n';
+    const merged = mergeLefthook(already, [
+      ...check,
+      {
+        name: 'payo-verify',
+        run: 'bun test',
+        stage: 'pre-commit' as const,
+        capability: 'verify' as const,
+      },
+    ]);
+    expect(merged).toContain('payo-verify:');
+    expect(merged).toContain('pre-commit:');
+    expect(merged.match(/payo-secret-scan:/g)?.length).toBe(1); // covered one not duplicated
+  });
 });
 
 describe('hookSetupHints', () => {
@@ -190,6 +334,20 @@ describe('hookSetupHints', () => {
     const hints = hookSetupHints(['.husky/pre-push'], { gitleaks: false });
     expect(hints.some((h) => h.includes('lefthook install'))).toBe(false);
   });
+
+  it('says plainly which checks nothing will run when the setup was left alone', () =>
+    inTempProject((dir) => {
+      mkdirSync(join(dir, '.husky'));
+      writeFileSync(join(dir, '.husky/pre-commit'), '#!/usr/bin/env sh\nnpx lint-staged\n');
+      const a = { gitleaks: true, hookPolicy: 'leave' };
+      const hints = hookSetupHints([], a, planHooks(a));
+      const deferred = hints.find((h) => h.includes('untouched'));
+      expect(deferred).toContain('.husky');
+      expect(deferred).toContain('secret scanning');
+      // Nothing was written, so there is no runner or binary to set up.
+      expect(hints.some((h) => h.includes('lefthook install'))).toBe(false);
+      expect(hints.some((h) => h.includes('Install gitleaks'))).toBe(false);
+    }));
 });
 
 describe('detectHookRunner', () => {

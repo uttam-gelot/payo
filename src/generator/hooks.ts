@@ -6,11 +6,12 @@
  *    tool-agnostic, covers humans too. Written for lefthook on a greenfield
  *    repo; merged into an existing runner (husky / pre-commit / native) when one
  *    is already present, so the developer's setup is respected, never clobbered.
- *  - a soft NATIVE `ask` hook per supported tool (Claude / Cursor / Copilot) that
- *    surfaces a confirm prompt at `git commit` / `git push` (change-audit,
- *    confirm-push) or a destructive query (DB-safety). It stores no state and
- *    runs no model — it just makes the prompt appear. Tools without a soft-ask
- *    hook (Codex, Antigravity, Windsurf) are covered by the mechanical floor.
+ *  - a NATIVE pre-tool gate per supported tool (Claude / Cursor / Copilot) on
+ *    `git commit` / `git push` and destructive queries. It runs no model; it
+ *    either raises the tool's confirm prompt for the HUMAN (confirm-push,
+ *    DB-safety) or denies once per change set to hand the AGENT an instruction
+ *    it must act on (change-audit). Tools without a pre-tool hook (Codex,
+ *    Antigravity, Windsurf) are covered by the mechanical floor.
  *
  * Every edit is idempotent: a `payo:` marker in each block lets a re-run detect
  * its own prior output and skip, so running Payo twice adds nothing.
@@ -19,70 +20,24 @@ import fs from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import type { Answers } from '../questions/types';
-import { resolveCommands } from './commands';
-import { pmRun } from '../stack/commands';
-import { hasTesting } from '../stack/predicates';
 import { writeArtifact, resolveContained } from './paths';
 import { writeFileAtomic } from '../fsutil';
 import { probeCommand } from './agent';
-import { detectHookRunner, type HookRunner } from '../detect/hooks';
+import { planHooks, type HookPlan, type PlannedCheck } from './hookplan';
 
 /** Marker that tags every Payo-written hook block, for idempotent re-runs. */
 const MARK = 'payo:';
 
-/** A mechanical check: a command that hard-blocks the given git stage on failure. */
-interface Check {
-  /** Stable hook-entry name; also the idempotency key. */
-  name: string;
-  /** Shell command to run. */
-  run: string;
-  stage: 'pre-commit' | 'pre-push';
-}
-
 /**
- * The mechanical checks implied by the answers, each pinned to the stage the
- * user chose (timing fidelity). gitleaks scans before push (its convention);
- * the verify command lands at commit or push per `verifyTiming`.
+ * A mechanical check: a command that hard-blocks the given git stage on failure.
+ * Which checks exist and whether the repo's own runner already covers them is
+ * decided by `planHooks`; this module only writes what the plan hands it.
  */
-function mechanicalChecks(a: Answers): Check[] {
-  const checks: Check[] = [];
-  if (a.gitleaks === true) {
-    checks.push({ name: 'payo-secret-scan', run: 'gitleaks detect --redact', stage: 'pre-push' });
-  }
-  const stage =
-    a.verifyTiming === 'commit' ? 'pre-commit' : a.verifyTiming === 'push' ? 'pre-push' : undefined;
-  // Prefer the framework's own test command; fall back to the package manager's
-  // `test` script for stacks without a framework module (e.g. a plain CLI), but
-  // only when the user actually chose a testing setup.
-  const test = resolveCommands(a).test ?? (hasTesting(a) ? pmRun(a, 'test') : undefined);
-  if (stage && test) checks.push({ name: 'payo-verify', run: test, stage });
-  return checks;
-}
+type Check = PlannedCheck;
 
 // ---------------------------------------------------------------------------
 // Mechanical layer — lefthook (greenfield) or merge into the existing runner
 // ---------------------------------------------------------------------------
-
-/**
- * A word-boundary regex that recognises a check the repo ALREADY runs, even when
- * it was set up by hand (not by Payo). Lets a re-run skip a capability the
- * existing runner already covers instead of appending a duplicate command.
- */
-function coveragePattern(check: Check): RegExp {
-  if (check.name === 'payo-secret-scan') return /\bgitleaks\b/i;
-  // verify → any recognised test runner (the exact command varies by stack).
-  return /\b(test|vitest|jest|mocha|pytest|ava|tap|phpunit)\b/i;
-}
-
-/** True when `existing` hook config already runs this check (by Payo or by hand). */
-function alreadyCovered(check: Check, existing: string): boolean {
-  return coveragePattern(check).test(existing);
-}
-
-/** Drop the checks the existing runner content already covers. */
-function uncoveredChecks(checks: Check[], existing: string): Check[] {
-  return checks.filter((c) => !alreadyCovered(c, existing));
-}
 
 /** The `lefthook install` guidance banner shared by fresh and merged configs. */
 const LEFTHOOK_BANNER =
@@ -118,11 +73,14 @@ function renderLefthook(checks: Check[]): string {
  * not need a YAML parser; idempotent via the `payo:` marker.
  */
 export function mergeLefthook(text: string, checks: Check[]): string {
-  if (text.includes(MARK)) return text; // already ours — no-op
+  // Per-check, not per-file: a config we wrote earlier must still be able to
+  // receive a check the user enabled later.
+  const pending = checks.filter((c) => !text.includes(`${MARK}${c.name}`));
+  if (pending.length === 0) return text; // every check already ours — no-op
   let out = text.endsWith('\n') || text === '' ? text : text + '\n';
   const stages: Check['stage'][] = ['pre-commit', 'pre-push'];
   for (const stage of stages) {
-    const items = checks.filter((c) => c.stage === stage);
+    const items = pending.filter((c) => c.stage === stage);
     if (items.length === 0) continue;
     const entries = items
       .map((c) => `    ${c.name}:\n      run: ${c.run}  # ${MARK}${c.name}`)
@@ -155,8 +113,9 @@ export function mergeLefthook(text: string, checks: Check[]): string {
 /** Append a marked command line to a shell-script hook (husky / native). */
 function appendShellHook(absPath: string, checks: Check[]): boolean {
   const existing = fs.existsSync(absPath) ? fs.readFileSync(absPath, 'utf8') : '';
-  if (existing.includes(MARK)) return false;
-  const lines = checks.map((c) => `${c.run}  # ${MARK}${c.name}`).join('\n');
+  const pending = checks.filter((c) => !existing.includes(`${MARK}${c.name}`));
+  if (pending.length === 0) return false;
+  const lines = pending.map((c) => `${c.run}  # ${MARK}${c.name}`).join('\n');
   const header = existing ? '' : '#!/usr/bin/env sh\n';
   const body = `${header}${existing}${existing && !existing.endsWith('\n') ? '\n' : ''}${lines}\n`;
   writeFileAtomic(absPath, body);
@@ -171,8 +130,9 @@ function appendShellHook(absPath: string, checks: Check[]): boolean {
 /** Append a marked `repo: local` entry to a `.pre-commit-config.yaml`. */
 function appendPreCommit(absPath: string, checks: Check[]): boolean {
   const existing = fs.readFileSync(absPath, 'utf8');
-  if (existing.includes(MARK)) return false;
-  const hooks = checks
+  const pending = checks.filter((c) => !existing.includes(`${MARK}${c.name}`));
+  if (pending.length === 0) return false;
+  const hooks = pending
     .map(
       (c) =>
         `      - id: ${c.name}  # ${MARK}${c.name}\n` +
@@ -190,29 +150,26 @@ function appendPreCommit(absPath: string, checks: Check[]): boolean {
 }
 
 /**
- * Emit the mechanical git hook. Greenfield → write `lefthook.yml`. Existing
- * runner → merge Payo's checks into it (idempotent). Returns the paths touched.
+ * Write the plan's checks into the repo's hook config. Greenfield → a fresh
+ * `lefthook.yml`. Existing runner → append into it, never rewriting a line the
+ * developer wrote. Whether anything is written at all was already decided by
+ * `planHooks`, which is what respects the user's "leave my hooks alone" choice.
+ * Returns the paths touched.
  */
-function emitMechanical(a: Answers, cwd: string): string[] {
-  const checks = mechanicalChecks(a);
+function emitMechanical(plan: HookPlan): string[] {
+  const checks = plan.write;
   if (checks.length === 0) return [];
 
-  const detected = detectHookRunner(cwd);
-  const runner: HookRunner | 'greenfield' = detected?.runner ?? 'greenfield';
-
-  switch (runner) {
+  switch (plan.runner) {
     case 'greenfield': {
       writeArtifact({ path: 'lefthook.yml', content: renderLefthook(checks) });
       return ['lefthook.yml'];
     }
     case 'lefthook': {
-      const rel = detected!.configPath;
+      const rel = plan.configPath!;
       const abs = resolveContained(rel);
       const current = fs.readFileSync(abs, 'utf8');
-      // Skip any check this lefthook.yml already runs (Payo's or hand-written).
-      const needed = uncoveredChecks(checks, current);
-      if (needed.length === 0) return [];
-      const merged = mergeLefthook(current, needed);
+      const merged = mergeLefthook(current, checks);
       if (merged === current) return [];
       writeFileAtomic(abs, merged);
       return [rel];
@@ -221,42 +178,35 @@ function emitMechanical(a: Answers, cwd: string): string[] {
       const touched: string[] = [];
       for (const stage of ['pre-commit', 'pre-push'] as const) {
         const rel = `.husky/${stage}`;
-        const abs = resolveContained(rel);
-        const existing = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : '';
-        const staged = uncoveredChecks(
-          checks.filter((c) => c.stage === stage),
-          existing,
-        );
+        const staged = checks.filter((c) => c.stage === stage);
         if (staged.length === 0) continue;
-        if (appendShellHook(abs, staged)) touched.push(rel);
+        if (appendShellHook(resolveContained(rel), staged)) touched.push(rel);
       }
       return touched;
     }
     case 'native': {
-      const base = detected!.configPath === '.git/hooks' ? '.git/hooks' : detected!.configPath;
+      const base = plan.configPath!;
       const touched: string[] = [];
       for (const stage of ['pre-commit', 'pre-push'] as const) {
         const rel = path.join(base, stage);
+        const staged = checks.filter((c) => c.stage === stage);
+        if (staged.length === 0) continue;
         // Native hooks may sit outside cwd only via an absolute hooksPath; keep
         // writes contained to the project.
         const abs = path.isAbsolute(base) ? path.join(base, stage) : resolveContained(rel);
-        const existing = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : '';
-        const staged = uncoveredChecks(
-          checks.filter((c) => c.stage === stage),
-          existing,
-        );
-        if (staged.length === 0) continue;
         if (appendShellHook(abs, staged)) touched.push(rel);
       }
       return touched;
     }
     case 'pre-commit': {
-      const rel = detected!.configPath;
+      const rel = plan.configPath!;
       const abs = resolveContained(rel);
-      const needed = uncoveredChecks(checks, fs.readFileSync(abs, 'utf8'));
-      if (needed.length === 0) return [];
-      return appendPreCommit(abs, needed) ? [rel] : [];
+      return appendPreCommit(abs, checks) ? [rel] : [];
     }
+    case 'simple-git-hooks':
+      // planHooks never routes writes here — its config maps a stage to ONE
+      // command string, so adding a check means rewriting the user's own line.
+      return [];
   }
 }
 
@@ -264,9 +214,20 @@ function emitMechanical(a: Answers, cwd: string): string[] {
 // Native soft-`ask` layer — Claude / Cursor / Copilot
 // ---------------------------------------------------------------------------
 
-/** A confirm gate: what to match, and the message to surface. */
+/**
+ * A gate on a pending command.
+ *
+ * `ask` raises the tool's own permission prompt: the message goes to the HUMAN,
+ * who answers yes or no. That is right for "confirm you meant this".
+ *
+ * `deny` blocks the call and feeds the message back to the AGENT, which is the
+ * only decision that can make the agent DO something first. `ask` cannot: the
+ * human approves the prompt, the command runs, and the requested work never
+ * happens — which is exactly how the change-audit gate used to be skipped.
+ */
 interface Gate {
   match: 'commit' | 'push' | 'sql';
+  decision: 'deny' | 'ask';
   message: string;
 }
 
@@ -277,15 +238,24 @@ function gates(a: Answers): Gate[] {
     const push = a.auditTiming !== 'commit';
     g.push({
       match: push ? 'push' : 'commit',
-      message: `Run the change-audit skill on this change before ${push ? 'pushing' : 'committing'} and report any conflicts with the project skills.`,
+      decision: 'deny',
+      message:
+        `Run the change-audit skill on this change first, then repeat this ${push ? 'push' : 'commit'}. ` +
+        'It compares the diff against the project skills and reports conflicts — it does not run ' +
+        'tests, linters or formatters.',
     });
   }
   if (a.confirmPush === true) {
-    g.push({ match: 'push', message: 'Confirm you intend to push to the remote.' });
+    g.push({
+      match: 'push',
+      decision: 'ask',
+      message: 'Confirm you intend to push to the remote.',
+    });
   }
   if (a.dbSafety === true) {
     g.push({
       match: 'sql',
+      decision: 'ask',
       message:
         'Review this command before running it — it looks like destructive SQL or a migration.',
     });
@@ -300,43 +270,105 @@ const MATCH_PATTERN: Record<Gate['match'], string> = {
 };
 
 /**
- * A POSIX-sh one-liner: read the tool's stdin (the pending command, in whatever
- * JSON shape), and if it matches a guarded action, print `jsonTemplate` with the
- * gate's message substituted (`%s`). Order: push → commit → sql, so the more
- * specific message wins. The leading marker comment makes the config idempotent.
+ * How the deny gate identifies "this change" — the key it stamps so the same
+ * change set is denied once, not forever. HEAD for a push (the commits being
+ * sent), the staged tree's hash for a commit.
  */
-function askCommand(relevant: Gate[], jsonTemplate: string): string {
-  const branches = relevant
+const CHANGE_KEY: Record<'push' | 'commit', string> = {
+  push: 'git rev-parse HEAD 2>/dev/null',
+  commit: 'git diff --staged 2>/dev/null | git hash-object --stdin 2>/dev/null',
+};
+
+/** Safe single-quoted sh literal (handles an apostrophe inside a message). */
+function shSingleQuote(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * The deny branch: block the command once per change set, handing the agent the
+ * reason. The stamp lives in the git dir, so it is never committed and is
+ * naturally per-worktree; a second attempt on the SAME change set falls through
+ * and proceeds. When the key cannot be read (no commits yet, not a repo) the
+ * gate steps aside rather than blocking a command it cannot track.
+ */
+function denyBranch(gate: Gate, template: string): string {
+  const key = CHANGE_KEY[gate.match === 'commit' ? 'commit' : 'push'];
+  return [
+    `if printf '%s' "$IN" | grep -qiE '${MATCH_PATTERN[gate.match]}'; then`,
+    `  K=$(${key}); S="$(git rev-parse --git-dir 2>/dev/null)/payo-audit-gate"`,
+    `  if [ -n "$K" ] && [ "$(cat "$S" 2>/dev/null)" != "$K" ]; then`,
+    `    printf '%s' "$K" >"$S" 2>/dev/null`,
+    `    MSG=${shSingleQuote(gate.message)}; printf '${template}' "$MSG"; exit 0`,
+    '  fi',
+    'fi',
+  ].join('\n');
+}
+
+/** The ask chain: first matching gate raises the tool's permission prompt. */
+function askBranches(asks: Gate[], template: string): string {
+  const branches = asks
     .map(
       (g, i) =>
         `${i === 0 ? 'if' : 'elif'} printf '%s' "$IN" | grep -qiE '${MATCH_PATTERN[g.match]}'; ` +
-        `then MSG='${g.message}'`,
+        `then MSG=${shSingleQuote(g.message)}`,
     )
     .join('; ');
-  return (
-    `# ${MARK}skill-gate\n` +
-    `IN=$(cat); ${branches}; else exit 0; fi; ` +
-    `printf '${jsonTemplate}' "$MSG"`
-  );
+  return `${branches}; else exit 0; fi\nprintf '${template}' "$MSG"`;
+}
+
+/**
+ * The POSIX-sh gate: read the tool's stdin (the pending command, in whatever
+ * JSON shape) and decide. The deny gate runs first and returns immediately; on
+ * the retry it falls through to the ask chain, so a repo with both change-audit
+ * and confirm-push still gets its confirm prompt. Order among asks is push →
+ * commit → sql, so the more specific message wins. The leading marker comment is
+ * what a re-run recognises as ours.
+ */
+function gateCommand(relevant: Gate[], spec: AskTool): string {
+  const deny = relevant.find((g) => g.decision === 'deny');
+  const asks = relevant.filter((g) => g.decision === 'ask');
+  return [
+    `# ${GATE_MARK}`,
+    'IN=$(cat)',
+    ...(deny ? [denyBranch(deny, spec.denyTemplate)] : []),
+    ...(asks.length > 0 ? [askBranches(asks, spec.askTemplate)] : []),
+    'exit 0',
+  ].join('\n');
+}
+
+/** The marker that identifies a Payo-written gate entry inside a tool config. */
+const GATE_MARK = `${MARK}skill-gate`;
+
+/** True when a parsed config entry is a gate Payo wrote on an earlier run. */
+function isPayoGate(entry: unknown): boolean {
+  return JSON.stringify(entry ?? null).includes(GATE_MARK);
 }
 
 /** Per-tool native `ask` config: where it lives and how to shape it. */
 interface AskTool {
   /** Config file path, project-relative. */
   configPath: string;
-  /** printf template emitting this tool's soft-`ask` decision, `%s` = message. */
-  jsonTemplate: string;
+  /** printf template emitting this tool's `ask` decision, `%s` = message to the human. */
+  askTemplate: string;
+  /** printf template emitting this tool's `deny` decision, `%s` = message to the agent. */
+  denyTemplate: string;
   /** Wrap the sh command into this tool's config object. */
   wrap(command: string): unknown;
-  /** Merge our entry into an existing parsed config; return the new config. */
+  /**
+   * Upsert our entry into an existing parsed config: drop any gate a previous
+   * Payo run left behind, then add the current one. Replacing rather than
+   * skipping is what lets a stale gate heal itself when the shape changes.
+   */
   merge(existing: unknown, command: string): unknown;
 }
 
 const ASK_TOOLS: Record<string, AskTool> = {
   claude: {
     configPath: '.claude/settings.json',
-    jsonTemplate:
+    askTemplate:
       '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"%s"}}',
+    denyTemplate:
+      '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}',
     wrap: (command) => ({
       hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command }] }] },
     }),
@@ -349,7 +381,9 @@ const ASK_TOOLS: Record<string, AskTool> = {
         string,
         unknown
       >;
-      const pre = Array.isArray(hooks.PreToolUse) ? [...(hooks.PreToolUse as unknown[])] : [];
+      const pre = Array.isArray(hooks.PreToolUse)
+        ? (hooks.PreToolUse as unknown[]).filter((e) => !isPayoGate(e))
+        : [];
       pre.push({ matcher: 'Bash', hooks: [{ type: 'command', command }] });
       hooks.PreToolUse = pre;
       cfg.hooks = hooks;
@@ -358,7 +392,9 @@ const ASK_TOOLS: Record<string, AskTool> = {
   },
   cursor: {
     configPath: '.cursor/hooks.json',
-    jsonTemplate: '{"permission":"ask","user_message":"%s"}',
+    askTemplate: '{"permission":"ask","user_message":"%s"}',
+    // `agent_message` is the field Cursor feeds back into the agent's loop.
+    denyTemplate: '{"permission":"deny","agent_message":"%s"}',
     wrap: (command) => ({ hooks: { beforeShellExecution: [{ command, failClosed: true }] } }),
     merge: (existing, command) => {
       const cfg = (existing && typeof existing === 'object' ? { ...existing } : {}) as Record<
@@ -370,7 +406,7 @@ const ASK_TOOLS: Record<string, AskTool> = {
         unknown
       >;
       const arr = Array.isArray(hooks.beforeShellExecution)
-        ? [...(hooks.beforeShellExecution as unknown[])]
+        ? (hooks.beforeShellExecution as unknown[]).filter((e) => !isPayoGate(e))
         : [];
       arr.push({ command, failClosed: true });
       hooks.beforeShellExecution = arr;
@@ -380,7 +416,8 @@ const ASK_TOOLS: Record<string, AskTool> = {
   },
   copilot: {
     configPath: '.github/hooks/payo-pretool.json',
-    jsonTemplate: '{"permissionDecision":"ask","permissionDecisionReason":"%s"}',
+    askTemplate: '{"permissionDecision":"ask","permissionDecisionReason":"%s"}',
+    denyTemplate: '{"permissionDecision":"deny","permissionDecisionReason":"%s"}',
     wrap: (command) => ({ event: 'preToolUse', command }),
     // Copilot reads one hook per file, so a fresh file is always our own.
     merge: (_existing, command) => ({ event: 'preToolUse', command }),
@@ -388,35 +425,39 @@ const ASK_TOOLS: Record<string, AskTool> = {
 };
 
 /**
- * Emit the soft-`ask` native hook for each supported tool that has one. Skips a
- * config that already carries our marker (idempotent). Returns paths touched.
+ * Emit the soft-`ask` native hook for each supported tool that has one. A config
+ * already carrying the exact current gate is left alone (idempotent); one
+ * carrying an older Payo gate has it replaced in place, so a stale gate from a
+ * previous Payo version heals instead of persisting forever. Returns paths touched.
  */
 function emitNativeAsk(a: Answers, tools: string[] | undefined): string[] {
   const relevant = gates(a);
   if (relevant.length === 0) return [];
   // Undefined ⇒ older session / programmatic caller: cover every soft-ask tool.
   const selected = tools ?? Object.keys(ASK_TOOLS);
-  // Deterministic order so the printed message prefers push, then commit, then sql.
+  // Deterministic order so the printed message prefers push, then commit, then
+  // sql. Every gate is kept: a repo with both change-audit and confirm-push has
+  // two gates on `git push` — the deny fires first, and its retry reaches the ask.
   const order: Gate['match'][] = ['push', 'commit', 'sql'];
-  const ordered = order
-    .map((m) => relevant.find((g) => g.match === m))
-    .filter((g): g is Gate => Boolean(g));
+  const ordered = order.flatMap((m) => relevant.filter((g) => g.match === m));
 
   const touched: string[] = [];
   for (const tool of selected) {
     const spec = ASK_TOOLS[tool];
     if (!spec) continue; // no soft-ask hook (codex / antigravity / windsurf)
-    const command = askCommand(ordered, spec.jsonTemplate);
+    const command = gateCommand(ordered, spec);
     const abs = resolveContained(spec.configPath);
     if (fs.existsSync(abs)) {
       const raw = fs.readFileSync(abs, 'utf8');
-      if (raw.includes(`${MARK}skill-gate`)) continue; // already ours
       let parsed: unknown;
       try {
         parsed = JSON.parse(raw);
       } catch {
         continue; // don't corrupt an unparseable config
       }
+      // Compare the command itself, not the serialized file: re-formatting a
+      // config the user indents differently would be a spurious edit.
+      if (JSON.stringify(parsed).includes(JSON.stringify(command))) continue; // already current
       writeFileAtomic(abs, JSON.stringify(spec.merge(parsed, command), null, 2) + '\n');
     } else {
       writeArtifact({
@@ -432,12 +473,18 @@ function emitNativeAsk(a: Answers, tools: string[] | undefined): string[] {
 /**
  * Emit every skill-enforcement hook implied by the answers: the mechanical git
  * floor plus the per-tool soft-`ask` gates. `tools` is the set the user chose to
- * support (falls back to the selected AI tool). Returns the project-relative
- * paths written, for the CLI report. Writes nothing when no hook-bearing flag is
- * set.
+ * support (falls back to the selected AI tool). `plan` is the hook plan the
+ * generator already computed — passing it keeps the written hooks identical to
+ * what the generated guidance claims is automated; omitting it recomputes the
+ * same plan. Returns the project-relative paths written, for the CLI report.
  */
-export function emitHooks(a: Answers, tools?: string[], cwd: string = process.cwd()): string[] {
-  return [...new Set([...emitMechanical(a, cwd), ...emitNativeAsk(a, tools)])];
+export function emitHooks(
+  a: Answers,
+  tools?: string[],
+  cwd: string = process.cwd(),
+  plan: HookPlan = planHooks(a, cwd),
+): string[] {
+  return [...new Set([...emitMechanical(plan), ...emitNativeAsk(a, tools)])];
 }
 
 /** True when `bin` resolves on PATH. */
@@ -449,15 +496,24 @@ function onPath(bin: string): boolean {
   }
 }
 
+/** Human wording for a check class, for the post-generation report. */
+const CHECK_LABEL: Record<PlannedCheck['capability'], string> = {
+  'secret-scan': 'secret scanning',
+  verify: 'the tests',
+  lint: 'the linter',
+  format: 'the format check',
+};
+
 /**
- * One-time setup commands the user must run for the freshly written hooks to
- * take effect — surfaced by the CLI after generation. A fresh `lefthook.yml`
- * needs `lefthook install` to wire `.git/hooks` (and lefthook itself if it is
- * not on PATH); a merged runner is already active. gitleaks is flagged only when
- * a hook that uses it was written and the binary is missing. Empty when there is
- * nothing to do.
+ * What the user still has to do for the hooks to mean anything — surfaced by the
+ * CLI after generation. A fresh `lefthook.yml` needs `lefthook install` to wire
+ * `.git/hooks` (and lefthook itself if it is not on PATH); a runner that was
+ * merged into is already active, and one that was left alone needs nothing at
+ * all. A binary is flagged only when a check that needs it was actually written.
+ * Deferred checks get a line of their own: nothing runs them, and the user
+ * should know that before trusting the setup. Empty when there is nothing to do.
  */
-export function hookSetupHints(files: string[], a: Answers): string[] {
+export function hookSetupHints(files: string[], a: Answers, plan?: HookPlan): string[] {
   const hints: string[] = [];
   if (files.includes('lefthook.yml')) {
     if (!onPath('lefthook')) {
@@ -465,8 +521,18 @@ export function hookSetupHints(files: string[], a: Answers): string[] {
     }
     hints.push('Enable the git hooks:  lefthook install');
   }
-  if (a.gitleaks === true && files.length > 0 && !onPath('gitleaks')) {
+  const wroteSecretScan = plan
+    ? plan.write.some((c) => c.capability === 'secret-scan')
+    : a.gitleaks === true && files.length > 0;
+  if (wroteSecretScan && !onPath('gitleaks')) {
     hints.push('Install gitleaks (the secret-scan hook needs it):  brew install gitleaks');
+  }
+  if (plan && plan.deferred.length > 0) {
+    const what = [...new Set(plan.deferred.map((c) => CHECK_LABEL[c.capability]))].join(', ');
+    const where = plan.configPath ?? 'your hook runner';
+    hints.push(
+      `Left ${where} untouched — no hook runs ${what}. The generated skills ask the assistant to run them instead.`,
+    );
   }
   return hints;
 }

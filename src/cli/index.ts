@@ -35,6 +35,7 @@ import {
   backupFiles,
 } from '../generator/index';
 import { hookSetupHints } from '../generator/hooks';
+import { planHooks } from '../generator/hookplan';
 import type { ResumeStore } from '../generator/types';
 import { printBanner } from './banner';
 
@@ -70,6 +71,12 @@ export async function run(): Promise<void> {
   // --- Auto-detect existing stack (fresh sessions only; resume keeps answers) ---
   if (session.answered.length === 0) {
     const detected = detectStack(process.cwd());
+    // The existing git-hook runner and what it already covers. Recorded before
+    // the start-mode gate on purpose: a repo's hooks must be respected whether
+    // the user is continuing the project or starting fresh inside it. Drives the
+    // hookPolicy question and, through the hook plan, what the generated
+    // guidance may claim is already automated.
+    if (detected.hooks) session = recordAnswer(session, 'existingHooks', detected.hooks);
     if (Object.keys(detected.answers).length > 0) {
       // The repo may already hold AI config — possibly for a different tool than
       // the user is about to pick. Surface it and pre-select the tool in use.
@@ -332,11 +339,13 @@ export async function run(): Promise<void> {
     );
   }
 
-  // Skill-enforcement hooks were written — tell the user the one-time commands to
-  // activate them (install the runner / gitleaks, then wire the git hooks).
-  const hookHints = hookSetupHints(result.files, session.answers);
+  // What the hook layer still needs from the user: the one-time commands to
+  // activate anything written, and an honest note about any check the user's
+  // "leave my hooks alone" choice means nothing will run.
+  const plan = planHooks(session.answers);
+  const hookHints = hookSetupHints(result.files, session.answers, plan);
   if (hookHints.length > 0) {
-    note(hookHints.map((h) => `• ${h}`).join('\n'), 'Activate your new git hooks');
+    note(hookHints.map((h) => `• ${h}`).join('\n'), 'Git hooks');
   }
 
   // Offer to remove retired per-tool config the universal layout supersedes.

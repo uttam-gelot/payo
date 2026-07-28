@@ -11,6 +11,13 @@ import type { TechModule } from '../stack/types';
 import { resolveGuidance } from './guidance';
 import { dbFamily, hasTesting as testingSelected } from '../stack/predicates';
 import { getModule, modulesFor } from '../stack/registry';
+import {
+  automatedSummary,
+  hookPlanFrom,
+  isAutomated,
+  manualVerifyTools,
+  verifyToolsPhrase,
+} from './hookplan';
 import '../stack/modules/index'; // side-effect: ensure modules are registered for renderer-only calls
 
 /**
@@ -391,26 +398,33 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
       );
     if (answers.confirmPush === true)
       lines.push('- Never push to a remote without explicit confirmation.');
-    if (answers.gitleaks === true)
+    // A check a git hook already runs must NOT also be asked of the agent: it
+    // would run everything once by hand and then wait for the hook to run it all
+    // again on commit / push. Name the hook instead, and keep manual
+    // instructions only for what no hook covers.
+    const plan = hookPlanFrom(answers);
+    const automated = automatedSummary(plan);
+    if (automated) {
+      lines.push(`- Git hooks: ${automated}, and blocks the commit or push when a check fails.`);
+      lines.push(
+        '- Do not run those checks yourself first — the hook runs them. If it blocks, fix the failure and retry.',
+      );
+    }
+    if (answers.gitleaks === true && !isAutomated(plan, 'secret-scan'))
       lines.push(
         '- Scan for secrets with gitleaks before every push; offer to install it if missing.',
       );
-    // Name only the verification tools the user actually selected — a project
-    // whose tests were skipped must never be told to run tests.
-    const verifyTools = [
-      str(answers, 'formatter') && 'formatter',
-      str(answers, 'linter') && 'linter',
-      testingSelected(answers) && 'tests',
-    ].filter((t): t is string => typeof t === 'string');
-    const verifyPhrase =
-      verifyTools.length === 0
-        ? "the project's checks"
-        : verifyTools.length === 1
-          ? `the ${verifyTools[0]}`
-          : `the ${verifyTools.slice(0, -1).join(', ')}, and ${verifyTools[verifyTools.length - 1]}`;
-    if (answers.verifyTiming === 'commit')
+    // Name only the verification tools the user actually selected AND no hook
+    // runs — a project whose tests were skipped must never be told to run tests,
+    // and neither must one whose hook already runs them.
+    const verifyTools = manualVerifyTools(answers, plan);
+    const verifyPhrase = verifyToolsPhrase(verifyTools);
+    // With everything automated there is nothing left to ask for by hand; the
+    // "do not run those checks yourself" line above already covers the timing.
+    const anyManual = verifyTools.length > 0 || !automated;
+    if (anyManual && answers.verifyTiming === 'commit')
       lines.push(`- Run ${verifyPhrase} before committing; only commit when they pass.`);
-    if (answers.verifyTiming === 'push')
+    if (anyManual && answers.verifyTiming === 'push')
       lines.push(`- Run ${verifyPhrase} before pushing; only push when they pass.`);
     if (answers.atomicCommits === true)
       lines.push('- Keep commits small and atomic — one logical change per commit.');

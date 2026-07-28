@@ -65,6 +65,36 @@ describe('flow gating by project type', () => {
     expect(reachable({ ...base, auditSkill: false }).has('auditTiming')).toBe(false);
   });
 
+  it('asks about existing hooks only when there is something they do not cover', () => {
+    const base = { projectType: 'backend', language: 'go', gitleaks: true };
+    const husky = (coverage: Record<string, string[]>): Answers => ({
+      ...base,
+      existingHooks: { runner: 'husky', configPath: '.husky', coverage },
+    });
+
+    // Greenfield repo — nothing to respect, so nothing to ask.
+    expect(reachable(base).has('hookPolicy')).toBe(false);
+    // A runner that already scans for secrets covers the only wanted check.
+    expect(
+      reachable(husky({ 'pre-commit': [], 'pre-push': ['secret-scan'] })).has('hookPolicy'),
+    ).toBe(false);
+    // A runner that lints but does not scan is missing one — worth asking about.
+    expect(reachable(husky({ 'pre-commit': ['lint'], 'pre-push': [] })).has('hookPolicy')).toBe(
+      true,
+    );
+    // simple-git-hooks can never be written into, so the question is pointless.
+    expect(
+      reachable({
+        ...base,
+        existingHooks: {
+          runner: 'simple-git-hooks',
+          configPath: 'package.json',
+          coverage: { 'pre-commit': [], 'pre-push': [] },
+        },
+      }).has('hookPolicy'),
+    ).toBe(false);
+  });
+
   it('existing shapes are unchanged: backend keeps API, frontend keeps styling', () => {
     const backend = reachable({ projectType: 'backend', language: 'go' });
     expect(backend.has('apiArchitecture')).toBe(true);
