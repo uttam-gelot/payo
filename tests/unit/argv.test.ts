@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'bun:test';
 import { parseArgs, versionText, helpText } from '../../src/cli/argv';
 import pkg from '../../package.json';
+import { config } from '../../src/config';
 
 describe('parseArgs', () => {
   it('returns run for no arguments', () => {
@@ -43,5 +44,14 @@ describe('helpText', () => {
       expect(help).toContain(env);
     }
     expect(help).toContain('https://github.com/uttam-gelot/payo');
+  });
+
+  it('prints the defaults the config actually uses', () => {
+    // The help text drifted from config once already (it advertised a 120s agent
+    // timeout for two releases after the real default moved to 420s).
+    const help = helpText();
+    expect(help).toContain(`default: ${config.generation.concurrency()}`);
+    expect(help).toContain(`default: ${config.generation.retries()}`);
+    expect(help).toContain(`default: ${config.agent.timeoutMs()}`);
   });
 });
