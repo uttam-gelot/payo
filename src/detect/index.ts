@@ -19,8 +19,10 @@ import { detectRuby } from './ruby';
 import { detectGit } from './git';
 import { enumerateWorkspaces } from './workspaces';
 import { scriptSignals } from './scripts';
+import { detectHooks } from './hooks';
 
 export type { DetectionResult, DetectionSource, PackageSummary } from './types';
+export type { DetectedHooks, HookCapability, HookCoverage, HookRunner, HookStage } from './hooks';
 
 /** Detectors in priority order — used to break ties when several manifests coexist. */
 const DETECTORS = [
@@ -216,9 +218,11 @@ export function detectStack(cwd: string = process.cwd()): DetectionResult {
   // of workspace members), so they merge onto whichever primary stack is chosen.
   const gitConv = detectGit(cwd);
   const root = withGit(detectAt(cwd), gitConv);
+  // Repo-level like the git conventions: hooks live at the root even in a monorepo.
+  const hooks = detectHooks(cwd) ?? undefined;
 
   const members = enumerateWorkspaces(cwd);
-  if (members.length === 0) return applyScriptHints(root, cwd);
+  if (members.length === 0) return withHooks(applyScriptHints(root, cwd), hooks);
 
   const detected = members.map((rel) => ({ rel, result: detectAt(path.join(cwd, rel)) }));
 
@@ -258,14 +262,22 @@ export function detectStack(cwd: string = process.cwd()): DetectionResult {
 
   const base = withGit(coherent({ answers, sources }), gitConv);
   const secondary = secondaryLanguages(str(base.answers, 'language'), allResults);
-  return applyScriptHints(
-    {
-      ...base,
-      ...(secondary.length > 0 ? { secondary } : {}),
-      packages: collapsePackages(detected.map((d) => summarize(d.rel, d.result))),
-    },
-    cwd,
+  return withHooks(
+    applyScriptHints(
+      {
+        ...base,
+        ...(secondary.length > 0 ? { secondary } : {}),
+        packages: collapsePackages(detected.map((d) => summarize(d.rel, d.result))),
+      },
+      cwd,
+    ),
+    hooks,
   );
+}
+
+/** Attach the detected hook runner, when the repo has one. */
+function withHooks(result: DetectionResult, hooks: DetectionResult['hooks']): DetectionResult {
+  return hooks ? { ...result, hooks } : result;
 }
 
 /** Merge repo-level git conventions onto a detection result (git fills, never overrides). */

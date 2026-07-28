@@ -262,6 +262,12 @@ function emitMechanical(a: Answers, cwd: string): string[] {
       if (needed.length === 0) return [];
       return appendPreCommit(abs, needed) ? [rel] : [];
     }
+    case 'simple-git-hooks':
+      // Its config is a stage → single-command-string map, so the only way in is
+      // to rewrite the user's command line (`x && y`), which changes their
+      // failure semantics. Leave it alone; the guidance keeps asking the agent to
+      // run whatever this runner does not cover.
+      return [];
   }
 }
 

@@ -235,6 +235,24 @@ interface DetectionLike {
   answers: Record<string, unknown>;
   secondary?: string[];
   packages?: { path: string; language?: string }[];
+  hooks?: { runner: string; configPath: string; coverage: Record<string, string[]> };
+}
+
+/** Human wording for a detected hook capability. */
+const CAPABILITY_LABEL: Record<string, string> = {
+  'secret-scan': 'secret scan',
+  verify: 'tests',
+  lint: 'lint',
+  format: 'format',
+};
+
+/** e.g. "husky (lefthook.yml) — pre-commit: lint; pre-push: tests" */
+function hookSummaryLine(hooks: NonNullable<DetectionLike['hooks']>): string {
+  const stages = Object.entries(hooks.coverage)
+    .filter(([, caps]) => caps.length > 0)
+    .map(([stage, caps]) => `${stage}: ${caps.map((c) => CAPABILITY_LABEL[c] ?? c).join(', ')}`);
+  const what = stages.length > 0 ? stages.join('; ') : 'no recognised checks';
+  return `• ${'Git hooks'.padEnd(16)} ${hooks.runner} (${hooks.configPath}) — ${what}`;
 }
 
 /** Build the "Detected from your project" lines — one per recorded id, in order. */
@@ -251,6 +269,9 @@ export function detectionSummaryLines(detected: DetectionLike): string[] {
     });
     lines.push(`• ${'Also detected'.padEnd(16)} ${labels.join(', ')}`);
   }
+  // The user must see their existing hook setup before being asked whether Payo
+  // may touch it — the question itself cannot name the runner (messages are static).
+  if (detected.hooks) lines.push(hookSummaryLine(detected.hooks));
   return lines;
 }
 

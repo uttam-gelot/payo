@@ -87,7 +87,10 @@ describe('emitHooks — native soft-ask', () => {
             permissions: { allow: ['Read'] },
             hooks: {
               PreToolUse: [
-                { matcher: 'Bash', hooks: [{ type: 'command', command: '# payo:skill-gate\nOLD' }] },
+                {
+                  matcher: 'Bash',
+                  hooks: [{ type: 'command', command: '# payo:skill-gate\nOLD' }],
+                },
                 { matcher: 'Bash', hooks: [{ type: 'command', command: 'my own hook' }] },
               ],
             },

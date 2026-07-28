@@ -1,4 +1,5 @@
 import type { Answers } from '../questions/types';
+import type { DetectedHooks } from './hooks';
 
 /** Where a detected answer came from — shown in the confirm summary. */
 export type DetectionSource =
@@ -47,6 +48,12 @@ export interface DetectionResult {
    * interviews for a single primary stack.
    */
   secondary?: string[];
+  /**
+   * The git-hook runner the repo already uses and what it covers, when one is
+   * present. Not an answer id — it decides whether Payo may touch the repo's
+   * hooks at all, and what the generated guidance may claim is already automated.
+   */
+  hooks?: DetectedHooks;
 }
 
 export const EMPTY_DETECTION: DetectionResult = { answers: {}, sources: {} };
