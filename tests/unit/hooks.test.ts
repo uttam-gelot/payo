@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { execSync } from 'child_process';
 import { join } from 'path';
 import { inTempProject } from '../helpers/tmpProject';
+import { initGitRepo, commitEmpty } from '../helpers/gitRepo';
 import { emitHooks, mergeLefthook, hookSetupHints } from '../../src/generator/hooks';
 import { detectHookRunner } from '../../src/detect/hooks';
 import { planHooks } from '../../src/generator/hookplan';
@@ -80,10 +81,7 @@ describe('emitHooks — native pre-tool gate', () => {
 
   it('denies a change set once, then lets the retry through', () =>
     inTempProject((dir) => {
-      execSync('git init -q . && git commit -q --allow-empty -m init', {
-        cwd: dir,
-        shell: '/bin/sh',
-      });
+      initGitRepo(dir);
       emitHooks({ auditSkill: true, auditTiming: 'push' }, ['claude']);
       const command = readJson<ClaudeCfg>(join(dir, '.claude/settings.json')).hooks.PreToolUse[0]
         .hooks[0].command;
@@ -98,7 +96,7 @@ describe('emitHooks — native pre-tool gate', () => {
       expect(push()).toBe(''); // same change set — already asked for, so it proceeds
 
       // A new commit is a new change set and must be audited on its own.
-      execSync('git commit -q --allow-empty -m second', { cwd: dir, shell: '/bin/sh' });
+      commitEmpty(dir, 'second');
       expect(push()).toContain('"deny"');
 
       // The stamp lives in the git dir, so it is never committed.
@@ -107,10 +105,7 @@ describe('emitHooks — native pre-tool gate', () => {
 
   it('stays silent on a command it does not guard', () =>
     inTempProject((dir) => {
-      execSync('git init -q . && git commit -q --allow-empty -m init', {
-        cwd: dir,
-        shell: '/bin/sh',
-      });
+      initGitRepo(dir);
       emitHooks({ auditSkill: true, auditTiming: 'push' }, ['claude']);
       const command = readJson<ClaudeCfg>(join(dir, '.claude/settings.json')).hooks.PreToolUse[0]
         .hooks[0].command;
