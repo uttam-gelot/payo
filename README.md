@@ -25,6 +25,7 @@ project's conventions instead of guessing.
 
 - [What is Payo?](#what-is-payo)
 - [Why Payo?](#why-payo)
+- [How Payo differs from a generic skills pack](#how-payo-differs-from-a-generic-skills-pack)
 - [Who is this for?](#who-is-this-for)
 - [Quick Start](#quick-start)
 - [How to use — a walkthrough](#how-to-use--a-walkthrough)
@@ -84,6 +85,61 @@ assistant already reads, so the AI reaches for _your_ framework, _your_ folder
 layout, _your_ testing and git rules every time — without you stopping to explain
 them. You keep vibe coding at full speed; the output just fits the project
 instead of fighting it.
+
+## How Payo differs from a generic skills pack
+
+There are plenty of ways to get skills and rule files into a repo: curated
+collections, awesome-lists, starter templates, a rules pack someone published.
+They all hand you the **same markdown everyone else gets** — written for a
+generic project, then left for you to adapt. Payo isn't a catalog you install.
+It's a generator that writes _your_ skills, from _your_ repo.
+
+**1. Your skills are written, not downloaded.** Payo doesn't ship skill content.
+It runs the agent CLI you already have installed and authenticated — `claude`,
+`codex`, `cursor-agent`, `copilot`, `agy` — over your answers, several skills at
+a time, retrying and logging each attempt. The result is authored for this
+project on this machine, under your account.
+
+**2. Only the skills your project needs exist at all.** Every skill is gated on
+your answers: no database means there is no `data-layer/` skill — not a stub, not
+an "N/A" section, no directory. Same for auth, state management, API
+conventions, logging, testing. A pack gives you all of them and expects you to
+delete the two-thirds that don't apply; Payo never creates them. The interview
+works the same way: a bank of **200+ stack-tailored questions** across **100+
+tech modules**, from which you're asked only the handful your stack pulls in.
+
+**3. Real commands and real paths, not placeholders.** Because Payo knows your
+package manager, framework, and ORM, the guidance says `pnpm exec eslint .` —
+not `npx eslint .`, and not `<your lint command>`. It says `cargo test`, `php
+artisan migrate`, `bin/rails db:migrate`, and lists your monorepo's actual
+package directories. The generation prompt explicitly forbids guidance for any
+tool that isn't in your stack, so nothing generic leaks back in.
+
+**4. It reads your repo, including habits you never wrote down.** On an existing
+project, Payo detects your stack from the manifests and infers your
+branch-naming and commit-message conventions by parsing your **local** git
+history (which never enters an AI prompt). In **Detect everything** mode your
+code is the source of truth: anything Payo can't find is **skipped**, not filled
+with a plausible default — so it won't prescribe `/v1` API versioning, a testing
+setup, or a folder layout your project never adopted.
+
+**5. Guidance that's enforced, not just suggested.** A skills pack is prose, and
+an agent can skip prose. When you enable a guardrail, Payo also writes the
+mechanism that makes it fire: a `lefthook.yml` that hard-blocks the commit or
+push, and a native pre-tool gate for Claude, Cursor, and Copilot. It plans both
+layers together, so each check runs in exactly one place — the agent is told not
+to re-run what a hook already runs.
+
+**6. One canonical copy, every tool.** One `SKILL.md` per topic under
+`.agents/skills/`, with Claude Code and Windsurf pointed at it by symlink. No
+per-tool duplicates to edit twice and no copies to drift apart — which is
+exactly what a multi-format rules pack leaves you maintaining.
+
+**7. Re-runnable, and nothing leaves your machine.** Re-running Payo doesn't
+duplicate a hook or clobber your config: hook edits are matched per check, native
+gates upsert, and retired files are cleaned up on your say-so. An interrupted run
+resumes from `.payo/`. There's no Payo backend, no account, and no telemetry —
+without an agent CLI installed, nothing leaves your machine at all.
 
 ## Who is this for?
 
@@ -338,7 +394,7 @@ A few environment variables tune AI generation:
 | ----------------------- | -------- | ------------------------------------ |
 | `PAYO_CONCURRENCY`      | `4`      | Max parallel agent subprocesses      |
 | `PAYO_RETRIES`          | `1`      | Extra attempts after a failed run    |
-| `PAYO_AGENT_TIMEOUT_MS` | `120000` | Wall-clock cap per file (ms)         |
+| `PAYO_AGENT_TIMEOUT_MS` | `420000` | Wall-clock cap per file (ms)         |
 
 ### Your data stays yours
 

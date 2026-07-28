@@ -51,7 +51,7 @@
     "url": "https://payo.uttamgelot.com/",
     "image": "https://payo.uttamgelot.com/og.png",
     "downloadUrl": "https://www.npmjs.com/package/@uge/payo",
-    "softwareVersion": "2.1.2",
+    "softwareVersion": "2.3.1",
     "license": "https://opensource.org/licenses/MIT",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
   }
@@ -85,6 +85,11 @@
       },
       {
         "@type": "Question",
+        "name": "How is Payo different from a generic skills pack or rules template?",
+        "acceptedAnswer": { "@type": "Answer", "text": "A pack hands every project the same markdown. Payo ships no skill content — it generates yours by running the agent CLI you already have installed against your answers and your repo. Skills you don't need are never created: no database means there is no data-layer skill at all, not a stub. The guidance names your real commands and paths (pnpm exec eslint . rather than a placeholder), and on an existing project it infers your branch-naming and commit conventions from your local git history. Guardrails are backed by a lefthook git hook and a native pre-tool gate, so they are enforced rather than merely suggested, and everything lands in one canonical set of Agent Skills that every skills-compatible tool reads." }
+      },
+      {
+        "@type": "Question",
         "name": "Does Payo work on an existing project?",
         "acceptedAnswer": { "@type": "Answer", "text": "Yes. Payo detects your stack from what's already in the repo — manifests like package.json, pyproject.toml, go.mod, Cargo.toml, composer.json, *.csproj, pom.xml, build.gradle and Gemfile, plus lockfiles, tool configs, and folder layout — across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby, then pre-fills the questionnaire. Choose Detect everything and it uses your code, folder structure, and git history as the source of truth — recording what it finds (branch-naming and commit conventions included) and skipping what it can't — so you just review the summary before generating." }
       },
@@ -96,12 +101,12 @@
       {
         "@type": "Question",
         "name": "Can Payo audit my changes against the project rules?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Yes, optionally. Payo can add a change-audit skill: opt in during the questionnaire and choose when it runs — before every commit or before pushing. At that point your AI assistant reads the pending change, picks only the relevant project skills, and reports anything that conflicts before you commit or push. To make sure it actually fires, Payo also writes a native PreToolUse hook for Claude, Cursor, and Copilot that pops a confirm prompt right when the agent runs git commit or git push. The generated AGENTS.md also tells the assistant to consult and follow the applicable skills before writing code." }
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes, optionally. Payo can add a change-audit skill: opt in during the questionnaire and choose when it runs — before every commit or before pushing. At that point your AI assistant reads the pending change, picks only the relevant project skills, and reports anything that conflicts before you commit or push. To make sure it actually fires, Payo also writes a native PreToolUse hook for Claude, Cursor, and Copilot: it denies the git commit or git push once with an instruction back to the agent — a confirm prompt would simply be approved and the audit skipped — and the retry for that same change goes through. The generated AGENTS.md also tells the assistant to consult and follow the applicable skills before writing code." }
       },
       {
         "@type": "Question",
         "name": "Does Payo add safety guardrails for databases and secrets?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Payo asks whether the assistant must get explicit confirmation before running destructive SQL or database migrations, and whether to add a gitleaks secret-scan convention that scans for leaked secrets before every push. Beyond the skills, Payo writes the hooks that enforce them: a lefthook git hook (or a merge into your existing husky / pre-commit / native hooks) that runs gitleaks and your tests and hard-blocks the commit or push on failure, plus a native confirm prompt before destructive SQL for Claude, Cursor, and Copilot. Payo writes the config and tells you to run lefthook install once; it installs no tools itself. Both guardrails are recommended on and applied in Detect everything." }
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Payo asks whether the assistant must get explicit confirmation before running destructive SQL or database migrations, and whether to add a gitleaks secret-scan convention that scans for leaked secrets before every push. Beyond the skills, Payo writes the hooks that enforce them: a lefthook git hook that runs gitleaks, your test command, your linter and a format check at the stage you chose and hard-blocks the commit or push on failure, plus a native confirm prompt before destructive SQL for Claude, Cursor, and Copilot. If your repo already has hooks — lefthook, husky, pre-commit, simple-git-hooks or a committed .githooks directory — Payo reads what each stage already covers and leaves your setup untouched by default, asking before it merges anything. Payo writes the config and tells you to run lefthook install once; it installs no tools itself. Both guardrails are recommended on and applied in Detect everything." }
       }
     ]
   }
@@ -206,6 +211,10 @@
     .tool .name { font-weight: 680; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
     .tool .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--teal); }
     .tool .files { color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: 13px; line-height: 1.7; word-break: break-word; }
+    .tool .num { flex: none; width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center;
+      background: linear-gradient(135deg, var(--teal), var(--teal-deep)); color: #fff; font-size: 12px; font-weight: 700; }
+    .tool .body { color: var(--muted); font-size: .95rem; line-height: 1.6; }
+    .tool .body code { font-size: .85em; }
 
     /* stacks */
     .stacks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
@@ -284,6 +293,7 @@
     <div class="nav-in">
       <a class="brand" href="/"><img src="https://raw.githubusercontent.com/uttam-gelot/payo/main/assets/icon.png" alt="" />Payo</a>
       <div class="nav-links">
+        <a href="#different">Why Payo</a>
         <a href="#how">How it works</a>
         <a href="#faq">FAQ</a>
         <a href="https://github.com/uttam-gelot/payo">GitHub</a>
@@ -470,6 +480,48 @@
       </div>
     </section>
 
+    <section id="different">
+      <div class="sec-head">
+        <h2>Not a skills pack — a skills generator</h2>
+        <p>
+          Curated collections, awesome-lists, starter rule packs: they all hand you the
+          <strong>same markdown everyone else gets</strong>, written for a generic project and
+          left for you to adapt. Payo ships no skill content. It writes <em>yours</em>, from
+          <em>your</em> repo.
+        </p>
+      </div>
+      <div class="tools">
+        <div class="tool">
+          <div class="name"><span class="num">1</span>Written, not downloaded</div>
+          <div class="body">Payo runs the agent CLI you already have installed and signed in to — <code>claude</code>, <code>codex</code>, <code>cursor-agent</code>, <code>copilot</code>, <code>agy</code> — over your answers, several skills at a time. Authored for this project, on this machine, under your account.</div>
+        </div>
+        <div class="tool">
+          <div class="name"><span class="num">2</span>Only the skills you need exist</div>
+          <div class="body">No database means there is no <code>data-layer</code> skill — not a stub, not an "N/A" section, no directory. Same for auth, state, API, logging, testing. A pack gives you all of them and expects you to delete two-thirds.</div>
+        </div>
+        <div class="tool">
+          <div class="name"><span class="num">3</span>Real commands, not placeholders</div>
+          <div class="body">It says <code>pnpm exec eslint .</code> — not <code>npx</code>, not <code>&lt;your lint command&gt;</code>. <code>cargo test</code>, <code>php artisan migrate</code>, <code>bin/rails db:migrate</code>, your real package dirs. Guidance for tools outside your stack is forbidden outright.</div>
+        </div>
+        <div class="tool">
+          <div class="name"><span class="num">4</span>Reads habits you never wrote down</div>
+          <div class="body">Branch naming and commit style are inferred from your <strong>local</strong> git history, which never enters an AI prompt. In <strong>Detect everything</strong>, whatever isn't found is skipped — never filled with a plausible default.</div>
+        </div>
+        <div class="tool">
+          <div class="name"><span class="num">5</span>Enforced, not just suggested</div>
+          <div class="body">A pack is prose, and an agent can skip prose. Enable a guardrail and Payo writes the mechanism too: a <code>lefthook</code> hook that hard-blocks the push, plus a native pre-tool gate — planned together so no check runs twice.</div>
+        </div>
+        <div class="tool">
+          <div class="name"><span class="num">6</span>One canonical copy</div>
+          <div class="body">One <code>SKILL.md</code> per topic in <code>.agents/skills/</code>, with Claude Code and Windsurf pointed at it by symlink. Nothing to edit twice, nothing to drift — unlike a multi-format rules pack.</div>
+        </div>
+        <div class="tool">
+          <div class="name"><span class="num">7</span>Re-runnable, and yours alone</div>
+          <div class="body">Re-running never duplicates a hook or clobbers your config; an interrupted run resumes from <code>.payo/</code>. No backend, no account, no telemetry — with no agent CLI installed, nothing leaves your machine.</div>
+        </div>
+      </div>
+    </section>
+
     <section id="existing">
       <div class="sec-head">
         <h2>Works on existing projects too</h2>
@@ -540,6 +592,10 @@
           <p>Claude Code, Cursor, GitHub Copilot, Codex, Windsurf, Antigravity, and Gemini — all from one universal layout (AGENTS.md + <code>.agents/skills/</code>), with thin shims for Claude Code and Windsurf.</p>
         </details>
         <details>
+          <summary>How is Payo different from a generic skills pack or rules template?</summary>
+          <p>A pack hands every project the same markdown. Payo ships <strong>no skill content</strong> — it generates yours by running the agent CLI you already have installed against your answers and your repo. Skills you don't need are never created: no database means there is no <code>data-layer</code> skill at all, not a stub. The guidance names your real commands and paths (<code>pnpm exec eslint .</code>, not a placeholder), and on an existing project it infers your branch-naming and commit conventions from your <strong>local</strong> git history. Guardrails are backed by a <code>lefthook</code> git hook and a native pre-tool gate — enforced, not merely suggested — and it all lands in one canonical set of Agent Skills every skills-compatible tool reads.</p>
+        </details>
+        <details>
           <summary>Does Payo work on an existing project?</summary>
           <p>Yes. Payo detects your stack from what's already in the repo — manifests (<code>package.json</code>, <code>pyproject.toml</code>, <code>go.mod</code>, <code>Cargo.toml</code>, <code>composer.json</code>, <code>*.csproj</code>, <code>pom.xml</code>, <code>build.gradle</code>, <code>Gemfile</code>), lockfiles, tool configs, and folder layout — across TypeScript/JavaScript, Python, Go, Rust, PHP, C#, Java, and Ruby, then pre-fills the questionnaire. Choose <strong>Detect everything</strong> and it uses your code, folder structure, and git history as the source of truth — recording what it finds (branch-naming and commit conventions included) and skipping what it can't — so you just review the summary before generating.</p>
         </details>
@@ -549,11 +605,11 @@
         </details>
         <details>
           <summary>Can Payo audit my changes against the project rules?</summary>
-          <p>Yes, optionally. Opt into the <strong>change-audit</strong> skill during the questionnaire and pick when it runs — before every commit or before pushing. At that point your assistant reads the pending change, selects only the relevant project skills, and reports anything that conflicts. To make sure it fires, Payo also writes a native <code>PreToolUse</code> hook for Claude, Cursor, and Copilot that pops a confirm prompt right when the agent runs <code>git commit</code> / <code>git push</code>. The generated <code>AGENTS.md</code> also tells the assistant to consult and follow the applicable skills before writing code.</p>
+          <p>Yes, optionally. Opt into the <strong>change-audit</strong> skill during the questionnaire and pick when it runs — before every commit or before pushing. At that point your assistant reads the pending change, selects only the relevant project skills, and reports anything that conflicts. To make sure it fires, Payo also writes a native <code>PreToolUse</code> hook for Claude, Cursor, and Copilot: it <strong>denies</strong> the <code>git commit</code> / <code>git push</code> once, with an instruction back to the agent — a confirm prompt would just be approved and the audit skipped — and the retry for that same change goes through. The generated <code>AGENTS.md</code> also tells the assistant to consult and follow the applicable skills before writing code.</p>
         </details>
         <details>
           <summary>Does Payo add safety guardrails for databases and secrets?</summary>
-          <p>Yes. Payo asks whether the assistant must get explicit confirmation before running destructive SQL or database migrations, and whether to add a <strong>gitleaks</strong> secret-scan convention that scans for leaked secrets before every push. Beyond the skills, Payo writes the hooks that enforce them: a <code>lefthook</code> git hook — or a merge into your existing husky / pre-commit / native hooks — that runs gitleaks and your tests and <strong>hard-blocks</strong> the commit or push on failure, plus a native confirm prompt before destructive SQL for Claude, Cursor, and Copilot. Payo writes the config and tells you to run <code>lefthook install</code> once; it installs no tools itself. Both are recommended on and applied in <strong>Detect everything</strong>.</p>
+          <p>Yes. Payo asks whether the assistant must get explicit confirmation before running destructive SQL or database migrations, and whether to add a <strong>gitleaks</strong> secret-scan convention that scans for leaked secrets before every push. Beyond the skills, Payo writes the hooks that enforce them: a <code>lefthook</code> git hook that runs gitleaks, your test command, your linter and a format check at the stage you chose and <strong>hard-blocks</strong> the commit or push on failure, plus a native confirm prompt before destructive SQL for Claude, Cursor, and Copilot. Already have hooks — lefthook, husky, pre-commit, simple-git-hooks or a committed <code>.githooks/</code>? Payo reads what each stage already covers and <strong>leaves your setup untouched by default</strong>, asking before it merges anything. Payo writes the config and tells you to run <code>lefthook install</code> once; it installs no tools itself. Both are recommended on and applied in <strong>Detect everything</strong>.</p>
         </details>
         <details>
           <summary>Is Payo free and open source?</summary>
