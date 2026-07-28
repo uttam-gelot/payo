@@ -6,11 +6,12 @@
  *    tool-agnostic, covers humans too. Written for lefthook on a greenfield
  *    repo; merged into an existing runner (husky / pre-commit / native) when one
  *    is already present, so the developer's setup is respected, never clobbered.
- *  - a soft NATIVE `ask` hook per supported tool (Claude / Cursor / Copilot) that
- *    surfaces a confirm prompt at `git commit` / `git push` (change-audit,
- *    confirm-push) or a destructive query (DB-safety). It stores no state and
- *    runs no model — it just makes the prompt appear. Tools without a soft-ask
- *    hook (Codex, Antigravity, Windsurf) are covered by the mechanical floor.
+ *  - a NATIVE pre-tool gate per supported tool (Claude / Cursor / Copilot) on
+ *    `git commit` / `git push` and destructive queries. It runs no model; it
+ *    either raises the tool's confirm prompt for the HUMAN (confirm-push,
+ *    DB-safety) or denies once per change set to hand the AGENT an instruction
+ *    it must act on (change-audit). Tools without a pre-tool hook (Codex,
+ *    Antigravity, Windsurf) are covered by the mechanical floor.
  *
  * Every edit is idempotent: a `payo:` marker in each block lets a re-run detect
  * its own prior output and skip, so running Payo twice adds nothing.
@@ -213,9 +214,20 @@ function emitMechanical(plan: HookPlan): string[] {
 // Native soft-`ask` layer — Claude / Cursor / Copilot
 // ---------------------------------------------------------------------------
 
-/** A confirm gate: what to match, and the message to surface. */
+/**
+ * A gate on a pending command.
+ *
+ * `ask` raises the tool's own permission prompt: the message goes to the HUMAN,
+ * who answers yes or no. That is right for "confirm you meant this".
+ *
+ * `deny` blocks the call and feeds the message back to the AGENT, which is the
+ * only decision that can make the agent DO something first. `ask` cannot: the
+ * human approves the prompt, the command runs, and the requested work never
+ * happens — which is exactly how the change-audit gate used to be skipped.
+ */
 interface Gate {
   match: 'commit' | 'push' | 'sql';
+  decision: 'deny' | 'ask';
   message: string;
 }
 
@@ -226,15 +238,24 @@ function gates(a: Answers): Gate[] {
     const push = a.auditTiming !== 'commit';
     g.push({
       match: push ? 'push' : 'commit',
-      message: `Run the change-audit skill on this change before ${push ? 'pushing' : 'committing'} and report any conflicts with the project skills.`,
+      decision: 'deny',
+      message:
+        `Run the change-audit skill on this change first, then repeat this ${push ? 'push' : 'commit'}. ` +
+        'It compares the diff against the project skills and reports conflicts — it does not run ' +
+        'tests, linters or formatters.',
     });
   }
   if (a.confirmPush === true) {
-    g.push({ match: 'push', message: 'Confirm you intend to push to the remote.' });
+    g.push({
+      match: 'push',
+      decision: 'ask',
+      message: 'Confirm you intend to push to the remote.',
+    });
   }
   if (a.dbSafety === true) {
     g.push({
       match: 'sql',
+      decision: 'ask',
       message:
         'Review this command before running it — it looks like destructive SQL or a migration.',
     });
@@ -249,24 +270,70 @@ const MATCH_PATTERN: Record<Gate['match'], string> = {
 };
 
 /**
- * A POSIX-sh one-liner: read the tool's stdin (the pending command, in whatever
- * JSON shape), and if it matches a guarded action, print `jsonTemplate` with the
- * gate's message substituted (`%s`). Order: push → commit → sql, so the more
- * specific message wins. The leading marker comment makes the config idempotent.
+ * How the deny gate identifies "this change" — the key it stamps so the same
+ * change set is denied once, not forever. HEAD for a push (the commits being
+ * sent), the staged tree's hash for a commit.
  */
-function askCommand(relevant: Gate[], jsonTemplate: string): string {
-  const branches = relevant
+const CHANGE_KEY: Record<'push' | 'commit', string> = {
+  push: 'git rev-parse HEAD 2>/dev/null',
+  commit: 'git diff --staged 2>/dev/null | git hash-object --stdin 2>/dev/null',
+};
+
+/** Safe single-quoted sh literal (handles an apostrophe inside a message). */
+function shSingleQuote(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * The deny branch: block the command once per change set, handing the agent the
+ * reason. The stamp lives in the git dir, so it is never committed and is
+ * naturally per-worktree; a second attempt on the SAME change set falls through
+ * and proceeds. When the key cannot be read (no commits yet, not a repo) the
+ * gate steps aside rather than blocking a command it cannot track.
+ */
+function denyBranch(gate: Gate, template: string): string {
+  const key = CHANGE_KEY[gate.match === 'commit' ? 'commit' : 'push'];
+  return [
+    `if printf '%s' "$IN" | grep -qiE '${MATCH_PATTERN[gate.match]}'; then`,
+    `  K=$(${key}); S="$(git rev-parse --git-dir 2>/dev/null)/payo-audit-gate"`,
+    `  if [ -n "$K" ] && [ "$(cat "$S" 2>/dev/null)" != "$K" ]; then`,
+    `    printf '%s' "$K" >"$S" 2>/dev/null`,
+    `    MSG=${shSingleQuote(gate.message)}; printf '${template}' "$MSG"; exit 0`,
+    '  fi',
+    'fi',
+  ].join('\n');
+}
+
+/** The ask chain: first matching gate raises the tool's permission prompt. */
+function askBranches(asks: Gate[], template: string): string {
+  const branches = asks
     .map(
       (g, i) =>
         `${i === 0 ? 'if' : 'elif'} printf '%s' "$IN" | grep -qiE '${MATCH_PATTERN[g.match]}'; ` +
-        `then MSG='${g.message}'`,
+        `then MSG=${shSingleQuote(g.message)}`,
     )
     .join('; ');
-  return (
-    `# ${MARK}skill-gate\n` +
-    `IN=$(cat); ${branches}; else exit 0; fi; ` +
-    `printf '${jsonTemplate}' "$MSG"`
-  );
+  return `${branches}; else exit 0; fi\nprintf '${template}' "$MSG"`;
+}
+
+/**
+ * The POSIX-sh gate: read the tool's stdin (the pending command, in whatever
+ * JSON shape) and decide. The deny gate runs first and returns immediately; on
+ * the retry it falls through to the ask chain, so a repo with both change-audit
+ * and confirm-push still gets its confirm prompt. Order among asks is push →
+ * commit → sql, so the more specific message wins. The leading marker comment is
+ * what a re-run recognises as ours.
+ */
+function gateCommand(relevant: Gate[], spec: AskTool): string {
+  const deny = relevant.find((g) => g.decision === 'deny');
+  const asks = relevant.filter((g) => g.decision === 'ask');
+  return [
+    `# ${GATE_MARK}`,
+    'IN=$(cat)',
+    ...(deny ? [denyBranch(deny, spec.denyTemplate)] : []),
+    ...(asks.length > 0 ? [askBranches(asks, spec.askTemplate)] : []),
+    'exit 0',
+  ].join('\n');
 }
 
 /** The marker that identifies a Payo-written gate entry inside a tool config. */
@@ -281,8 +348,10 @@ function isPayoGate(entry: unknown): boolean {
 interface AskTool {
   /** Config file path, project-relative. */
   configPath: string;
-  /** printf template emitting this tool's soft-`ask` decision, `%s` = message. */
-  jsonTemplate: string;
+  /** printf template emitting this tool's `ask` decision, `%s` = message to the human. */
+  askTemplate: string;
+  /** printf template emitting this tool's `deny` decision, `%s` = message to the agent. */
+  denyTemplate: string;
   /** Wrap the sh command into this tool's config object. */
   wrap(command: string): unknown;
   /**
@@ -296,8 +365,10 @@ interface AskTool {
 const ASK_TOOLS: Record<string, AskTool> = {
   claude: {
     configPath: '.claude/settings.json',
-    jsonTemplate:
+    askTemplate:
       '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"%s"}}',
+    denyTemplate:
+      '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}',
     wrap: (command) => ({
       hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command }] }] },
     }),
@@ -321,7 +392,9 @@ const ASK_TOOLS: Record<string, AskTool> = {
   },
   cursor: {
     configPath: '.cursor/hooks.json',
-    jsonTemplate: '{"permission":"ask","user_message":"%s"}',
+    askTemplate: '{"permission":"ask","user_message":"%s"}',
+    // `agent_message` is the field Cursor feeds back into the agent's loop.
+    denyTemplate: '{"permission":"deny","agent_message":"%s"}',
     wrap: (command) => ({ hooks: { beforeShellExecution: [{ command, failClosed: true }] } }),
     merge: (existing, command) => {
       const cfg = (existing && typeof existing === 'object' ? { ...existing } : {}) as Record<
@@ -343,7 +416,8 @@ const ASK_TOOLS: Record<string, AskTool> = {
   },
   copilot: {
     configPath: '.github/hooks/payo-pretool.json',
-    jsonTemplate: '{"permissionDecision":"ask","permissionDecisionReason":"%s"}',
+    askTemplate: '{"permissionDecision":"ask","permissionDecisionReason":"%s"}',
+    denyTemplate: '{"permissionDecision":"deny","permissionDecisionReason":"%s"}',
     wrap: (command) => ({ event: 'preToolUse', command }),
     // Copilot reads one hook per file, so a fresh file is always our own.
     merge: (_existing, command) => ({ event: 'preToolUse', command }),
@@ -361,17 +435,17 @@ function emitNativeAsk(a: Answers, tools: string[] | undefined): string[] {
   if (relevant.length === 0) return [];
   // Undefined ⇒ older session / programmatic caller: cover every soft-ask tool.
   const selected = tools ?? Object.keys(ASK_TOOLS);
-  // Deterministic order so the printed message prefers push, then commit, then sql.
+  // Deterministic order so the printed message prefers push, then commit, then
+  // sql. Every gate is kept: a repo with both change-audit and confirm-push has
+  // two gates on `git push` — the deny fires first, and its retry reaches the ask.
   const order: Gate['match'][] = ['push', 'commit', 'sql'];
-  const ordered = order
-    .map((m) => relevant.find((g) => g.match === m))
-    .filter((g): g is Gate => Boolean(g));
+  const ordered = order.flatMap((m) => relevant.filter((g) => g.match === m));
 
   const touched: string[] = [];
   for (const tool of selected) {
     const spec = ASK_TOOLS[tool];
     if (!spec) continue; // no soft-ask hook (codex / antigravity / windsurf)
-    const command = askCommand(ordered, spec.jsonTemplate);
+    const command = gateCommand(ordered, spec);
     const abs = resolveContained(spec.configPath);
     if (fs.existsSync(abs)) {
       const raw = fs.readFileSync(abs, 'utf8');

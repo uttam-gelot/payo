@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { execSync } from 'child_process';
 import { join } from 'path';
 import { inTempProject } from '../helpers/tmpProject';
 import { emitHooks, mergeLefthook, hookSetupHints } from '../../src/generator/hooks';
@@ -42,17 +43,82 @@ describe('emitHooks — mechanical (lefthook, greenfield)', () => {
     }));
 });
 
-describe('emitHooks — native soft-ask', () => {
-  it('writes a Claude PreToolUse ask gate for change-audit', () =>
+describe('emitHooks — native pre-tool gate', () => {
+  it('denies for change-audit, so the reason reaches the agent rather than the user', () =>
     inTempProject((dir) => {
+      // `ask` only raises a human prompt; approving it runs the push and the
+      // audit never happens. Only `deny` feeds the instruction back to the agent.
       const files = emitHooks({ auditSkill: true, auditTiming: 'push' }, ['claude']);
       expect(files).toContain('.claude/settings.json');
-      const cfg = readJson<ClaudeCfg>(join(dir, '.claude/settings.json'));
-      const command = cfg.hooks.PreToolUse[0].hooks[0].command;
+      const command = readJson<ClaudeCfg>(join(dir, '.claude/settings.json')).hooks.PreToolUse[0]
+        .hooks[0].command;
       expect(command).toContain('payo:skill-gate');
-      expect(command).toContain('permissionDecision":"ask'); // template baked into the sh command
+      expect(command).toContain('permissionDecision":"deny');
+      expect(command).not.toContain('permissionDecision":"ask');
       expect(command).toContain('change-audit');
       expect(command).toContain('git[[:space:]]+push');
+    }));
+
+  it('keeps ask for the gates that are genuinely a human decision', () =>
+    inTempProject((dir) => {
+      emitHooks({ confirmPush: true, dbSafety: true }, ['claude']);
+      const command = readJson<ClaudeCfg>(join(dir, '.claude/settings.json')).hooks.PreToolUse[0]
+        .hooks[0].command;
+      expect(command).toContain('permissionDecision":"ask');
+      expect(command).not.toContain('permissionDecision":"deny');
+    }));
+
+  it('keeps both push gates so the audit retry still reaches confirm-push', () =>
+    inTempProject((dir) => {
+      emitHooks({ auditSkill: true, auditTiming: 'push', confirmPush: true }, ['claude']);
+      const command = readJson<ClaudeCfg>(join(dir, '.claude/settings.json')).hooks.PreToolUse[0]
+        .hooks[0].command;
+      expect(command).toContain('permissionDecision":"deny');
+      expect(command).toContain('permissionDecision":"ask');
+    }));
+
+  it('denies a change set once, then lets the retry through', () =>
+    inTempProject((dir) => {
+      execSync('git init -q . && git commit -q --allow-empty -m init', {
+        cwd: dir,
+        shell: '/bin/sh',
+      });
+      emitHooks({ auditSkill: true, auditTiming: 'push' }, ['claude']);
+      const command = readJson<ClaudeCfg>(join(dir, '.claude/settings.json')).hooks.PreToolUse[0]
+        .hooks[0].command;
+      const push = (): string =>
+        execSync(command, {
+          cwd: dir,
+          shell: '/bin/sh',
+          input: JSON.stringify({ tool_input: { command: 'git push origin main' } }),
+        }).toString();
+
+      expect(push()).toContain('"deny"');
+      expect(push()).toBe(''); // same change set — already asked for, so it proceeds
+
+      // A new commit is a new change set and must be audited on its own.
+      execSync('git commit -q --allow-empty -m second', { cwd: dir, shell: '/bin/sh' });
+      expect(push()).toContain('"deny"');
+
+      // The stamp lives in the git dir, so it is never committed.
+      expect(existsSync(join(dir, '.git/payo-audit-gate'))).toBe(true);
+    }));
+
+  it('stays silent on a command it does not guard', () =>
+    inTempProject((dir) => {
+      execSync('git init -q . && git commit -q --allow-empty -m init', {
+        cwd: dir,
+        shell: '/bin/sh',
+      });
+      emitHooks({ auditSkill: true, auditTiming: 'push' }, ['claude']);
+      const command = readJson<ClaudeCfg>(join(dir, '.claude/settings.json')).hooks.PreToolUse[0]
+        .hooks[0].command;
+      const out = execSync(command, {
+        cwd: dir,
+        shell: '/bin/sh',
+        input: JSON.stringify({ tool_input: { command: 'ls -la' } }),
+      }).toString();
+      expect(out).toBe('');
     }));
 
   it('merges into an existing .claude/settings.json without dropping keys', () =>
