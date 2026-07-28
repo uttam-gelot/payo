@@ -70,6 +70,12 @@ export async function run(): Promise<void> {
   // --- Auto-detect existing stack (fresh sessions only; resume keeps answers) ---
   if (session.answered.length === 0) {
     const detected = detectStack(process.cwd());
+    // The existing git-hook runner and what it already covers. Recorded before
+    // the start-mode gate on purpose: a repo's hooks must be respected whether
+    // the user is continuing the project or starting fresh inside it. Drives the
+    // hookPolicy question and, through the hook plan, what the generated
+    // guidance may claim is already automated.
+    if (detected.hooks) session = recordAnswer(session, 'existingHooks', detected.hooks);
     if (Object.keys(detected.answers).length > 0) {
       // The repo may already hold AI config — possibly for a different tool than
       // the user is about to pick. Surface it and pre-select the tool in use.
@@ -194,12 +200,6 @@ export async function run(): Promise<void> {
         // generated docs must not pretend the other stacks don't exist.
         if (result.secondary && result.secondary.length > 0) {
           session = recordAnswer(session, 'secondaryLanguages', result.secondary);
-        }
-        // The existing git-hook runner and what it already covers. Drives the
-        // hookPolicy question and, through the hook plan, what the generated
-        // guidance claims is automated — so it must reach the generator.
-        if (result.hooks) {
-          session = recordAnswer(session, 'existingHooks', result.hooks);
         }
 
         // Stage-2 conflicts: the agent found evidence contradicting a Stage-1

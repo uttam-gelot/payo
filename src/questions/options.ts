@@ -603,6 +603,16 @@ export const verifyTimingOptions: Option<string>[] = [
   { value: 'none', label: 'Never automatically' },
 ];
 
+/**
+ * What to do with a git-hook runner the repo already has. Leaving it alone is
+ * the recommendation: the developer's hook setup is a deliberate choice, and the
+ * generated guidance can reference whatever it does instead of duplicating it.
+ */
+export const hookPolicyOptions: Option<string>[] = [
+  { value: 'leave', label: 'Leave my hooks exactly as they are', hint: 'recommended' },
+  { value: 'merge', label: 'Add only the checks they are missing' },
+];
+
 /** When the change-audit skill should run in the workflow. */
 export const auditTimingOptions: Option<string>[] = [
   { value: 'push', label: 'Before pushing to a remote', hint: 'recommended' },

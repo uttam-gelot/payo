@@ -161,12 +161,30 @@ describe('emitHooks — content-aware dedup (existing runner)', () => {
         'pre-push:\n  commands:\n    secrets:\n      run: gitleaks detect\n',
       );
       emitHooks(
-        { gitleaks: true, verifyTiming: 'push', testRunner: 'vitest', packageManager: 'npm' },
+        {
+          gitleaks: true,
+          verifyTiming: 'push',
+          testRunner: 'vitest',
+          packageManager: 'npm',
+          hookPolicy: 'merge',
+        },
         ['claude'],
       );
       const yml = readFileSync(join(dir, 'lefthook.yml'), 'utf8');
       expect(yml.match(/gitleaks/g)?.length).toBe(1); // secret scan not duplicated
       expect(yml).toContain('payo-verify'); // verify was missing → added
+    }));
+
+  it('leaves an existing runner byte-identical unless the user opted into merging', () =>
+    inTempProject((dir) => {
+      const before = 'pre-commit:\n  commands:\n    mine:\n      run: echo hi\n';
+      writeFileSync(join(dir, 'lefthook.yml'), before);
+      const files = emitHooks(
+        { gitleaks: true, verifyTiming: 'push', testRunner: 'vitest', packageManager: 'npm' },
+        ['claude'],
+      );
+      expect(files).toEqual([]);
+      expect(readFileSync(join(dir, 'lefthook.yml'), 'utf8')).toBe(before);
     }));
 });
 

@@ -168,24 +168,25 @@ function normalizeCoverage(raw: unknown): HookCoverage {
   return out;
 }
 
+/** The existing hook setup detection recorded onto the answers, if it did. */
+function recordedHooks(a: Answers): DetectedHooks | null {
+  const recorded = a.existingHooks;
+  if (!recorded || typeof recorded !== 'object') return null;
+  const r = recorded as Record<string, unknown>;
+  if (typeof r.runner !== 'string' || typeof r.configPath !== 'string') return null;
+  return {
+    runner: r.runner as HookRunner,
+    configPath: r.configPath,
+    coverage: normalizeCoverage(r.coverage),
+  };
+}
+
 /**
- * The existing hook setup recorded during detection, when the CLI already found
- * it. Falls back to reading the repo, so a programmatic caller still gets the
- * same answer.
+ * The existing hook setup, preferring what detection already recorded and
+ * falling back to reading the repo so a programmatic caller gets the same answer.
  */
 function existingHooks(a: Answers, cwd: string): DetectedHooks | null {
-  const recorded = a.existingHooks;
-  if (recorded && typeof recorded === 'object') {
-    const r = recorded as Record<string, unknown>;
-    if (typeof r.runner === 'string' && typeof r.configPath === 'string') {
-      return {
-        runner: r.runner as HookRunner,
-        configPath: r.configPath,
-        coverage: normalizeCoverage(r.coverage),
-      };
-    }
-  }
-  return detectHooks(cwd);
+  return recordedHooks(a) ?? detectHooks(cwd);
 }
 
 /**
@@ -206,8 +207,9 @@ export function planHooks(a: Answers, cwd: string = process.cwd()): HookPlan {
     };
   }
 
-  // 'leave' keeps the developer's runner untouched; 'merge' adds what it misses.
-  const merge = a.hookPolicy !== 'leave' && WRITABLE_RUNNERS.has(existing.runner);
+  // A repo's hook setup is a deliberate choice, so Payo touches it only on an
+  // explicit `merge`. Anything else — including no answer at all — leaves it be.
+  const merge = a.hookPolicy === 'merge' && WRITABLE_RUNNERS.has(existing.runner);
   const write: PlannedCheck[] = [];
   const covered: PlannedCheck[] = [];
   const deferred: PlannedCheck[] = [];
@@ -228,6 +230,20 @@ export function planHooks(a: Answers, cwd: string = process.cwd()): HookPlan {
     deferred,
     readOnly: write.length === 0,
   };
+}
+
+/**
+ * True when the repo has a runner Payo could extend AND some wanted check it
+ * does not already cover — i.e. when asking the user about their hooks is worth
+ * a question. False on a greenfield repo (nothing to respect) and on a repo that
+ * already covers everything (nothing to add).
+ */
+export function hasUnaddressedHookWork(a: Answers): boolean {
+  // Answers-only, never the filesystem: like every other `when`, whether the
+  // question is asked must depend on the interview, not on the process's cwd.
+  const existing = recordedHooks(a);
+  if (!existing || !WRITABLE_RUNNERS.has(existing.runner)) return false;
+  return desiredChecks(a).some((c) => !coversCapability(existing.coverage, c.capability));
 }
 
 /** Answer key carrying the plan from `generate` to the rule and skill builders. */

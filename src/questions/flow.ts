@@ -7,6 +7,7 @@ import type { Answers, FlowSection, Question } from './types';
 import * as opt from './options';
 import { getModule, modulesFor } from '../stack/registry';
 import { dbFamily, hasModeledDb } from '../stack/predicates';
+import { hasUnaddressedHookWork } from '../generator/hookplan';
 import '../stack/modules/index'; // side-effect: register modules
 
 /**
@@ -349,6 +350,21 @@ const core: Record<string, Question> = {
     optionsFrom: opt.stateManagementOptions,
     when: (a) => opt.hasUI(a),
   },
+  hookPolicy: {
+    id: 'hookPolicy',
+    type: 'select',
+    summary: 'Existing git hooks',
+    // The runner's name cannot go here (messages are static) — the detection
+    // summary printed before the interview names it and lists what it covers.
+    message:
+      'This repo already runs git hooks. Add the checks they are missing, or leave them untouched?',
+    options: opt.hookPolicyOptions,
+    allowOther: false,
+    policyDefault: true,
+    // Only worth asking when there is a runner Payo could extend AND something
+    // it does not already cover — otherwise there is nothing to decide.
+    when: (a) => hasUnaddressedHookWork(a),
+  },
   auditSkill: {
     id: 'auditSkill',
     type: 'confirm',
@@ -447,6 +463,10 @@ export const flow: FlowSection[] = [
     gate: () => ({ id: 'testing.__recommended', title: 'Testing' }),
     questions: () => [core.testTypes, core.testRunner, core.e2eTool],
   },
+  // Whether Payo may extend the repo's existing hook runner. Asked after the
+  // tooling and testing groups because what the hooks would be missing is only
+  // known once the formatter, linter and test runner are settled.
+  single(core.hookPolicy),
   // Opt-in change-audit skill — asked explicitly on every project; the timing
   // follow-up only surfaces once opted in.
   single(core.auditSkill, core.auditTiming),
