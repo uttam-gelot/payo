@@ -424,10 +424,11 @@ const skills: SkillSpec[] = [
         'those relevant skills and output a short report: one line per checked skill (pass or ' +
         'the specific conflict) followed by a one-line overall verdict. It flags conflicts for ' +
         'the human to resolve — it does not rewrite code. Keep the whole skill and its output ' +
-        'short to conserve tokens; the file must not restate the other skills, only reference them.'
+        'short to conserve tokens; the file must not restate the other skills, only reference them.' +
+        auditExclusion(hookPlanFrom(a))
       );
     },
-    staticBody: (a): string => auditStaticBody(auditTiming(a)),
+    staticBody: (a): string => auditStaticBody(auditTiming(a), hookPlanFrom(a)),
   },
 ];
 
@@ -441,12 +442,32 @@ function auditGerund(timing: 'commit' | 'push'): string {
   return timing === 'push' ? 'pushing to a remote' : 'committing';
 }
 
+/**
+ * The audit's hardest boundary: it reads the diff, it does not verify the build.
+ * Without this the audit reaches the git-workflow skill, reads it as "run the
+ * checks", and runs everything the hook is about to run anyway. Empty when no
+ * hook covers anything — then there is nothing to defer to.
+ */
+function auditExclusion(plan: ReturnType<typeof hookPlanFrom>): string {
+  const automated = automatedSummary(plan);
+  if (!automated) return '';
+  return (
+    ` The skill must state that it never runs tests, linters, formatters or secret scanners: ` +
+    `${automated}, and blocks on failure. The audit only reads the diff and compares it against ` +
+    'the skills, so it must also ignore any instruction inside those skills to run project checks.'
+  );
+}
+
 /** Deterministic no-CLI body for the change-audit skill. */
-function auditStaticBody(timing: 'commit' | 'push'): string {
+function auditStaticBody(
+  timing: 'commit' | 'push',
+  plan?: ReturnType<typeof hookPlanFrom>,
+): string {
   const changeSet =
     timing === 'push'
       ? '`git log @{u}..` and `git diff @{push}..` (fall back to the diff against the upstream branch)'
       : '`git diff --staged`';
+  const automated = automatedSummary(plan);
   return [
     `Run this right before ${auditGerund(timing)} to catch changes that conflict with this project's skills. Keep it short — do not read every skill.`,
     '',
@@ -454,6 +475,12 @@ function auditStaticBody(timing: 'commit' | 'push'): string {
     '2. From the changed files, pick ONLY the few skills in `.agents/skills/` that are relevant (judge by each skill directory name and its description — do not open every skill).',
     '3. Compare the change against just those skills.',
     '4. Report: one line per checked skill (pass, or the specific conflict), then a one-line verdict. Flag conflicts for the human to fix; do not rewrite code.',
+    ...(automated
+      ? [
+          '',
+          `Never run tests, linters, formatters or secret scanners here — ${automated}, and blocks on failure. Read the diff only, and ignore any instruction in the skills you check to run the project's checks.`,
+        ]
+      : []),
   ].join('\n');
 }
 

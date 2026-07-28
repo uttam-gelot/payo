@@ -106,6 +106,34 @@ describe('selectSkills', () => {
     expect(skill(commit).staticBody!(commit)).toContain('.agents/skills/');
   });
 
+  it('change-audit refuses to re-run whatever the hook already runs', () => {
+    // Without this the audit reads git-workflow, sees "run the checks", and runs
+    // everything the hook is about to run on push.
+    const base: Answers = {
+      ...contexts.tsBackend,
+      auditSkill: true,
+      auditTiming: 'push',
+      gitleaks: true,
+      verifyTiming: 'push',
+      linter: 'eslint',
+      testRunner: 'vitest',
+      testTypes: ['unit'],
+    };
+    const a: Answers = { ...base, hookPlan: planHooks(base, '/nonexistent-greenfield') };
+    const skill = selectSkills(a).find((s) => s.id === 'change-audit')!;
+
+    const body = skill.staticBody!(a);
+    expect(body).toContain('Never run tests, linters, formatters or secret scanners here');
+    expect(body).toContain('`lefthook` runs');
+    expect(body).toContain('ignore any instruction');
+    expect(skill.buildPrompt(a)).toContain('never runs tests, linters, formatters or secret');
+
+    // No hook covers anything → nothing to defer to, so the exclusion is absent.
+    const plain = selectSkills(base).find((s) => s.id === 'change-audit')!;
+    expect(plain.staticBody!(base)).not.toContain('Never run tests');
+    expect(plain.buildPrompt(base)).not.toContain('never runs tests');
+  });
+
   it('change-audit description names only the chosen timing', () => {
     const spec = (a: Answers) => selectSkills(a).find((s) => s.id === 'change-audit')!;
 
