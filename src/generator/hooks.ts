@@ -147,12 +147,19 @@ export function mergeLefthook(text: string, checks: Check[]): string {
  * Append a marked command line to a shell-script hook (husky / native).
  * `runner` names whose banner a brand-new file gets; omit it to write the bare
  * shebang, which is what merging into a developer's existing setup wants.
+ *
+ * Every command carries its own `|| exit 1`. A shell script exits with the
+ * status of its LAST line, so four bare commands would let a failing secret
+ * scan through as long as the format check that followed it passed. Guarding
+ * per line rather than with a `set -e` at the top is what makes this safe to
+ * append to a script the developer wrote — their existing lines keep their
+ * existing semantics.
  */
 function appendShellHook(absPath: string, checks: Check[], runner?: HookRunner): boolean {
   const existing = fs.existsSync(absPath) ? fs.readFileSync(absPath, 'utf8') : '';
   const pending = checks.filter((c) => !existing.includes(`${MARK}${c.name}`));
   if (pending.length === 0) return false;
-  const lines = pending.map((c) => `${c.run}  # ${MARK}${c.name}`).join('\n');
+  const lines = pending.map((c) => `${c.run} || exit 1  # ${MARK}${c.name}`).join('\n');
   const banner = (runner && SETUP_BANNER[runner]) ?? '';
   const header = existing ? '' : `#!/usr/bin/env sh\n${banner}`;
   const body = `${header}${existing}${existing && !existing.endsWith('\n') ? '\n' : ''}${lines}\n`;

@@ -54,7 +54,8 @@ describe('emitHooks — mechanical (the chosen greenfield runner)', () => {
       const sh = readFileSync(join(dir, '.husky/pre-push'), 'utf8');
       expect(sh.startsWith('#!/usr/bin/env sh\n')).toBe(true);
       expect(sh).toContain('npx husky'); // the install banner
-      expect(sh).toContain('gitleaks detect --redact  # payo:payo-secret-scan');
+      // `|| exit 1` per line: sh exits with the status of the last line only.
+      expect(sh).toContain('gitleaks detect --redact || exit 1  # payo:payo-secret-scan');
     }));
 
   it('writes a valid fresh .pre-commit-config.yaml when pre-commit is chosen', () =>
@@ -75,7 +76,35 @@ describe('emitHooks — mechanical (the chosen greenfield runner)', () => {
       expect(files).toContain('.githooks/pre-push');
       const sh = readFileSync(join(dir, '.githooks/pre-push'), 'utf8');
       expect(sh).toContain('git config core.hooksPath .githooks'); // the banner
-      expect(sh).toContain('gitleaks detect --redact  # payo:payo-secret-scan');
+      // `|| exit 1` per line: sh exits with the status of the last line only.
+      expect(sh).toContain('gitleaks detect --redact || exit 1  # payo:payo-secret-scan');
+    }));
+
+  it('guards every check so an early failure still blocks the push', () =>
+    inTempProject((dir) => {
+      // sh exits with the status of its LAST line, so a bare list of commands
+      // would let a failing secret scan through whenever the format check that
+      // followed it passed.
+      const a = {
+        gitleaks: true,
+        verifyTiming: 'push',
+        testRunner: 'bun-test',
+        hookRunner: 'native',
+      };
+      emitHooks(a, ['claude']);
+      const abs = join(dir, '.githooks/pre-push');
+      const checks = readFileSync(abs, 'utf8')
+        .split('\n')
+        .filter((l) => l.includes('# payo:'));
+      expect(checks.length).toBeGreaterThan(1);
+      for (const line of checks) expect(line).toContain(' || exit 1  # payo:');
+
+      // And the guard does what it claims: a failing first check exits non-zero.
+      writeFileSync(
+        abs,
+        readFileSync(abs, 'utf8').replace(/^(?!#).*\|\| exit 1/m, 'false || exit 1'),
+      );
+      expect(() => execSync(abs, { cwd: dir, shell: '/bin/sh', stdio: 'ignore' })).toThrow();
     }));
 
   it('writes no mechanical config when the user wants no runner', () =>

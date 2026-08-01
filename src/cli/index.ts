@@ -342,7 +342,9 @@ export async function run(): Promise<void> {
   // What the hook layer still needs from the user: the one-time commands to
   // activate anything written, and an honest note about any check the user's
   // "leave my hooks alone" choice means nothing will run.
-  const plan = planHooks(session.answers);
+  // The plan the run acted on, not a fresh one: a config Payo just wrote would
+  // now be detected as a pre-existing runner, hiding the activation commands.
+  const plan = result.hookPlan ?? planHooks(session.answers);
   const hookHints = hookSetupHints(result.files, session.answers, plan);
   if (hookHints.length > 0) {
     note(hookHints.map((h) => `• ${h}`).join('\n'), 'Git hooks');
