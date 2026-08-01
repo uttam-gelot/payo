@@ -87,4 +87,44 @@ describe('generate() — an existing hook runner', () => {
       expect(yml).toContain('payo-format');
     });
   });
+
+  it('ignores a runner choice on a repo that already has one', async () => {
+    await inTempProject(async (dir) => {
+      // The question is never asked here, but a resumed session could still
+      // carry the answer — it must not create a second runner beside theirs.
+      const before = seedHusky(dir);
+      await generate(withHusky({ hookPolicy: 'leave', hookRunner: 'lefthook' }));
+
+      expect(readFileSync(join(dir, '.husky/pre-commit'), 'utf-8')).toBe(before);
+      expect(existsSync(join(dir, 'lefthook.yml'))).toBe(false);
+    });
+  });
+});
+
+describe('generate() — a greenfield repo with a chosen runner', () => {
+  beforeEach(() => setAgentOverride({ isAvailable: false }));
+  afterEach(() => resetAgentOverride());
+
+  it('writes that runner and names it in the generated guidance', async () => {
+    await inTempProject(async (dir) => {
+      await generate({ ...fullStackAnswers('claude'), gitleaks: true, hookRunner: 'husky' });
+
+      expect(readFileSync(join(dir, '.husky/pre-push'), 'utf-8')).toContain('payo-secret-scan');
+      expect(existsSync(join(dir, 'lefthook.yml'))).toBe(false);
+      expect(readFileSync(join(dir, 'AGENTS.md'), 'utf-8')).toContain('`husky` runs');
+    });
+  });
+
+  it('writes no runner, and keeps the manual instructions, when none is chosen', async () => {
+    await inTempProject(async (dir) => {
+      await generate({ ...fullStackAnswers('claude'), gitleaks: true, hookRunner: 'none' });
+
+      expect(existsSync(join(dir, 'lefthook.yml'))).toBe(false);
+      expect(existsSync(join(dir, '.husky'))).toBe(false);
+      // Nothing is automated, so the agent is still asked to do it all by hand.
+      const agents = readFileSync(join(dir, 'AGENTS.md'), 'utf-8');
+      expect(agents).toContain('Scan for secrets with gitleaks');
+      expect(agents).not.toContain('runs the linter');
+    });
+  });
 });
