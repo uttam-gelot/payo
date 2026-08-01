@@ -408,6 +408,31 @@ describe('hookSetupHints', () => {
       expect(hints.some((h) => h.includes('lefthook install'))).toBe(false);
       expect(hints.some((h) => h.includes('Install gitleaks'))).toBe(false);
     }));
+
+  it('gives the activation command for whichever runner was written', () =>
+    inTempProject(() => {
+      const hintsFor = (hookRunner: string): string =>
+        hookSetupHints(
+          [],
+          { gitleaks: true, hookRunner },
+          planHooks({ gitleaks: true, hookRunner }),
+        ).join('\n');
+
+      expect(hintsFor('lefthook')).toContain('lefthook install');
+      expect(hintsFor('husky')).toContain('npx husky');
+      expect(hintsFor('husky')).not.toContain('lefthook');
+      expect(hintsFor('pre-commit')).toContain('pre-commit install --hook-type pre-push');
+      expect(hintsFor('native')).toContain('git config core.hooksPath .githooks');
+    }));
+
+  it('says nothing runs the checks when no runner was chosen', () =>
+    inTempProject(() => {
+      const a = { gitleaks: true, hookRunner: 'none' };
+      const hints = hookSetupHints([], a, planHooks(a));
+      expect(hints.join('\n')).toContain('No hook runner was added — nothing runs secret scanning');
+      // Nothing was written, so no binary is worth installing.
+      expect(hints.some((h) => h.includes('Install gitleaks'))).toBe(false);
+    }));
 });
 
 describe('detectHookRunner', () => {

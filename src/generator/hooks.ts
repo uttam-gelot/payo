@@ -543,17 +543,55 @@ const CHECK_LABEL: Record<PlannedCheck['capability'], string> = {
 };
 
 /**
+ * The one-time commands that turn a config Payo just created into hooks git
+ * actually runs. Payo writes config and never installs anything, so the binary
+ * or package each runner needs is the user's to add — and is only mentioned when
+ * it is not already on PATH. A runner that was merged into is already active and
+ * gets nothing here.
+ */
+const ACTIVATION_HINTS: Partial<Record<HookRunner, (plan: HookPlan) => string[]>> = {
+  lefthook: () => [
+    ...(onPath('lefthook')
+      ? []
+      : ['Install lefthook:  brew install lefthook   (or: npm i -D lefthook)']),
+    'Enable the git hooks:  lefthook install',
+  ],
+  husky: () => [
+    'Install husky:  npm i -D husky',
+    // Deliberately `husky`, not `husky init` — init scaffolds its own
+    // pre-commit script, which would sit on top of the one just written.
+    'Enable the git hooks:  npx husky',
+  ],
+  'pre-commit': (plan) => [
+    ...(onPath('pre-commit')
+      ? []
+      : ['Install pre-commit:  brew install pre-commit   (or: pip install pre-commit)']),
+    'Enable the git hooks:  pre-commit install',
+    // pre-commit wires one stage per invocation; pre-push is opt-in.
+    ...(plan.write.some((c) => c.stage === 'pre-push')
+      ? ['Enable the pre-push hooks:  pre-commit install --hook-type pre-push']
+      : []),
+  ],
+  native: (plan) => [`Point git at the hooks:  git config core.hooksPath ${plan.configPath}`],
+};
+
+/**
  * What the user still has to do for the hooks to mean anything — surfaced by the
- * CLI after generation. A fresh `lefthook.yml` needs `lefthook install` to wire
- * `.git/hooks` (and lefthook itself if it is not on PATH); a runner that was
- * merged into is already active, and one that was left alone needs nothing at
- * all. A binary is flagged only when a check that needs it was actually written.
- * Deferred checks get a line of their own: nothing runs them, and the user
- * should know that before trusting the setup. Empty when there is nothing to do.
+ * CLI after generation. A config Payo created needs its runner installed and
+ * wired to `.git/hooks`; a runner that was merged into is already active, and
+ * one that was left alone needs nothing at all. A binary is flagged only when a
+ * check that needs it was actually written. Deferred checks get a line of their
+ * own: nothing runs them, and the user should know that before trusting the
+ * setup. Empty when there is nothing to do.
  */
 export function hookSetupHints(files: string[], a: Answers, plan?: HookPlan): string[] {
   const hints: string[] = [];
-  if (files.includes('lefthook.yml')) {
+  if (plan) {
+    if (plan.greenfield && plan.write.length > 0) {
+      hints.push(...(ACTIVATION_HINTS[plan.runner]?.(plan) ?? []));
+    }
+  } else if (files.includes('lefthook.yml')) {
+    // No plan (older callers): the written file is the only evidence available.
     if (!onPath('lefthook')) {
       hints.push('Install lefthook:  brew install lefthook   (or: npm i -D lefthook)');
     }
@@ -567,9 +605,10 @@ export function hookSetupHints(files: string[], a: Answers, plan?: HookPlan): st
   }
   if (plan && plan.deferred.length > 0) {
     const what = [...new Set(plan.deferred.map((c) => CHECK_LABEL[c.capability]))].join(', ');
-    const where = plan.configPath ?? 'your hook runner';
     hints.push(
-      `Left ${where} untouched — no hook runs ${what}. The generated skills ask the assistant to run them instead.`,
+      plan.configPath
+        ? `Left ${plan.configPath} untouched — no hook runs ${what}. The generated skills ask the assistant to run them instead.`
+        : `No hook runner was added — nothing runs ${what}. The generated skills ask the assistant to run them instead.`,
     );
   }
   return hints;
