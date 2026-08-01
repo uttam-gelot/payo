@@ -44,9 +44,17 @@ export interface PlannedCheck {
 }
 
 export interface HookPlan {
-  /** The runner that will carry the checks, or 'greenfield' when Payo adds one. */
-  runner: HookRunner | 'greenfield';
-  /** The existing runner's config path; absent on a greenfield repo. */
+  /**
+   * The runner that will carry the checks — the one the repo already uses, or
+   * the one the user picked for a repo that has none.
+   */
+  runner: HookRunner;
+  /**
+   * True when Payo creates that runner's config from scratch rather than
+   * merging into a config the developer wrote.
+   */
+  greenfield: boolean;
+  /** The config path the checks are written to (or read from). */
   configPath?: string;
   write: PlannedCheck[];
   covered: PlannedCheck[];
@@ -56,7 +64,8 @@ export interface HookPlan {
 }
 
 export const EMPTY_PLAN: HookPlan = {
-  runner: 'greenfield',
+  runner: 'lefthook',
+  greenfield: true,
   write: [],
   covered: [],
   deferred: [],
@@ -69,6 +78,31 @@ export const EMPTY_PLAN: HookPlan = {
  * string, so adding a check means editing the user's own command.
  */
 const WRITABLE_RUNNERS = new Set<HookRunner>(['lefthook', 'husky', 'pre-commit', 'native']);
+
+/**
+ * Where a runner's config goes when Payo is the one creating it. Only the
+ * writable runners can be chosen, so simple-git-hooks has no entry.
+ */
+const GREENFIELD_CONFIG: Partial<Record<HookRunner, string>> = {
+  lefthook: 'lefthook.yml',
+  husky: '.husky',
+  'pre-commit': '.pre-commit-config.yaml',
+  // A committed directory rather than `.git/hooks`, which git never tracks.
+  native: '.githooks',
+};
+
+/**
+ * The runner to set up on a repo that has none, or undefined when the user
+ * declined one. An unset or unrecognised answer falls back to lefthook: that
+ * keeps sessions written before this question existed — and programmatic
+ * `generate()` callers, which never run the interview — generating what they
+ * always did.
+ */
+function chosenRunner(a: Answers): HookRunner | undefined {
+  const v = a.hookRunner;
+  if (v === 'none') return undefined;
+  return typeof v === 'string' && v in GREENFIELD_CONFIG ? (v as HookRunner) : 'lefthook';
+}
 
 /**
  * Non-mutating check command per linter, keyed by the `linter` answer. Tools
@@ -198,12 +232,18 @@ export function planHooks(a: Answers, cwd: string = process.cwd()): HookPlan {
   const existing = existingHooks(a, cwd);
 
   if (!existing) {
+    // No runner to respect — the user's pick decides who carries the checks.
+    // "None" is not a refusal of the checks themselves: they land in `deferred`
+    // so the generated prose keeps asking the agent to run them by hand.
+    const runner = chosenRunner(a);
     return {
-      runner: 'greenfield',
-      write: desired,
+      runner: runner ?? 'lefthook',
+      greenfield: true,
+      configPath: runner ? GREENFIELD_CONFIG[runner] : undefined,
+      write: runner ? desired : [],
       covered: [],
-      deferred: [],
-      readOnly: desired.length === 0,
+      deferred: runner ? [] : desired,
+      readOnly: !runner || desired.length === 0,
     };
   }
 
@@ -229,6 +269,7 @@ export function planHooks(a: Answers, cwd: string = process.cwd()): HookPlan {
 
   return {
     runner: existing.runner,
+    greenfield: false,
     configPath: existing.configPath,
     write,
     covered,
@@ -281,9 +322,9 @@ export function isAutomated(plan: HookPlan | undefined, cap: HookCapability): bo
   return automatedChecks(plan).some((c) => c.capability === cap);
 }
 
-/** The runner name to use in prose, e.g. "lefthook" for a fresh greenfield config. */
+/** The runner name to use in prose, e.g. "lefthook" or "husky". */
 export function runnerLabel(plan: HookPlan): string {
-  return plan.runner === 'greenfield' ? 'lefthook' : plan.runner;
+  return plan.runner;
 }
 
 /**

@@ -161,12 +161,12 @@ function emitMechanical(plan: HookPlan): string[] {
   if (checks.length === 0) return [];
 
   switch (plan.runner) {
-    case 'greenfield': {
-      writeArtifact({ path: 'lefthook.yml', content: renderLefthook(checks) });
-      return ['lefthook.yml'];
-    }
     case 'lefthook': {
       const rel = plan.configPath!;
+      if (plan.greenfield) {
+        writeArtifact({ path: rel, content: renderLefthook(checks) });
+        return [rel];
+      }
       const abs = resolveContained(rel);
       const current = fs.readFileSync(abs, 'utf8');
       const merged = mergeLefthook(current, checks);
