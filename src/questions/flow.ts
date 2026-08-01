@@ -7,7 +7,7 @@ import type { Answers, FlowSection, Question } from './types';
 import * as opt from './options';
 import { getModule, modulesFor } from '../stack/registry';
 import { dbFamily, hasModeledDb } from '../stack/predicates';
-import { hasUnaddressedHookWork } from '../generator/hookplan';
+import { hasUnaddressedHookWork, needsHookRunnerChoice } from '../generator/hookplan';
 import '../stack/modules/index'; // side-effect: register modules
 
 /**
@@ -365,6 +365,19 @@ const core: Record<string, Question> = {
     // it does not already cover — otherwise there is nothing to decide.
     when: (a) => hasUnaddressedHookWork(a),
   },
+  hookRunner: {
+    id: 'hookRunner',
+    type: 'select',
+    summary: 'Git hook runner',
+    message: 'Which git hook runner should Payo set up to run these checks?',
+    options: opt.hookRunnerOptions,
+    allowOther: false,
+    // No recommended option and no policyDefault: the runner is a team
+    // convention, so it is always asked rather than assumed.
+    // The mirror image of hookPolicy — that question needs an existing runner,
+    // this one needs the absence of one, so exactly one of the two ever fires.
+    when: (a) => needsHookRunnerChoice(a),
+  },
   auditSkill: {
     id: 'auditSkill',
     type: 'confirm',
@@ -463,10 +476,11 @@ export const flow: FlowSection[] = [
     gate: () => ({ id: 'testing.__recommended', title: 'Testing' }),
     questions: () => [core.testTypes, core.testRunner, core.e2eTool],
   },
-  // Whether Payo may extend the repo's existing hook runner. Asked after the
-  // tooling and testing groups because what the hooks would be missing is only
-  // known once the formatter, linter and test runner are settled.
-  single(core.hookPolicy),
+  // The git hook layer: whether Payo may extend the repo's existing runner, or
+  // — when it has none — which runner to set up. Asked after the tooling and
+  // testing groups because what the hooks would run is only known once the
+  // formatter, linter and test runner are settled.
+  single(core.hookPolicy, core.hookRunner),
   // Opt-in change-audit skill — asked explicitly on every project; the timing
   // follow-up only surfaces once opted in.
   single(core.auditSkill, core.auditTiming),

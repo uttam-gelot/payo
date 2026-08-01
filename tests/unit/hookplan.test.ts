@@ -2,7 +2,13 @@ import { describe, it, expect } from 'bun:test';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { inTempProject } from '../helpers/tmpProject';
-import { desiredChecks, planHooks, isAutomated, runnerLabel } from '../../src/generator/hookplan';
+import {
+  desiredChecks,
+  planHooks,
+  isAutomated,
+  runnerLabel,
+  type HookPlan,
+} from '../../src/generator/hookplan';
 
 const NODE = {
   language: 'typescript',
@@ -65,7 +71,9 @@ describe('planHooks — greenfield', () => {
   it('writes every wanted check when the repo has no runner', () =>
     inTempProject(() => {
       const plan = planHooks({ ...NODE, gitleaks: true, verifyTiming: 'push' });
-      expect(plan.runner).toBe('greenfield');
+      // An unanswered hookRunner keeps the historical default.
+      expect(plan.runner).toBe('lefthook');
+      expect(plan.greenfield).toBe(true);
       expect(runnerLabel(plan)).toBe('lefthook');
       expect(plan.write.length).toBe(4);
       expect(plan.covered).toEqual([]);
@@ -76,6 +84,36 @@ describe('planHooks — greenfield', () => {
   it('is readOnly when the answers ask for no checks', () =>
     inTempProject(() => {
       expect(planHooks(NODE).readOnly).toBe(true);
+    }));
+
+  it('carries the chosen runner and its config path', () =>
+    inTempProject(() => {
+      const wanted = { ...NODE, gitleaks: true, verifyTiming: 'push' };
+      const cases: [string, string][] = [
+        ['lefthook', 'lefthook.yml'],
+        ['husky', '.husky'],
+        ['pre-commit', '.pre-commit-config.yaml'],
+        ['native', '.githooks'],
+      ];
+      for (const [hookRunner, configPath] of cases) {
+        const plan = planHooks({ ...wanted, hookRunner });
+        expect(plan.runner).toBe(hookRunner as HookPlan['runner']);
+        expect(plan.greenfield).toBe(true);
+        expect(plan.configPath).toBe(configPath);
+        expect(plan.write.length).toBe(4);
+        expect(runnerLabel(plan)).toBe(hookRunner);
+      }
+    }));
+
+  it('defers every check when the user wants no runner at all', () =>
+    inTempProject(() => {
+      const plan = planHooks({ ...NODE, gitleaks: true, verifyTiming: 'push', hookRunner: 'none' });
+      expect(plan.write).toEqual([]);
+      expect(plan.deferred.length).toBe(4);
+      expect(plan.configPath).toBeUndefined();
+      expect(plan.readOnly).toBe(true);
+      // Nothing is automated, so the prose must keep asking for all of it.
+      expect(isAutomated(plan, 'verify')).toBe(false);
     }));
 });
 

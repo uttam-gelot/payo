@@ -7,8 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **You now choose which git hook runner Payo sets up.** A repo with no hooks
+  always got a `lefthook.yml`, whether or not lefthook was a tool your team
+  wanted to install. Payo now asks, offering **Lefthook**, **Husky**,
+  **pre-commit**, plain **`.githooks/`** scripts, or **none at all**, and writes
+  that runner's own config — `.husky/pre-push`, a fresh `.pre-commit-config.yaml`
+  with its `repos:` key, or executable `.githooks/` scripts. No option is marked
+  recommended: which runner a team wants is a convention, not a property of the
+  stack. Picking none writes no hook config, and the generated skills keep asking
+  the assistant to run the checks by hand. The question only appears on a repo
+  that has no runner yet — one that already has hooks is still asked the existing
+  "leave them alone / add what's missing" question instead.
+- Each fresh hook config carries a header naming the runner, how to install it,
+  and the one command that activates it; the post-run note repeats that command
+  and skips the install line when the binary is already on your PATH.
+
 ### Fixed
 
+- **A hook that ran several checks could pass despite one of them failing.**
+  Husky and native `.githooks/` hooks are shell scripts, which exit with the
+  status of their last line — so a failing secret scan was swallowed whenever
+  the format check after it passed. Every check Payo writes now carries its own
+  `|| exit 1`.
+- The post-generation "Git hooks" note went silent about the setup commands
+  whenever Payo had just written a hook config: the plan was recomputed after
+  the write, so the runner Payo had added looked like one the repo already had.
 - `payo --help` advertised a 120000 ms agent timeout two releases after the real
   default moved to 420000, and still described the retired per-tool output
   formats (`.cursorrules`, …) instead of the universal layout. Both corrected,

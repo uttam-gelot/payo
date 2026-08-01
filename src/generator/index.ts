@@ -55,14 +55,11 @@ export { resolveContained };
  * here — outside the `predictTargets` overwrite/backup guard.
  */
 function withHooks(result: GenerationResult, answers: Answers): GenerationResult {
-  const hookFiles = emitHooks(
-    answers,
-    shimToolsFrom(answers),
-    process.cwd(),
-    hookPlanFrom(answers) ?? planHooks(answers),
-  );
-  if (hookFiles.length === 0) return result;
-  return { ...result, files: [...new Set([...result.files, ...hookFiles])] };
+  const plan = hookPlanFrom(answers) ?? planHooks(answers);
+  const hookFiles = emitHooks(answers, shimToolsFrom(answers), process.cwd(), plan);
+  // The plan travels with the result: re-planning after the write would detect
+  // the runner Payo just added and forget that it needs activating.
+  return { ...result, hookPlan: plan, files: [...new Set([...result.files, ...hookFiles])] };
 }
 
 /**

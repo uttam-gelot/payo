@@ -27,6 +27,9 @@ function seedSingles(): Session {
     database: 'none',
     logger: 'none',
     auditSkill: false,
+    // Auto mode settles gates, not single questions: the gitleaks policy default
+    // makes a hook check wanted, which would otherwise prompt for the runner.
+    hookRunner: 'lefthook',
   };
   for (const [id, value] of Object.entries(singles)) s = recordAnswer(s, id, value);
   return s;

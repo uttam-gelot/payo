@@ -3,6 +3,7 @@
  * and the generator entry point.
  */
 import type { AiTool } from '../types/index';
+import type { HookPlan } from './hookplan';
 
 /** A single provider-agnostic block of generated guidance. */
 export interface RuleSection {
@@ -106,4 +107,11 @@ export interface GenerationResult {
   failures?: string[];
   /** AI mode: per-failure diagnostic (agent stderr / exit reason) for surfacing to the user. */
   failureDetails?: { title: string; reason?: string }[];
+  /**
+   * The hook plan this run acted on. Reported rather than recomputed because
+   * generation changes what a fresh plan would say: once a config has been
+   * written, detection sees a runner where there was none, and the setup hints
+   * would no longer know the repo had just been given one.
+   */
+  hookPlan?: HookPlan;
 }

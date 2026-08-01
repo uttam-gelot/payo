@@ -13,6 +13,7 @@ import {
   packageManagerOptions,
   testTypeOptions,
   e2eToolOptions,
+  hookRunnerOptions,
   projectTypeOptions,
   hasUI,
   hasServer,
@@ -211,5 +212,19 @@ describe('testTypeOptions', () => {
 describe('e2eToolOptions', () => {
   it('has no "None" — only surfaces after e2e is already chosen', () => {
     expect(vals(e2eToolOptions)).not.toContain('none');
+  });
+});
+
+describe('hookRunnerOptions', () => {
+  it('offers four runners plus an opt-out', () => {
+    expect(vals(hookRunnerOptions)).toEqual(['lefthook', 'husky', 'pre-commit', 'native', 'none']);
+  });
+
+  it('tags no option recommended — the runner is a team convention', () => {
+    expect(recCount(hookRunnerOptions)).toBe(0);
+  });
+
+  it('omits simple-git-hooks, whose config cannot be extended safely', () => {
+    expect(vals(hookRunnerOptions)).not.toContain('simple-git-hooks');
   });
 });

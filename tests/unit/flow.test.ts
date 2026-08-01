@@ -95,6 +95,22 @@ describe('flow gating by project type', () => {
     ).toBe(false);
   });
 
+  it('asks which hook runner to set up only on a repo that has none', () => {
+    const base = { projectType: 'backend', language: 'go', gitleaks: true };
+
+    // Greenfield repo that wants a secret scan — the one case worth asking.
+    expect(reachable(base).has('hookRunner')).toBe(true);
+    // Nothing to run means no runner to pick.
+    expect(reachable({ ...base, gitleaks: false }).has('hookRunner')).toBe(false);
+    // A repo with a runner gets hookPolicy instead — never both.
+    const withHusky = reachable({
+      ...base,
+      existingHooks: { runner: 'husky', configPath: '.husky', coverage: {} },
+    });
+    expect(withHusky.has('hookRunner')).toBe(false);
+    expect(withHusky.has('hookPolicy')).toBe(true);
+  });
+
   it('existing shapes are unchanged: backend keeps API, frontend keeps styling', () => {
     const backend = reachable({ projectType: 'backend', language: 'go' });
     expect(backend.has('apiArchitecture')).toBe(true);

@@ -45,6 +45,95 @@ describe('emitHooks — mechanical (lefthook, greenfield)', () => {
     }));
 });
 
+describe('emitHooks — mechanical (the chosen greenfield runner)', () => {
+  it('writes husky shell hooks when husky is chosen', () =>
+    inTempProject((dir) => {
+      const files = emitHooks({ gitleaks: true, hookRunner: 'husky' }, ['claude']);
+      expect(files).toContain('.husky/pre-push');
+      expect(existsSync(join(dir, 'lefthook.yml'))).toBe(false);
+      const sh = readFileSync(join(dir, '.husky/pre-push'), 'utf8');
+      expect(sh.startsWith('#!/usr/bin/env sh\n')).toBe(true);
+      expect(sh).toContain('npx husky'); // the install banner
+      // `|| exit 1` per line: sh exits with the status of the last line only.
+      expect(sh).toContain('gitleaks detect --redact || exit 1  # payo:payo-secret-scan');
+    }));
+
+  it('writes a valid fresh .pre-commit-config.yaml when pre-commit is chosen', () =>
+    inTempProject((dir) => {
+      const files = emitHooks({ gitleaks: true, hookRunner: 'pre-commit' }, ['claude']);
+      expect(files).toContain('.pre-commit-config.yaml');
+      const yml = readFileSync(join(dir, '.pre-commit-config.yaml'), 'utf8');
+      // The top-level key is what makes the file loadable at all.
+      expect(yml).toContain('\nrepos:\n');
+      expect(yml).toContain('- repo: local');
+      expect(yml).toContain('entry: gitleaks detect --redact');
+      expect(yml).toContain('stages: [push]');
+    }));
+
+  it('writes .githooks scripts when native git hooks are chosen', () =>
+    inTempProject((dir) => {
+      const files = emitHooks({ gitleaks: true, hookRunner: 'native' }, ['claude']);
+      expect(files).toContain('.githooks/pre-push');
+      const sh = readFileSync(join(dir, '.githooks/pre-push'), 'utf8');
+      expect(sh).toContain('git config core.hooksPath .githooks'); // the banner
+      // `|| exit 1` per line: sh exits with the status of the last line only.
+      expect(sh).toContain('gitleaks detect --redact || exit 1  # payo:payo-secret-scan');
+    }));
+
+  it('guards every check so an early failure still blocks the push', () =>
+    inTempProject((dir) => {
+      // sh exits with the status of its LAST line, so a bare list of commands
+      // would let a failing secret scan through whenever the format check that
+      // followed it passed.
+      const a = {
+        gitleaks: true,
+        verifyTiming: 'push',
+        testRunner: 'bun-test',
+        hookRunner: 'native',
+      };
+      emitHooks(a, ['claude']);
+      const abs = join(dir, '.githooks/pre-push');
+      const checks = readFileSync(abs, 'utf8')
+        .split('\n')
+        .filter((l) => l.includes('# payo:'));
+      expect(checks.length).toBeGreaterThan(1);
+      for (const line of checks) expect(line).toContain(' || exit 1  # payo:');
+
+      // And the guard does what it claims: a failing first check exits non-zero.
+      writeFileSync(
+        abs,
+        readFileSync(abs, 'utf8').replace(/^(?!#).*\|\| exit 1/m, 'false || exit 1'),
+      );
+      expect(() => execSync(abs, { cwd: dir, shell: '/bin/sh', stdio: 'ignore' })).toThrow();
+    }));
+
+  it('writes no mechanical config when the user wants no runner', () =>
+    inTempProject((dir) => {
+      const files = emitHooks({ gitleaks: true, hookRunner: 'none' }, ['claude']);
+      expect(files).toEqual([]);
+      for (const rel of ['lefthook.yml', '.husky', '.pre-commit-config.yaml', '.githooks']) {
+        expect(existsSync(join(dir, rel))).toBe(false);
+      }
+    }));
+
+  // A fresh project per runner: once one config is written, detection sees a
+  // runner and the second run takes the existing-runner path by design.
+  for (const [hookRunner, rel] of [
+    ['husky', '.husky/pre-push'],
+    ['pre-commit', '.pre-commit-config.yaml'],
+    ['native', '.githooks/pre-push'],
+  ] as const) {
+    it(`is idempotent for ${hookRunner} — a second run touches nothing`, () =>
+      inTempProject((dir) => {
+        const a = { gitleaks: true, hookRunner };
+        emitHooks(a, ['claude']);
+        const first = readFileSync(join(dir, rel), 'utf8');
+        expect(emitHooks(a, ['claude'])).not.toContain(rel);
+        expect(readFileSync(join(dir, rel), 'utf8')).toBe(first);
+      }));
+  }
+});
+
 describe('emitHooks — native pre-tool gate', () => {
   it('denies for change-audit, so the reason reaches the agent rather than the user', () =>
     inTempProject((dir) => {
@@ -346,6 +435,31 @@ describe('hookSetupHints', () => {
       expect(deferred).toContain('secret scanning');
       // Nothing was written, so there is no runner or binary to set up.
       expect(hints.some((h) => h.includes('lefthook install'))).toBe(false);
+      expect(hints.some((h) => h.includes('Install gitleaks'))).toBe(false);
+    }));
+
+  it('gives the activation command for whichever runner was written', () =>
+    inTempProject(() => {
+      const hintsFor = (hookRunner: string): string =>
+        hookSetupHints(
+          [],
+          { gitleaks: true, hookRunner },
+          planHooks({ gitleaks: true, hookRunner }),
+        ).join('\n');
+
+      expect(hintsFor('lefthook')).toContain('lefthook install');
+      expect(hintsFor('husky')).toContain('npx husky');
+      expect(hintsFor('husky')).not.toContain('lefthook');
+      expect(hintsFor('pre-commit')).toContain('pre-commit install --hook-type pre-push');
+      expect(hintsFor('native')).toContain('git config core.hooksPath .githooks');
+    }));
+
+  it('says nothing runs the checks when no runner was chosen', () =>
+    inTempProject(() => {
+      const a = { gitleaks: true, hookRunner: 'none' };
+      const hints = hookSetupHints([], a, planHooks(a));
+      expect(hints.join('\n')).toContain('No hook runner was added — nothing runs secret scanning');
+      // Nothing was written, so no binary is worth installing.
       expect(hints.some((h) => h.includes('Install gitleaks'))).toBe(false);
     }));
 });
