@@ -454,6 +454,12 @@ interface AskTool {
    * Cursor, Copilot).
    */
   allowDefault?: string;
+  /**
+   * One-time step the user must take before this tool will run the gate, surfaced
+   * by `hookSetupHints` when the gate file is written (e.g. Codex requires
+   * trusting non-managed hooks). Omit for tools that activate on write.
+   */
+  activationHint?: string;
   /** Wrap the sh command into this tool's config object. */
   wrap(command: string): unknown;
   /**
@@ -464,24 +470,26 @@ interface AskTool {
   merge(existing: unknown, command: string): unknown;
 }
 
+// Claude Code and Codex CLI share one PreToolUse contract (hookSpecificOutput +
+// permissionDecision), so the decision templates are defined once here.
+const PRETOOLUSE_TEMPLATE = (decision: 'ask' | 'deny'): string =>
+  `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"${decision}","permissionDecisionReason":"%s"}}`;
+
 const ASK_TOOLS: Record<string, AskTool> = {
-  // Claude Code and Codex CLI share the same PreToolUse shape and deny contract
-  // (hookSpecificOutput + permissionDecision), so they differ only by config path.
+  // Claude and Codex differ only by config path and Codex's trust step.
   claude: {
     configPath: '.claude/settings.json',
-    askTemplate:
-      '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"%s"}}',
-    denyTemplate:
-      '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}',
+    askTemplate: PRETOOLUSE_TEMPLATE('ask'),
+    denyTemplate: PRETOOLUSE_TEMPLATE('deny'),
     wrap: (command) => wrapPreToolUse(command, 'Bash'),
     merge: (existing, command) => mergePreToolUse(existing, command, 'Bash'),
   },
   codex: {
     configPath: '.codex/hooks.json',
-    askTemplate:
-      '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"%s"}}',
-    denyTemplate:
-      '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}',
+    askTemplate: PRETOOLUSE_TEMPLATE('ask'),
+    denyTemplate: PRETOOLUSE_TEMPLATE('deny'),
+    // Codex ships hooks on but runs a non-managed hook only after /hooks review.
+    activationHint: 'Trust the Codex change-audit hook so it runs:  run /hooks inside Codex',
     wrap: (command) => wrapPreToolUse(command, 'Bash'),
     merge: (existing, command) => mergePreToolUse(existing, command, 'Bash'),
   },
@@ -680,10 +688,10 @@ export function hookSetupHints(files: string[], a: Answers, plan?: HookPlan): st
   if (wroteSecretScan && !onPath('gitleaks')) {
     hints.push('Install gitleaks (the secret-scan hook needs it):  brew install gitleaks');
   }
-  // Codex ships hooks on but requires reviewing/trusting each non-managed hook
-  // before it will run — without this the gate is inert.
-  if (files.includes(ASK_TOOLS.codex.configPath)) {
-    hints.push('Trust the Codex change-audit hook so it runs:  run /hooks inside Codex');
+  // A native gate that needs a one-time activation step (e.g. Codex hook trust)
+  // is inert until the user takes it — surface that when its file was written.
+  for (const spec of Object.values(ASK_TOOLS)) {
+    if (spec.activationHint && files.includes(spec.configPath)) hints.push(spec.activationHint);
   }
   if (plan && plan.deferred.length > 0) {
     const what = [...new Set(plan.deferred.map((c) => CHECK_LABEL[c.capability]))].join(', ');

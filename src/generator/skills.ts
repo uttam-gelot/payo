@@ -473,7 +473,7 @@ function auditExclusion(plan: ReturnType<typeof hookPlanFrom>): string {
 function auditReceiptStep(timing: 'commit' | 'push'): string {
   return (
     'If, and only if, the report shows no blocking conflict, record the pass so the ' +
-    `${timing === 'push' ? 'push' : 'commit'} can proceed: ` +
+    `${timing} can proceed: ` +
     `\`${auditReceiptCommand(timing)}\`. If any conflict remains, do NOT record it — resolve the ` +
     "conflict (or get the human's explicit sign-off), then run this audit again."
   );
