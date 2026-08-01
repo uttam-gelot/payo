@@ -312,6 +312,42 @@ export function hookPlanFrom(a: Answers): HookPlan | undefined {
   return v && typeof v === 'object' ? (v as HookPlan) : undefined;
 }
 
+// ---------------------------------------------------------------------------
+// change-audit gate ↔ skill: one shared fingerprint of "this change"
+// ---------------------------------------------------------------------------
+
+/**
+ * How the change-audit layer fingerprints "this change": HEAD for a push (the
+ * commits about to be sent), the staged tree's hash for a commit. The native
+ * gate READS this key and the change-audit skill RECORDS it, so keeping the two
+ * derived from one function is what stops them ever disagreeing on what counts as
+ * the same change. `2>/dev/null` only quiets stderr — it never alters the value —
+ * so the gate's `$(…)` and the skill's `… > receipt` compute an identical string.
+ */
+export function auditKeyCommand(timing: 'commit' | 'push'): string {
+  return timing === 'commit'
+    ? 'git diff --staged 2>/dev/null | git hash-object --stdin 2>/dev/null'
+    : 'git rev-parse HEAD 2>/dev/null';
+}
+
+/**
+ * The receipt the change-audit skill writes on a clean audit and the gate checks
+ * before letting the git command through. Lives in the git dir, so it is never
+ * committed and is naturally per-worktree. A quoted sh word — safe to drop into a
+ * `$(…)` assignment or after a `>` redirect as-is.
+ */
+export const AUDIT_RECEIPT = '"$(git rev-parse --git-dir)/payo-audit-receipt"';
+
+/**
+ * The literal shell the change-audit skill runs as its FINAL step to record that
+ * this exact change passed. Keyed by `auditKeyCommand`, so the gate opens for
+ * precisely the change the skill signed off and no other — a later commit moves
+ * the key, staling the receipt and re-closing the gate.
+ */
+export function auditReceiptCommand(timing: 'commit' | 'push'): string {
+  return `${auditKeyCommand(timing)} > ${AUDIT_RECEIPT}`;
+}
+
 /** The checks a hook will run — Payo's own plus the ones already in place. */
 export function automatedChecks(plan: HookPlan | undefined): PlannedCheck[] {
   return plan ? [...plan.write, ...plan.covered] : [];

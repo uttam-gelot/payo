@@ -9,9 +9,10 @@
  *  - a NATIVE pre-tool gate per supported tool (Claude / Cursor / Copilot) on
  *    `git commit` / `git push` and destructive queries. It runs no model; it
  *    either raises the tool's confirm prompt for the HUMAN (confirm-push,
- *    DB-safety) or denies once per change set to hand the AGENT an instruction
- *    it must act on (change-audit). Tools without a pre-tool hook (Codex,
- *    Antigravity, Windsurf) are covered by the mechanical floor.
+ *    DB-safety) or denies the command until the change-audit skill records a pass
+ *    for that exact change, forcing the AGENT to run it first (change-audit).
+ *    Tools without a pre-tool hook (Codex, Antigravity, Windsurf) are covered by
+ *    the mechanical floor.
  *
  * Every edit is idempotent: a `payo:` marker in each block lets a re-run detect
  * its own prior output and skip, so running Payo twice adds nothing.
@@ -23,7 +24,13 @@ import type { Answers } from '../questions/types';
 import { writeArtifact, resolveContained } from './paths';
 import { writeFileAtomic } from '../fsutil';
 import { probeCommand } from './agent';
-import { planHooks, type HookPlan, type PlannedCheck } from './hookplan';
+import {
+  planHooks,
+  auditKeyCommand,
+  AUDIT_RECEIPT,
+  type HookPlan,
+  type PlannedCheck,
+} from './hookplan';
 import type { HookRunner } from '../detect/hooks';
 
 /** Marker that tags every Payo-written hook block, for idempotent re-runs. */
@@ -281,13 +288,15 @@ function gates(a: Answers): Gate[] {
   const g: Gate[] = [];
   if (a.auditSkill === true) {
     const push = a.auditTiming !== 'commit';
+    const act = push ? 'push' : 'commit';
     g.push({
       match: push ? 'push' : 'commit',
       decision: 'deny',
       message:
-        `Run the change-audit skill on this change first, then repeat this ${push ? 'push' : 'commit'}. ` +
-        'It compares the diff against the project skills and reports conflicts — it does not run ' +
-        'tests, linters or formatters.',
+        `Run the change-audit skill on this change before ${push ? 'pushing' : 'committing'}. ` +
+        `It records a pass only when the audit finds no conflict, and this ${act} stays blocked ` +
+        `until then — re-running the ${act} without it will keep failing. It reads the diff only; ` +
+        'it does not run tests, linters or formatters.',
     });
   }
   if (a.confirmPush === true) {
@@ -314,35 +323,28 @@ const MATCH_PATTERN: Record<Gate['match'], string> = {
   sql: '(DROP|TRUNCATE|DELETE[[:space:]]+FROM)[[:space:]]|migrate[[:space:]]+(reset|deploy)|db[[:space:]]+push',
 };
 
-/**
- * How the deny gate identifies "this change" — the key it stamps so the same
- * change set is denied once, not forever. HEAD for a push (the commits being
- * sent), the staged tree's hash for a commit.
- */
-const CHANGE_KEY: Record<'push' | 'commit', string> = {
-  push: 'git rev-parse HEAD 2>/dev/null',
-  commit: 'git diff --staged 2>/dev/null | git hash-object --stdin 2>/dev/null',
-};
-
 /** Safe single-quoted sh literal (handles an apostrophe inside a message). */
 function shSingleQuote(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
 /**
- * The deny branch: block the command once per change set, handing the agent the
- * reason. The stamp lives in the git dir, so it is never committed and is
- * naturally per-worktree; a second attempt on the SAME change set falls through
- * and proceeds. When the key cannot be read (no commits yet, not a repo) the
- * gate steps aside rather than blocking a command it cannot track.
+ * The deny branch: block the command until the change-audit skill has recorded a
+ * pass for THIS change. The gate only READS the receipt (`auditKeyCommand` +
+ * `AUDIT_RECEIPT`, shared with the skill) — it never writes it. That is the whole
+ * fix: a hook that stamps its own gate is opened by a blind retry, so an agent
+ * that ignores the deny and re-runs the command walks through without ever
+ * auditing. Here the receipt exists only if the skill wrote it, and only for the
+ * exact change it signed off, so a blind retry — or a retry while a conflict is
+ * unresolved — stays blocked. When the key cannot be read (no commits yet, not a
+ * repo) the gate steps aside rather than blocking a command it cannot track.
  */
 function denyBranch(gate: Gate, template: string): string {
-  const key = CHANGE_KEY[gate.match === 'commit' ? 'commit' : 'push'];
+  const timing = gate.match === 'commit' ? 'commit' : 'push';
   return [
     `if printf '%s' "$IN" | grep -qiE '${MATCH_PATTERN[gate.match]}'; then`,
-    `  K=$(${key}); S="$(git rev-parse --git-dir 2>/dev/null)/payo-audit-gate"`,
-    `  if [ -n "$K" ] && [ "$(cat "$S" 2>/dev/null)" != "$K" ]; then`,
-    `    printf '%s' "$K" >"$S" 2>/dev/null`,
+    `  K=$(${auditKeyCommand(timing)}); R=${AUDIT_RECEIPT}`,
+    `  if [ -n "$K" ] && [ "$(cat "$R" 2>/dev/null)" != "$K" ]; then`,
     `    MSG=${shSingleQuote(gate.message)}; printf '${template}' "$MSG"; exit 0`,
     '  fi',
     'fi',

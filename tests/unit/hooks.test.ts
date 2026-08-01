@@ -6,7 +6,7 @@ import { inTempProject } from '../helpers/tmpProject';
 import { initGitRepo, commitEmpty } from '../helpers/gitRepo';
 import { emitHooks, mergeLefthook, hookSetupHints } from '../../src/generator/hooks';
 import { detectHookRunner } from '../../src/detect/hooks';
-import { planHooks } from '../../src/generator/hookplan';
+import { planHooks, auditReceiptCommand } from '../../src/generator/hookplan';
 
 type ClaudeCfg = {
   permissions?: { allow: string[] };
@@ -168,7 +168,7 @@ describe('emitHooks — native pre-tool gate', () => {
       expect(command).toContain('permissionDecision":"ask');
     }));
 
-  it('denies a change set once, then lets the retry through', () =>
+  it('stays denied on a blind retry, and opens only once the skill records a pass', () =>
     inTempProject((dir) => {
       initGitRepo(dir);
       emitHooks({ auditSkill: true, auditTiming: 'push' }, ['claude']);
@@ -182,14 +182,20 @@ describe('emitHooks — native pre-tool gate', () => {
         }).toString();
 
       expect(push()).toContain('"deny"');
-      expect(push()).toBe(''); // same change set — already asked for, so it proceeds
+      expect(push()).toContain('"deny"'); // blind retry: no receipt yet, still blocked
 
-      // A new commit is a new change set and must be audited on its own.
+      // Stand in for the change-audit skill's final step: record a pass for HEAD.
+      execSync(auditReceiptCommand('push'), { cwd: dir, shell: '/bin/sh' });
+      expect(push()).toBe(''); // receipt matches HEAD — gate opens
+
+      // A new commit is a new change set; the stale receipt no longer matches.
       commitEmpty(dir, 'second');
       expect(push()).toContain('"deny"');
 
-      // The stamp lives in the git dir, so it is never committed.
-      expect(existsSync(join(dir, '.git/payo-audit-gate'))).toBe(true);
+      // The gate only READS the receipt — it never writes it (that is the fix).
+      expect(command).toContain('cat "$R"');
+      expect(command).not.toMatch(/>\s*"?\$R/);
+      expect(command).not.toContain('payo-audit-gate');
     }));
 
   it('stays silent on a command it does not guard', () =>
