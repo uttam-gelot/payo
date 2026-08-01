@@ -6,12 +6,13 @@
  *    tool-agnostic, covers humans too. Written for whichever runner the user
  *    picked on a repo that has none; merged into the existing runner when one is
  *    already present, so the developer's setup is respected, never clobbered.
- *  - a NATIVE pre-tool gate per supported tool (Claude / Cursor / Copilot) on
- *    `git commit` / `git push` and destructive queries. It runs no model; it
- *    either raises the tool's confirm prompt for the HUMAN (confirm-push,
- *    DB-safety) or denies once per change set to hand the AGENT an instruction
- *    it must act on (change-audit). Tools without a pre-tool hook (Codex,
- *    Antigravity, Windsurf) are covered by the mechanical floor.
+ *  - a NATIVE pre-tool gate per supported tool (Claude / Cursor / Copilot / Codex
+ *    / Antigravity) on `git commit` / `git push` and destructive queries. It runs
+ *    no model; it either raises the tool's confirm prompt for the HUMAN
+ *    (confirm-push, DB-safety) or denies the command until the change-audit skill
+ *    records a pass for that exact change, forcing the AGENT to run it first
+ *    (change-audit). Windsurf's hook is block-only (no reason reaches the agent),
+ *    so it — like tools with no hook at all — is covered by the mechanical floor.
  *
  * Every edit is idempotent: a `payo:` marker in each block lets a re-run detect
  * its own prior output and skip, so running Payo twice adds nothing.
@@ -23,7 +24,13 @@ import type { Answers } from '../questions/types';
 import { writeArtifact, resolveContained } from './paths';
 import { writeFileAtomic } from '../fsutil';
 import { probeCommand } from './agent';
-import { planHooks, type HookPlan, type PlannedCheck } from './hookplan';
+import {
+  planHooks,
+  auditKeyCommand,
+  AUDIT_RECEIPT,
+  type HookPlan,
+  type PlannedCheck,
+} from './hookplan';
 import type { HookRunner } from '../detect/hooks';
 
 /** Marker that tags every Payo-written hook block, for idempotent re-runs. */
@@ -256,7 +263,7 @@ function emitMechanical(plan: HookPlan): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Native soft-`ask` layer — Claude / Cursor / Copilot
+// Native pre-tool gate — Claude / Cursor / Copilot / Codex / Antigravity
 // ---------------------------------------------------------------------------
 
 /**
@@ -281,13 +288,15 @@ function gates(a: Answers): Gate[] {
   const g: Gate[] = [];
   if (a.auditSkill === true) {
     const push = a.auditTiming !== 'commit';
+    const act = push ? 'push' : 'commit';
     g.push({
       match: push ? 'push' : 'commit',
       decision: 'deny',
       message:
-        `Run the change-audit skill on this change first, then repeat this ${push ? 'push' : 'commit'}. ` +
-        'It compares the diff against the project skills and reports conflicts — it does not run ' +
-        'tests, linters or formatters.',
+        `Run the change-audit skill on this change before ${push ? 'pushing' : 'committing'}. ` +
+        `It records a pass only when the audit finds no conflict, and this ${act} stays blocked ` +
+        `until then — re-running the ${act} without it will keep failing. It reads the diff only; ` +
+        'it does not run tests, linters or formatters.',
     });
   }
   if (a.confirmPush === true) {
@@ -314,51 +323,51 @@ const MATCH_PATTERN: Record<Gate['match'], string> = {
   sql: '(DROP|TRUNCATE|DELETE[[:space:]]+FROM)[[:space:]]|migrate[[:space:]]+(reset|deploy)|db[[:space:]]+push',
 };
 
-/**
- * How the deny gate identifies "this change" — the key it stamps so the same
- * change set is denied once, not forever. HEAD for a push (the commits being
- * sent), the staged tree's hash for a commit.
- */
-const CHANGE_KEY: Record<'push' | 'commit', string> = {
-  push: 'git rev-parse HEAD 2>/dev/null',
-  commit: 'git diff --staged 2>/dev/null | git hash-object --stdin 2>/dev/null',
-};
-
 /** Safe single-quoted sh literal (handles an apostrophe inside a message). */
 function shSingleQuote(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
 /**
- * The deny branch: block the command once per change set, handing the agent the
- * reason. The stamp lives in the git dir, so it is never committed and is
- * naturally per-worktree; a second attempt on the SAME change set falls through
- * and proceeds. When the key cannot be read (no commits yet, not a repo) the
- * gate steps aside rather than blocking a command it cannot track.
+ * The deny branch: block the command until the change-audit skill has recorded a
+ * pass for THIS change. The gate only READS the receipt (`auditKeyCommand` +
+ * `AUDIT_RECEIPT`, shared with the skill) — it never writes it. That is the whole
+ * fix: a hook that stamps its own gate is opened by a blind retry, so an agent
+ * that ignores the deny and re-runs the command walks through without ever
+ * auditing. Here the receipt exists only if the skill wrote it, and only for the
+ * exact change it signed off, so a blind retry — or a retry while a conflict is
+ * unresolved — stays blocked. When the key cannot be read (no commits yet, not a
+ * repo) the gate steps aside rather than blocking a command it cannot track.
  */
 function denyBranch(gate: Gate, template: string): string {
-  const key = CHANGE_KEY[gate.match === 'commit' ? 'commit' : 'push'];
+  const timing = gate.match === 'commit' ? 'commit' : 'push';
   return [
     `if printf '%s' "$IN" | grep -qiE '${MATCH_PATTERN[gate.match]}'; then`,
-    `  K=$(${key}); S="$(git rev-parse --git-dir 2>/dev/null)/payo-audit-gate"`,
-    `  if [ -n "$K" ] && [ "$(cat "$S" 2>/dev/null)" != "$K" ]; then`,
-    `    printf '%s' "$K" >"$S" 2>/dev/null`,
+    `  K=$(${auditKeyCommand(timing)}); R=${AUDIT_RECEIPT}`,
+    `  if [ -n "$K" ] && [ "$(cat "$R" 2>/dev/null)" != "$K" ]; then`,
     `    MSG=${shSingleQuote(gate.message)}; printf '${template}' "$MSG"; exit 0`,
     '  fi',
     'fi',
   ].join('\n');
 }
 
-/** The ask chain: first matching gate raises the tool's permission prompt. */
+/**
+ * The ask chain: one self-contained block per gate, first match wins. Each block
+ * prints its tool's `ask` decision and `exit 0`; a non-match falls THROUGH to the
+ * next block (and ultimately to the allow-default), rather than the old combined
+ * `if/elif/else exit 0` that swallowed the fall-through. Falling through is what
+ * lets `spec.allowDefault` emit an explicit allow for tools that require a
+ * decision on every call (Antigravity). Ordering (push → commit → sql) is set by
+ * the caller, so the more specific message still wins.
+ */
 function askBranches(asks: Gate[], template: string): string {
-  const branches = asks
+  return asks
     .map(
-      (g, i) =>
-        `${i === 0 ? 'if' : 'elif'} printf '%s' "$IN" | grep -qiE '${MATCH_PATTERN[g.match]}'; ` +
-        `then MSG=${shSingleQuote(g.message)}`,
+      (g) =>
+        `if printf '%s' "$IN" | grep -qiE '${MATCH_PATTERN[g.match]}'; then ` +
+        `MSG=${shSingleQuote(g.message)}; printf '${template}' "$MSG"; exit 0; fi`,
     )
-    .join('; ');
-  return `${branches}; else exit 0; fi\nprintf '${template}' "$MSG"`;
+    .join('\n');
 }
 
 /**
@@ -366,8 +375,10 @@ function askBranches(asks: Gate[], template: string): string {
  * JSON shape) and decide. The deny gate runs first and returns immediately; on
  * the retry it falls through to the ask chain, so a repo with both change-audit
  * and confirm-push still gets its confirm prompt. Order among asks is push →
- * commit → sql, so the more specific message wins. The leading marker comment is
- * what a re-run recognises as ours.
+ * commit → sql, so the more specific message wins. `spec.allowDefault`, when set,
+ * emits an explicit allow on the final fall-through — some tools (Antigravity)
+ * treat "no output" as an error and deny everything, so they need a decision on
+ * every call. The leading marker comment is what a re-run recognises as ours.
  */
 function gateCommand(relevant: Gate[], spec: AskTool): string {
   const deny = relevant.find((g) => g.decision === 'deny');
@@ -377,6 +388,7 @@ function gateCommand(relevant: Gate[], spec: AskTool): string {
     'IN=$(cat)',
     ...(deny ? [denyBranch(deny, spec.denyTemplate)] : []),
     ...(asks.length > 0 ? [askBranches(asks, spec.askTemplate)] : []),
+    ...(spec.allowDefault ? [`printf '%s' '${spec.allowDefault}'`] : []),
     'exit 0',
   ].join('\n');
 }
@@ -389,6 +401,44 @@ function isPayoGate(entry: unknown): boolean {
   return JSON.stringify(entry ?? null).includes(GATE_MARK);
 }
 
+/** A `PreToolUse` array entry wrapping our sh command (Claude / Codex shape). */
+function preToolUseEntry(command: string, matcher: string): unknown {
+  return { matcher, hooks: [{ type: 'command', command }] };
+}
+
+/** Fresh Claude/Codex-shaped config carrying only our gate. */
+function wrapPreToolUse(command: string, matcher: string): unknown {
+  return { hooks: { PreToolUse: [preToolUseEntry(command, matcher)] } };
+}
+
+/**
+ * Upsert our gate into a Claude/Codex-shaped config: keep the developer's other
+ * `PreToolUse` entries, drop any gate a previous Payo run left behind, then add
+ * the current one. Shared by both tools since their config shape is identical.
+ */
+function mergePreToolUse(existing: unknown, command: string, matcher: string): unknown {
+  const cfg = (existing && typeof existing === 'object' ? { ...existing } : {}) as Record<
+    string,
+    unknown
+  >;
+  const hooks = (cfg.hooks && typeof cfg.hooks === 'object' ? { ...cfg.hooks } : {}) as Record<
+    string,
+    unknown
+  >;
+  const pre = Array.isArray(hooks.PreToolUse)
+    ? (hooks.PreToolUse as unknown[]).filter((e) => !isPayoGate(e))
+    : [];
+  pre.push(preToolUseEntry(command, matcher));
+  hooks.PreToolUse = pre;
+  cfg.hooks = hooks;
+  return cfg;
+}
+
+/** The Antigravity `PreToolUse` block for our gate (its matcher is `run_command`). */
+function antigravityGate(command: string): unknown {
+  return { PreToolUse: [{ matcher: 'run_command', hooks: [{ type: 'command', command }] }] };
+}
+
 /** Per-tool native `ask` config: where it lives and how to shape it. */
 interface AskTool {
   /** Config file path, project-relative. */
@@ -397,6 +447,19 @@ interface AskTool {
   askTemplate: string;
   /** printf template emitting this tool's `deny` decision, `%s` = message to the agent. */
   denyTemplate: string;
+  /**
+   * Literal decision printed on the final fall-through, for tools that require a
+   * decision on every call (Antigravity: "no output" is treated as an error and
+   * denies everything). Omit for tools where silence means allow (Claude, Codex,
+   * Cursor, Copilot).
+   */
+  allowDefault?: string;
+  /**
+   * One-time step the user must take before this tool will run the gate, surfaced
+   * by `hookSetupHints` when the gate file is written (e.g. Codex requires
+   * trusting non-managed hooks). Omit for tools that activate on write.
+   */
+  activationHint?: string;
   /** Wrap the sh command into this tool's config object. */
   wrap(command: string): unknown;
   /**
@@ -407,31 +470,46 @@ interface AskTool {
   merge(existing: unknown, command: string): unknown;
 }
 
+// Claude Code and Codex CLI share one PreToolUse contract (hookSpecificOutput +
+// permissionDecision), so the decision templates are defined once here.
+const PRETOOLUSE_TEMPLATE = (decision: 'ask' | 'deny'): string =>
+  `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"${decision}","permissionDecisionReason":"%s"}}`;
+
 const ASK_TOOLS: Record<string, AskTool> = {
+  // Claude and Codex differ only by config path and Codex's trust step.
   claude: {
     configPath: '.claude/settings.json',
-    askTemplate:
-      '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"%s"}}',
-    denyTemplate:
-      '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}',
-    wrap: (command) => ({
-      hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command }] }] },
-    }),
+    askTemplate: PRETOOLUSE_TEMPLATE('ask'),
+    denyTemplate: PRETOOLUSE_TEMPLATE('deny'),
+    wrap: (command) => wrapPreToolUse(command, 'Bash'),
+    merge: (existing, command) => mergePreToolUse(existing, command, 'Bash'),
+  },
+  codex: {
+    configPath: '.codex/hooks.json',
+    askTemplate: PRETOOLUSE_TEMPLATE('ask'),
+    denyTemplate: PRETOOLUSE_TEMPLATE('deny'),
+    // Codex ships hooks on but runs a non-managed hook only after /hooks review.
+    activationHint: 'Trust the Codex change-audit hook so it runs:  run /hooks inside Codex',
+    wrap: (command) => wrapPreToolUse(command, 'Bash'),
+    merge: (existing, command) => mergePreToolUse(existing, command, 'Bash'),
+  },
+  // Antigravity keys its hooks.json by a unique hook NAME (not a flat array), uses
+  // the `run_command` matcher, and a `{decision, reason}` contract. It also treats
+  // "no output" as an error, hence the explicit allow-default.
+  antigravity: {
+    configPath: '.agents/hooks.json',
+    askTemplate: '{"decision":"ask","reason":"%s"}',
+    denyTemplate: '{"decision":"deny","reason":"%s"}',
+    allowDefault: '{"decision":"allow"}',
+    wrap: (command) => ({ [GATE_MARK]: antigravityGate(command) }),
     merge: (existing, command) => {
       const cfg = (existing && typeof existing === 'object' ? { ...existing } : {}) as Record<
         string,
         unknown
       >;
-      const hooks = (cfg.hooks && typeof cfg.hooks === 'object' ? { ...cfg.hooks } : {}) as Record<
-        string,
-        unknown
-      >;
-      const pre = Array.isArray(hooks.PreToolUse)
-        ? (hooks.PreToolUse as unknown[]).filter((e) => !isPayoGate(e))
-        : [];
-      pre.push({ matcher: 'Bash', hooks: [{ type: 'command', command }] });
-      hooks.PreToolUse = pre;
-      cfg.hooks = hooks;
+      // Drop any prior Payo gate (keyed name may have changed) then set ours.
+      for (const k of Object.keys(cfg)) if (isPayoGate(cfg[k])) delete cfg[k];
+      cfg[GATE_MARK] = antigravityGate(command);
       return cfg;
     },
   },
@@ -489,7 +567,7 @@ function emitNativeAsk(a: Answers, tools: string[] | undefined): string[] {
   const touched: string[] = [];
   for (const tool of selected) {
     const spec = ASK_TOOLS[tool];
-    if (!spec) continue; // no soft-ask hook (codex / antigravity / windsurf)
+    if (!spec) continue; // no pre-tool gate (windsurf is block-only; other/generic)
     const command = gateCommand(ordered, spec);
     const abs = resolveContained(spec.configPath);
     if (fs.existsSync(abs)) {
@@ -609,6 +687,11 @@ export function hookSetupHints(files: string[], a: Answers, plan?: HookPlan): st
     : a.gitleaks === true && files.length > 0;
   if (wroteSecretScan && !onPath('gitleaks')) {
     hints.push('Install gitleaks (the secret-scan hook needs it):  brew install gitleaks');
+  }
+  // A native gate that needs a one-time activation step (e.g. Codex hook trust)
+  // is inert until the user takes it — surface that when its file was written.
+  for (const spec of Object.values(ASK_TOOLS)) {
+    if (spec.activationHint && files.includes(spec.configPath)) hints.push(spec.activationHint);
   }
   if (plan && plan.deferred.length > 0) {
     const what = [...new Set(plan.deferred.map((c) => CHECK_LABEL[c.capability]))].join(', ');

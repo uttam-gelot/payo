@@ -5,6 +5,7 @@
  */
 import type { Answers } from '../questions/types';
 import {
+  auditReceiptCommand,
   automatedSummary,
   hookPlanFrom,
   isAutomated,
@@ -424,7 +425,10 @@ const skills: SkillSpec[] = [
         'those relevant skills and output a short report: one line per checked skill (pass or ' +
         'the specific conflict) followed by a one-line overall verdict. It flags conflicts for ' +
         'the human to resolve — it does not rewrite code. Keep the whole skill and its output ' +
-        'short to conserve tokens; the file must not restate the other skills, only reference them.' +
+        'short to conserve tokens; the file must not restate the other skills, only reference them. ' +
+        `(4) It must END with this exact step, verbatim: ${auditReceiptStep(timing)} A native git ` +
+        `gate blocks the ${timing === 'push' ? 'push' : 'commit'} until that receipt is written, so ` +
+        'the skill is useless without this final step — always include it.' +
         auditExclusion(hookPlanFrom(a))
       );
     },
@@ -458,6 +462,23 @@ function auditExclusion(plan: ReturnType<typeof hookPlanFrom>): string {
   );
 }
 
+/**
+ * The change-audit skill's final, load-bearing step: record a pass so the native
+ * gate opens. Written ONLY on a clean audit (blocking) and keyed to this exact
+ * change via `auditReceiptCommand`, so a conflict — or a later change — keeps the
+ * gate shut. The gate reads this receipt and nothing else, so a skill that omits
+ * this step never lets the push/commit through. Shared verbatim by the static
+ * body and the AI meta-prompt so the recorded key can never drift from the gate.
+ */
+function auditReceiptStep(timing: 'commit' | 'push'): string {
+  return (
+    'If, and only if, the report shows no blocking conflict, record the pass so the ' +
+    `${timing} can proceed: ` +
+    `\`${auditReceiptCommand(timing)}\`. If any conflict remains, do NOT record it — resolve the ` +
+    "conflict (or get the human's explicit sign-off), then run this audit again."
+  );
+}
+
 /** Deterministic no-CLI body for the change-audit skill. */
 function auditStaticBody(
   timing: 'commit' | 'push',
@@ -475,6 +496,7 @@ function auditStaticBody(
     '2. From the changed files, pick ONLY the few skills in `.agents/skills/` that are relevant (judge by each skill directory name and its description — do not open every skill).',
     '3. Compare the change against just those skills.',
     '4. Report: one line per checked skill (pass, or the specific conflict), then a one-line verdict. Flag conflicts for the human to fix; do not rewrite code.',
+    '5. ' + auditReceiptStep(timing),
     ...(automated
       ? [
           '',

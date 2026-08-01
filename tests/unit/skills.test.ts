@@ -106,6 +106,26 @@ describe('selectSkills', () => {
     expect(skill(commit).staticBody!(commit)).toContain('.agents/skills/');
   });
 
+  it('change-audit ends by recording a pass, keyed to the gate for each timing', () => {
+    const commit: Answers = { ...contexts.tsBackend, auditSkill: true, auditTiming: 'commit' };
+    const push: Answers = { ...contexts.tsBackend, auditSkill: true, auditTiming: 'push' };
+    const skill = (a: Answers) => selectSkills(a).find((s) => s.id === 'change-audit')!;
+
+    // Blocking wording: the receipt is written only on a clean audit.
+    const pushBody = skill(push).staticBody!(push);
+    expect(pushBody).toContain('If, and only if, the report shows no blocking conflict');
+    // Push keys the receipt on HEAD; commit on the staged-tree hash — same command
+    // the native gate compares, so the two can never disagree.
+    expect(pushBody).toContain(
+      'git rev-parse HEAD 2>/dev/null > "$(git rev-parse --git-dir)/payo-audit-receipt"',
+    );
+    expect(skill(commit).staticBody!(commit)).toContain(
+      'git diff --staged 2>/dev/null | git hash-object --stdin 2>/dev/null > "$(git rev-parse --git-dir)/payo-audit-receipt"',
+    );
+    // The AI meta-prompt carries the same final step.
+    expect(skill(push).buildPrompt(push)).toContain('payo-audit-receipt');
+  });
+
   it('change-audit refuses to re-run whatever the hook already runs', () => {
     // Without this the audit reads git-workflow, sees "run the checks", and runs
     // everything the hook is about to run on push.
