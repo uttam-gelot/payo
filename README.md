@@ -125,8 +125,9 @@ setup, or a folder layout your project never adopted.
 
 **5. Guidance that's enforced, not just suggested.** A skills pack is prose, and
 an agent can skip prose. When you enable a guardrail, Payo also writes the
-mechanism that makes it fire: a `lefthook.yml` that hard-blocks the commit or
-push, and a native pre-tool gate for Claude, Cursor, and Copilot. It plans both
+mechanism that makes it fire: a git hook — in the runner you pick — that
+hard-blocks the commit or push, and a native pre-tool gate for Claude, Cursor,
+and Copilot. It plans both
 layers together, so each check runs in exactly one place — the agent is told not
 to re-run what a hook already runs.
 
@@ -318,11 +319,15 @@ Skills are guidance the assistant _should_ follow — but an agent can skip pros
 when you enable a guardrail, Payo also writes the hook that makes it fire regardless:
 
 - **A git hook (mechanical, hard block).** When you turn on the gitleaks scan or the
-  verify-before-commit/push step, Payo writes a **`lefthook.yml`** running `gitleaks`,
-  your test command, your linter and a format check at the stage you chose, and
-  **blocking the commit/push on failure** — for every tool, and for a human typing
-  `git`. Payo writes the config; you wire it up once with `lefthook install` (Payo
-  tells you the command; it installs nothing itself).
+  verify-before-commit/push step, Payo asks **which runner** should carry the checks —
+  **Lefthook**, **Husky**, **pre-commit**, plain **`.githooks/`** scripts, or none at
+  all — and writes that runner's config running `gitleaks`, your test command, your
+  linter and a format check at the stage you chose, **blocking the commit/push on
+  failure** — for every tool, and for a human typing `git`. No option is marked
+  "recommended": which runner your team wants is a convention, not something Payo
+  should decide. Payo writes the config and tells you the one command that activates
+  it — `lefthook install`, `npx husky`, `pre-commit install`, or
+  `git config core.hooksPath .githooks` — and installs nothing itself.
 
   **If your repo already has hooks** — **lefthook**, **husky**, **pre-commit**,
   **simple-git-hooks** or native `.git/hooks` — Payo reads what each stage already
