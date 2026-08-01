@@ -251,6 +251,17 @@ export function hasUnaddressedHookWork(a: Answers): boolean {
   return desiredChecks(a).some((c) => !coversCapability(existing.coverage, c.capability));
 }
 
+/**
+ * True when the repo has no hook runner at all yet still wants checks run — i.e.
+ * when asking WHICH runner to set up is worth a question. False once a runner is
+ * present (that repo gets the `hookPolicy` question instead) and false when no
+ * check was asked for, since there would be nothing for a runner to carry.
+ */
+export function needsHookRunnerChoice(a: Answers): boolean {
+  // Answers-only, never the filesystem — same contract as hasUnaddressedHookWork.
+  return recordedHooks(a) === null && desiredChecks(a).length > 0;
+}
+
 /** Answer key carrying the plan from `generate` to the rule and skill builders. */
 export const HOOK_PLAN_KEY = 'hookPlan';
 

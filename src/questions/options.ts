@@ -613,6 +613,23 @@ export const hookPolicyOptions: Option<string>[] = [
   { value: 'merge', label: 'Add only the checks they are missing' },
 ];
 
+/**
+ * Git hook runners Payo can set up on a repo that has none. No option carries
+ * `hint: 'recommended'`: which runner a team wants is a convention, not a
+ * property of the stack, so the pick is made with no thumb on the scale.
+ *
+ * `simple-git-hooks` is deliberately absent — its config maps a stage to ONE
+ * command string, so a later Payo run could not add a check without rewriting
+ * the user's own line (see WRITABLE_RUNNERS in generator/hookplan.ts).
+ */
+export const hookRunnerOptions: Option<string>[] = [
+  { value: 'lefthook', label: 'Lefthook — one binary, works in any language' },
+  { value: 'husky', label: 'Husky — the Node standard (npm dependency)' },
+  { value: 'pre-commit', label: 'pre-commit — the Python standard (pip dependency)' },
+  { value: 'native', label: 'Native git hooks — .githooks/ scripts, no dependency' },
+  { value: 'none', label: "None — don't add a hook runner" },
+];
+
 /** When the change-audit skill should run in the workflow. */
 export const auditTimingOptions: Option<string>[] = [
   { value: 'push', label: 'Before pushing to a remote', hint: 'recommended' },

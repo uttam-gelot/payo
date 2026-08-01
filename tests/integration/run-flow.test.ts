@@ -49,6 +49,7 @@ const BASE: Answers = {
   orm: 'prisma',
   logger: 'pino',
   auditSkill: false,
+  hookRunner: 'lefthook',
 };
 
 beforeEach(() => {
