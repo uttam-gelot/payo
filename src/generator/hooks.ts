@@ -3,9 +3,9 @@
  * agent may ignore, so this module emits executable hooks that fire regardless:
  *
  *  - a MECHANICAL git hook (gitleaks / tests) that HARD-BLOCKS on failure —
- *    tool-agnostic, covers humans too. Written for lefthook on a greenfield
- *    repo; merged into an existing runner (husky / pre-commit / native) when one
- *    is already present, so the developer's setup is respected, never clobbered.
+ *    tool-agnostic, covers humans too. Written for whichever runner the user
+ *    picked on a repo that has none; merged into the existing runner when one is
+ *    already present, so the developer's setup is respected, never clobbered.
  *  - a NATIVE pre-tool gate per supported tool (Claude / Cursor / Copilot) on
  *    `git commit` / `git push` and destructive queries. It runs no model; it
  *    either raises the tool's confirm prompt for the HUMAN (confirm-push,
@@ -24,6 +24,7 @@ import { writeArtifact, resolveContained } from './paths';
 import { writeFileAtomic } from '../fsutil';
 import { probeCommand } from './agent';
 import { planHooks, type HookPlan, type PlannedCheck } from './hookplan';
+import type { HookRunner } from '../detect/hooks';
 
 /** Marker that tags every Payo-written hook block, for idempotent re-runs. */
 const MARK = 'payo:';
@@ -36,20 +37,50 @@ const MARK = 'payo:';
 type Check = PlannedCheck;
 
 // ---------------------------------------------------------------------------
-// Mechanical layer — lefthook (greenfield) or merge into the existing runner
+// Mechanical layer — the chosen runner (greenfield) or merge into the existing one
 // ---------------------------------------------------------------------------
 
-/** The `lefthook install` guidance banner shared by fresh and merged configs. */
-const LEFTHOOK_BANNER =
-  '# Created by Payo — git hooks that enforce the generated guardrail skills.\n' +
-  '#\n' +
-  '# Requires the lefthook binary. Install it once with any of:\n' +
-  '#   brew install lefthook            # macOS / Linux (Homebrew)\n' +
-  '#   npm  install -D lefthook         # Node projects\n' +
-  '#   go   install github.com/evilmartians/lefthook@latest\n' +
-  '# Then wire it into this repo:\n' +
-  '#   lefthook install\n' +
-  '# Docs: https://github.com/evilmartians/lefthook\n';
+/**
+ * The header written at the top of a config Payo creates from scratch — what
+ * the runner is, how to install it, and how to wire it into the repo. Only ever
+ * written on a fresh file: a config the developer already has keeps its own top.
+ * `#` comments, which every target format (YAML and sh) reads the same way.
+ */
+const SETUP_BANNER: Partial<Record<HookRunner, string>> = {
+  lefthook:
+    '# Created by Payo — git hooks that enforce the generated guardrail skills.\n' +
+    '#\n' +
+    '# Requires the lefthook binary. Install it once with any of:\n' +
+    '#   brew install lefthook            # macOS / Linux (Homebrew)\n' +
+    '#   npm  install -D lefthook         # Node projects\n' +
+    '#   go   install github.com/evilmartians/lefthook@latest\n' +
+    '# Then wire it into this repo:\n' +
+    '#   lefthook install\n' +
+    '# Docs: https://github.com/evilmartians/lefthook\n',
+  husky:
+    '# Created by Payo — git hooks that enforce the generated guardrail skills.\n' +
+    '#\n' +
+    '# Requires husky. Install it once with:\n' +
+    '#   npm install -D husky\n' +
+    '# Then wire it into this repo:\n' +
+    '#   npx husky\n' +
+    '# Docs: https://typicode.github.io/husky\n',
+  'pre-commit':
+    '# Created by Payo — git hooks that enforce the generated guardrail skills.\n' +
+    '#\n' +
+    '# Requires the pre-commit framework. Install it once with any of:\n' +
+    '#   brew install pre-commit          # macOS / Linux (Homebrew)\n' +
+    '#   pip  install pre-commit          # Python projects\n' +
+    '# Then wire it into this repo:\n' +
+    '#   pre-commit install\n' +
+    '#   pre-commit install --hook-type pre-push\n' +
+    '# Docs: https://pre-commit.com\n',
+  native:
+    '# Created by Payo — git hooks that enforce the generated guardrail skills.\n' +
+    '#\n' +
+    '# Plain git hooks, no dependency. Point git at this directory once:\n' +
+    '#   git config core.hooksPath .githooks\n',
+};
 
 /** Render a fresh `lefthook.yml` for the given checks. */
 function renderLefthook(checks: Check[]): string {
@@ -63,7 +94,9 @@ function renderLefthook(checks: Check[]): string {
     return `${stage}:\n  commands:\n${lines}\n`;
   };
   return (
-    LEFTHOOK_BANNER + '\n' + [block('pre-commit'), block('pre-push')].filter(Boolean).join('\n')
+    SETUP_BANNER.lefthook +
+    '\n' +
+    [block('pre-commit'), block('pre-push')].filter(Boolean).join('\n')
   );
 }
 
@@ -110,13 +143,18 @@ export function mergeLefthook(text: string, checks: Check[]): string {
   return out.endsWith('\n') ? out : out + '\n';
 }
 
-/** Append a marked command line to a shell-script hook (husky / native). */
-function appendShellHook(absPath: string, checks: Check[]): boolean {
+/**
+ * Append a marked command line to a shell-script hook (husky / native).
+ * `runner` names whose banner a brand-new file gets; omit it to write the bare
+ * shebang, which is what merging into a developer's existing setup wants.
+ */
+function appendShellHook(absPath: string, checks: Check[], runner?: HookRunner): boolean {
   const existing = fs.existsSync(absPath) ? fs.readFileSync(absPath, 'utf8') : '';
   const pending = checks.filter((c) => !existing.includes(`${MARK}${c.name}`));
   if (pending.length === 0) return false;
   const lines = pending.map((c) => `${c.run}  # ${MARK}${c.name}`).join('\n');
-  const header = existing ? '' : '#!/usr/bin/env sh\n';
+  const banner = (runner && SETUP_BANNER[runner]) ?? '';
+  const header = existing ? '' : `#!/usr/bin/env sh\n${banner}`;
   const body = `${header}${existing}${existing && !existing.endsWith('\n') ? '\n' : ''}${lines}\n`;
   writeFileAtomic(absPath, body);
   try {
@@ -127,9 +165,12 @@ function appendShellHook(absPath: string, checks: Check[]): boolean {
   return true;
 }
 
-/** Append a marked `repo: local` entry to a `.pre-commit-config.yaml`. */
-function appendPreCommit(absPath: string, checks: Check[]): boolean {
-  const existing = fs.readFileSync(absPath, 'utf8');
+/**
+ * Append a marked `repo: local` entry to a `.pre-commit-config.yaml`, creating
+ * the file (banner and `repos:` key included) when the repo has none yet.
+ */
+function appendPreCommit(absPath: string, checks: Check[], fresh: boolean): boolean {
+  const existing = fresh ? '' : fs.readFileSync(absPath, 'utf8');
   const pending = checks.filter((c) => !existing.includes(`${MARK}${c.name}`));
   if (pending.length === 0) return false;
   const hooks = pending
@@ -144,17 +185,20 @@ function appendPreCommit(absPath: string, checks: Check[]): boolean {
     )
     .join('\n');
   const entry = `  - repo: local\n    hooks:\n${hooks}\n`;
-  const body = existing.endsWith('\n') ? existing + entry : existing + '\n' + entry;
+  const head = fresh ? `${SETUP_BANNER['pre-commit']}\nrepos:\n` : existing;
+  const body = head.endsWith('\n') ? head + entry : head + '\n' + entry;
   writeFileAtomic(absPath, body);
   return true;
 }
 
 /**
  * Write the plan's checks into the repo's hook config. Greenfield → a fresh
- * `lefthook.yml`. Existing runner → append into it, never rewriting a line the
- * developer wrote. Whether anything is written at all was already decided by
- * `planHooks`, which is what respects the user's "leave my hooks alone" choice.
- * Returns the paths touched.
+ * config for the runner the user picked. Existing runner → append into it,
+ * never rewriting a line the developer wrote. Both directions share one branch
+ * per runner: the only difference is that a fresh file also gets the runner's
+ * install banner. Whether anything is written at all was already decided by
+ * `planHooks`, which is what respects both the user's "leave my hooks alone"
+ * choice and their "no runner at all" choice. Returns the paths touched.
  */
 function emitMechanical(plan: HookPlan): string[] {
   const checks = plan.write;
@@ -174,16 +218,7 @@ function emitMechanical(plan: HookPlan): string[] {
       writeFileAtomic(abs, merged);
       return [rel];
     }
-    case 'husky': {
-      const touched: string[] = [];
-      for (const stage of ['pre-commit', 'pre-push'] as const) {
-        const rel = `.husky/${stage}`;
-        const staged = checks.filter((c) => c.stage === stage);
-        if (staged.length === 0) continue;
-        if (appendShellHook(resolveContained(rel), staged)) touched.push(rel);
-      }
-      return touched;
-    }
+    case 'husky':
     case 'native': {
       const base = plan.configPath!;
       const touched: string[] = [];
@@ -191,17 +226,20 @@ function emitMechanical(plan: HookPlan): string[] {
         const rel = path.join(base, stage);
         const staged = checks.filter((c) => c.stage === stage);
         if (staged.length === 0) continue;
-        // Native hooks may sit outside cwd only via an absolute hooksPath; keep
-        // writes contained to the project.
+        // A native hooksPath may point outside cwd; keep writes contained to the
+        // project unless it is explicitly absolute.
         const abs = path.isAbsolute(base) ? path.join(base, stage) : resolveContained(rel);
-        if (appendShellHook(abs, staged)) touched.push(rel);
+        if (appendShellHook(abs, staged, plan.greenfield ? plan.runner : undefined)) {
+          touched.push(rel);
+        }
       }
       return touched;
     }
     case 'pre-commit': {
       const rel = plan.configPath!;
       const abs = resolveContained(rel);
-      return appendPreCommit(abs, checks) ? [rel] : [];
+      // A greenfield pre-commit repo has no config file to read yet.
+      return appendPreCommit(abs, checks, plan.greenfield) ? [rel] : [];
     }
     case 'simple-git-hooks':
       // planHooks never routes writes here — its config maps a stage to ONE

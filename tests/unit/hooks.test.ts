@@ -45,6 +45,66 @@ describe('emitHooks — mechanical (lefthook, greenfield)', () => {
     }));
 });
 
+describe('emitHooks — mechanical (the chosen greenfield runner)', () => {
+  it('writes husky shell hooks when husky is chosen', () =>
+    inTempProject((dir) => {
+      const files = emitHooks({ gitleaks: true, hookRunner: 'husky' }, ['claude']);
+      expect(files).toContain('.husky/pre-push');
+      expect(existsSync(join(dir, 'lefthook.yml'))).toBe(false);
+      const sh = readFileSync(join(dir, '.husky/pre-push'), 'utf8');
+      expect(sh.startsWith('#!/usr/bin/env sh\n')).toBe(true);
+      expect(sh).toContain('npx husky'); // the install banner
+      expect(sh).toContain('gitleaks detect --redact  # payo:payo-secret-scan');
+    }));
+
+  it('writes a valid fresh .pre-commit-config.yaml when pre-commit is chosen', () =>
+    inTempProject((dir) => {
+      const files = emitHooks({ gitleaks: true, hookRunner: 'pre-commit' }, ['claude']);
+      expect(files).toContain('.pre-commit-config.yaml');
+      const yml = readFileSync(join(dir, '.pre-commit-config.yaml'), 'utf8');
+      // The top-level key is what makes the file loadable at all.
+      expect(yml).toContain('\nrepos:\n');
+      expect(yml).toContain('- repo: local');
+      expect(yml).toContain('entry: gitleaks detect --redact');
+      expect(yml).toContain('stages: [push]');
+    }));
+
+  it('writes .githooks scripts when native git hooks are chosen', () =>
+    inTempProject((dir) => {
+      const files = emitHooks({ gitleaks: true, hookRunner: 'native' }, ['claude']);
+      expect(files).toContain('.githooks/pre-push');
+      const sh = readFileSync(join(dir, '.githooks/pre-push'), 'utf8');
+      expect(sh).toContain('git config core.hooksPath .githooks'); // the banner
+      expect(sh).toContain('gitleaks detect --redact  # payo:payo-secret-scan');
+    }));
+
+  it('writes no mechanical config when the user wants no runner', () =>
+    inTempProject((dir) => {
+      const files = emitHooks({ gitleaks: true, hookRunner: 'none' }, ['claude']);
+      expect(files).toEqual([]);
+      for (const rel of ['lefthook.yml', '.husky', '.pre-commit-config.yaml', '.githooks']) {
+        expect(existsSync(join(dir, rel))).toBe(false);
+      }
+    }));
+
+  // A fresh project per runner: once one config is written, detection sees a
+  // runner and the second run takes the existing-runner path by design.
+  for (const [hookRunner, rel] of [
+    ['husky', '.husky/pre-push'],
+    ['pre-commit', '.pre-commit-config.yaml'],
+    ['native', '.githooks/pre-push'],
+  ] as const) {
+    it(`is idempotent for ${hookRunner} — a second run touches nothing`, () =>
+      inTempProject((dir) => {
+        const a = { gitleaks: true, hookRunner };
+        emitHooks(a, ['claude']);
+        const first = readFileSync(join(dir, rel), 'utf8');
+        expect(emitHooks(a, ['claude'])).not.toContain(rel);
+        expect(readFileSync(join(dir, rel), 'utf8')).toBe(first);
+      }));
+  }
+});
+
 describe('emitHooks — native pre-tool gate', () => {
   it('denies for change-audit, so the reason reaches the agent rather than the user', () =>
     inTempProject((dir) => {
