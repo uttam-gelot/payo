@@ -47,8 +47,8 @@ import { printBanner } from './banner';
  * and leaves the first one on screen — once per tick, so the line stacks up for
  * the whole run. Clamp the label so a frame is never wider than one row.
  */
-function spinnerLabel(text: string): string {
-  const max = (process.stdout.columns ?? 80) - 8; // symbol prefix + "..." + slack
+export function spinnerLabel(text: string, columns = process.stdout.columns ?? 80): string {
+  const max = columns - 8; // symbol prefix + "..." + slack
   if (max < 8 || text.length <= max) return text;
   return `${text.slice(0, max - 1)}…`;
 }
