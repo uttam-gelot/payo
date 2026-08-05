@@ -39,6 +39,20 @@ import { planHooks } from '../generator/hookplan';
 import type { ResumeStore } from '../generator/types';
 import { printBanner } from './banner';
 
+/**
+ * Clack's spinner erases the previous frame by re-wrapping the bare message, but
+ * renders it with a 3-column symbol prefix and up to 3 animated dots. When that
+ * extra width pushes the frame past the terminal edge while the bare message
+ * still fits, it moves the cursor up 0 rows, erases only the last physical row
+ * and leaves the first one on screen — once per tick, so the line stacks up for
+ * the whole run. Clamp the label so a frame is never wider than one row.
+ */
+function spinnerLabel(text: string): string {
+  const max = (process.stdout.columns ?? 80) - 8; // symbol prefix + "..." + slack
+  if (max < 8 || text.length <= max) return text;
+  return `${text.slice(0, max - 1)}…`;
+}
+
 export async function run(): Promise<void> {
   printBanner();
 
@@ -136,7 +150,7 @@ export async function run(): Promise<void> {
         // ("Analysis complete") on the common no-agent / nothing-to-fill path.
         if (willLlmDetectRun(detected, aiTool, depth)) {
           const s = spinner();
-          s.start(`Analyzing your project with ${aiTool}`);
+          s.start(spinnerLabel(`Analyzing your project with ${aiTool}`));
           try {
             result = await llmDetect(detected, aiTool, depth, process.cwd());
           } finally {
@@ -372,7 +386,7 @@ export async function run(): Promise<void> {
     let spin: ReturnType<typeof spinner> | undefined;
     const bootstrap = await generateBootstrap(session.answers, result.files, (name) => {
       spin = spinner();
-      spin.start(`Generating bootstrap prompt with ${name}… this may take a minute.`);
+      spin.start(spinnerLabel(`Generating bootstrap prompt with ${name}`));
     });
     spin?.stop(
       bootstrap.mode === 'ai'
