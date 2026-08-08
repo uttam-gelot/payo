@@ -17,7 +17,7 @@ describe('writeAgentLog', () => {
   });
 
   it('writes the transcript and returns its project-relative path', async () => {
-    await inTempProject(async (dir) => {
+    await inTempProject((dir) => {
       const res = writeAgentLog('project-overview', 1, 'exited with code 1', 'prompt', transcript);
       expect(res.error).toBeUndefined();
       expect(res.path).toBeDefined();
@@ -29,12 +29,18 @@ describe('writeAgentLog', () => {
   });
 
   it('returns an error instead of throwing or vanishing when the write itself fails', async () => {
-    await inTempProject(async (dir) => {
+    await inTempProject((dir) => {
       const payoDir = join(dir, '.payo');
       mkdirSync(payoDir);
       chmodSync(payoDir, 0o500); // read + execute, no write — blocks creating logs/
       try {
-        const res = writeAgentLog('project-overview', 1, 'exited with code 1', 'prompt', transcript);
+        const res = writeAgentLog(
+          'project-overview',
+          1,
+          'exited with code 1',
+          'prompt',
+          transcript,
+        );
         expect(res.path).toBeUndefined();
         expect(res.error).toBeDefined();
         expect(res.error).toContain('permission denied');
