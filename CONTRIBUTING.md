@@ -26,7 +26,7 @@ src/
 │   ├── predicates.ts  # appliesTo helpers (isTsJs, hasModeledDb, …)
 │   └── commands.ts    # pm/scaffold command helpers (pmCreate, pmRun, …)
 ├── generator/   # turns answers into files (AI agent runs or static templates)
-├── providers/   # per-AI-tool file format + output location
+├── providers/   # one entry per AI tool: id, display name, detection artifacts
 └── state/       # .payo/ session: save answers + resume progress
 ```
 
