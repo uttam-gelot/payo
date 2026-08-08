@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import {
   capsFor,
+  checkAgentReady,
   clearCapsCache,
   isAvailable,
   probeCommand,
@@ -109,5 +110,39 @@ describe('runAgent', () => {
     const res = await runAgent(shRunner('sleep 30', 200), 'prompt');
     expect(res.ok).toBe(false);
     expect(res.stderr).toBe('timed out');
+  }, 10000);
+});
+
+describe('checkAgentReady', () => {
+  it('binary missing on PATH → not-found', async () => {
+    const missing: AgentRunner = { binary: 'definitely-missing-bin-xyz', buildArgs: () => [] };
+    expect(await checkAgentReady(missing)).toEqual({ ok: false, reason: 'not-found' });
+  });
+
+  it('binary on PATH and exits clean → ok', async () => {
+    expect(await checkAgentReady(shRunner('exit 0'))).toEqual({ ok: true });
+  });
+
+  it('binary on PATH but exits non-zero → failed, with a diagnostic', async () => {
+    const result = await checkAgentReady(shRunner('echo boom; exit 1'));
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('failed');
+    expect(result.detail).toContain('exited with code 1');
+  });
+
+  it('binary on PATH but hangs → failed, timed out', async () => {
+    // The check ignores the runner's own timeoutMs and uses its own (shorter)
+    // budget; shrink that budget via env so the test doesn't wait out a real one.
+    const prior = process.env.PAYO_AGENT_HELLO_TIMEOUT_MS;
+    process.env.PAYO_AGENT_HELLO_TIMEOUT_MS = '200';
+    try {
+      const result = await checkAgentReady(shRunner('sleep 30'));
+      expect(result.ok).toBe(false);
+      expect(result.reason).toBe('failed');
+      expect(result.detail).toBe('timed out');
+    } finally {
+      if (prior === undefined) delete process.env.PAYO_AGENT_HELLO_TIMEOUT_MS;
+      else process.env.PAYO_AGENT_HELLO_TIMEOUT_MS = prior;
+    }
   }, 10000);
 });
