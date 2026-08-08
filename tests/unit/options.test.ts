@@ -34,6 +34,7 @@ describe('aiToolOptions', () => {
     // Q1 picks the generator CLI; only CLI-capable providers qualify.
     expect(ids).toEqual(['claude', 'codex', 'antigravity', 'cursor', 'copilot']);
     expect(ids).not.toContain('windsurf'); // static-only
+    expect(ids).not.toContain('zed'); // static-only
     expect(ids).not.toContain('other'); // internal fallback
   });
 
@@ -45,7 +46,7 @@ describe('aiToolOptions', () => {
 describe('supportToolOptions', () => {
   it('offers every supported tool except the internal fallback, untagged', () => {
     const ids = vals(supportToolOptions());
-    expect(ids).toEqual(['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'windsurf']);
+    expect(ids).toEqual(['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'windsurf', 'zed']);
     expect(ids).not.toContain('other');
     expect(recCount(supportToolOptions())).toBe(0);
   });

@@ -275,11 +275,13 @@ describe('emitHooks — native pre-tool gate', () => {
       expect(readFileSync(join(dir, '.claude/settings.json'), 'utf8')).toBe(first);
     }));
 
-  it('skips tools with no usable pre-tool gate (windsurf / other)', () =>
+  it('skips tools with no usable pre-tool gate (windsurf / zed / other)', () =>
     inTempProject((dir) => {
-      const files = emitHooks({ auditSkill: true }, ['windsurf', 'other']);
+      const files = emitHooks({ auditSkill: true }, ['windsurf', 'zed', 'other']);
       expect(files).toEqual([]);
       expect(existsSync(join(dir, '.windsurf'))).toBe(false);
+      // Zed's only native gate is declarative settings Payo does not write.
+      expect(existsSync(join(dir, '.zed'))).toBe(false);
     }));
 });
 

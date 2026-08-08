@@ -17,8 +17,9 @@ describe('provider registry (universal output)', () => {
     expect(getProvider('claude')?.agent?.binary).toBe('claude');
     expect(getProvider('codex')?.agent?.binary).toBe('codex');
     expect(getProvider('antigravity')?.agent?.binary).toBe('agy');
-    // Windsurf and the generic fallback have no headless CLI.
+    // Windsurf, Zed and the generic fallback have no headless CLI.
     expect(getProvider('windsurf')?.agent).toBeUndefined();
+    expect(getProvider('zed')?.agent).toBeUndefined();
     expect(getProvider('other')?.agent).toBeUndefined();
   });
 

@@ -7,6 +7,7 @@ import { cursorProvider } from './cursor';
 import { claudeProvider } from './claude';
 import { copilotProvider } from './copilot';
 import { windsurfProvider } from './windsurf';
+import { zedProvider } from './zed';
 import { codexProvider } from './codex';
 import { antigravityProvider } from './antigravity';
 import { genericProvider } from './generic';
@@ -18,6 +19,7 @@ registerProvider(antigravityProvider);
 registerProvider(cursorProvider);
 registerProvider(copilotProvider);
 registerProvider(windsurfProvider);
+registerProvider(zedProvider);
 registerProvider(genericProvider);
 
 export { getProvider, listProviders, registerProvider };

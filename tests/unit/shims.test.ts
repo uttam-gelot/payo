@@ -107,6 +107,6 @@ describe('shimRootsForTools', () => {
     expect(shimRootsForTools()).toEqual([SHIM_TOOLS.claude, SHIM_TOOLS.windsurf]);
     expect(shimRootsForTools(['claude'])).toEqual([SHIM_TOOLS.claude]);
     expect(shimRootsForTools(['windsurf'])).toEqual([SHIM_TOOLS.windsurf]);
-    expect(shimRootsForTools(['codex', 'cursor'])).toEqual([]); // native tools need no shim
+    expect(shimRootsForTools(['codex', 'cursor', 'zed'])).toEqual([]); // native tools need no shim
   });
 });

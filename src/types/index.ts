@@ -5,6 +5,7 @@
 export type AiTool =
   | 'cursor'
   | 'windsurf'
+  | 'zed'
   | 'copilot'
   | 'claude'
   | 'codex'
