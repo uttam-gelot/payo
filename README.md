@@ -128,7 +128,7 @@ setup, or a folder layout your project never adopted.
 an agent can skip prose. When you enable a guardrail, Payo also writes the
 mechanism that makes it fire: a git hook — in the runner you pick — that
 hard-blocks the commit or push, and a native pre-tool gate for Claude, Cursor,
-and Copilot. It plans both
+Copilot, Codex, and Antigravity. It plans both
 layers together, so each check runs in exactly one place — the agent is told not
 to re-run what a hook already runs.
 
@@ -341,14 +341,17 @@ when you enable a guardrail, Payo also writes the hook that makes it fire regard
   runs and, by default, **leaves your setup completely untouched**. Anything it
   already covers is simply never added; for anything missing, Payo asks whether to
   append it or leave the file alone, and leaving it alone is the recommended answer.
-- **A native tool hook.** For **Claude, Cursor, and Copilot**, Payo writes a
-  `PreToolUse` hook that fires when the agent runs `git commit` / `git push` or a
-  destructive query. Confirm-push and DB-safety raise a **confirm prompt for you**.
-  Change-audit instead **denies the command once** with an instruction back to the
-  agent — a confirm prompt would just be approved and the audit skipped — and the
-  retry for that same change goes through. It stores nothing outside `.git/` and runs
-  no model. Tools without a pre-tool hook (Codex, Antigravity, Windsurf, Zed) are
-  covered by the git hook above.
+- **A native tool hook.** For **Claude, Cursor, Copilot, Codex, and Antigravity**,
+  Payo writes a pre-tool hook that fires when the agent runs `git commit` /
+  `git push` or a destructive query. Confirm-push and DB-safety raise a **confirm
+  prompt for you**. Change-audit instead **denies the command** with an instruction
+  back to the agent — a confirm prompt would just be approved and the audit skipped
+  — and the gate stays shut until the change-audit skill records a pass for *that
+  exact change*. The receipt it writes lives inside `.git/`, so it is never
+  committed, and a later commit moves the key it is stamped with, re-closing the
+  gate. It stores nothing outside `.git/` and runs no model. Codex needs one
+  one-time `/hooks` trust step, which Payo prints. Tools with no usable pre-tool
+  gate (Windsurf, Zed) are covered by the git hook above.
 
 Both are **idempotent** — re-running Payo never duplicates a hook — and are written
 only for the guardrails you actually enabled. Whatever a hook runs, the generated
