@@ -73,6 +73,31 @@ export function capsFor(runner: AgentRunner): AgentCaps {
   };
 }
 
+/** Outcome of the post-selection agent readiness check. */
+export interface AgentCheckResult {
+  ok: boolean;
+  /** Why the check failed: binary missing on PATH, or it ran but didn't behave. */
+  reason?: 'not-found' | 'failed';
+  /** Short diagnostic when reason is 'failed'. */
+  detail?: string;
+}
+
+/**
+ * Confirms the selected CLI is not just on PATH but actually runs headlessly and
+ * responds — catches an installed-but-unauthenticated or otherwise broken CLI
+ * right after the user picks it, instead of failing silently at generation time.
+ */
+export async function checkAgentReady(runner: AgentRunner): Promise<AgentCheckResult> {
+  if (!isAvailable(runner)) return { ok: false, reason: 'not-found' };
+  const result = await runAgent(
+    { ...runner, timeoutMs: config.agent.helloTestMs() },
+    'Reply with the single word: ready',
+  );
+  return result.ok
+    ? { ok: true }
+    : { ok: false, reason: 'failed', detail: result.stderr ?? result.stdout };
+}
+
 export interface AgentResult {
   ok: boolean;
   /** Short diagnostic when ok is false. */

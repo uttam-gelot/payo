@@ -13,6 +13,7 @@ import {
 import {
   confirmResume,
   confirmBootstrapPrompt,
+  confirmContinueWithoutAgent,
   confirmOverwrite,
   confirmLegacyCleanup,
   confirmStartMode,
@@ -35,6 +36,8 @@ import {
   predictedExisting,
   backupFiles,
 } from '../generator/index';
+import { checkAgentReady } from '../generator/agent';
+import { getProvider } from '../providers/index';
 import { hookSetupHints } from '../generator/hooks';
 import { planHooks } from '../generator/hookplan';
 import type { ResumeStore } from '../generator/types';
@@ -52,6 +55,53 @@ export function spinnerLabel(text: string, columns = process.stdout.columns ?? 8
   const max = columns - 8; // symbol prefix + "..." + slack
   if (max < 8 || text.length <= max) return text;
   return `${text.slice(0, max - 1)}…`;
+}
+
+/**
+ * Ask the aiTool question and confirm the chosen CLI actually works — not just
+ * that its binary is on PATH, but that it runs headlessly and responds — before
+ * any further question is asked. On a failed check the user can continue anyway
+ * (generation falls back to static templates for anything that CLI would have
+ * written) or re-pick, looping until one succeeds or the risk is accepted.
+ * A no-op if aiTool is already answered (resumed session).
+ */
+async function selectAiTool(session: Session): Promise<Session> {
+  if (session.answered.includes('aiTool')) return session;
+  const aiToolQ = findQuestion(flow, session.answers, 'aiTool');
+  if (!aiToolQ) return session;
+
+  // Seed the detected tool so the prompt pre-selects it; the user's pick wins.
+  const detectedAiTool = detectAiTool(process.cwd());
+  if (detectedAiTool) session = seedDetected(session, { aiTool: detectedAiTool });
+
+  for (;;) {
+    const value = (await runQuestion(aiToolQ, session.answers)) as string;
+    const provider = getProvider(value);
+    const runner = provider?.agent;
+    if (!provider || !runner) return recordAnswer(session, 'aiTool', value);
+
+    const s = spinner();
+    s.start(spinnerLabel(`Checking that ${provider.displayName} responds`));
+    const check = await checkAgentReady(runner);
+    s.stop(
+      check.ok ? `${provider.displayName} is ready` : `${provider.displayName} did not respond`,
+    );
+    if (check.ok) return recordAnswer(session, 'aiTool', value);
+
+    note(
+      check.reason === 'not-found'
+        ? `\`${runner.binary}\` was not found on your PATH. Install it and sign in, or pick a different tool.`
+        : `\`${runner.binary}\` didn't respond${check.detail ? ` (${check.detail})` : ''}. Make sure it's installed and signed in.`,
+      'Agent check failed',
+    );
+
+    if (await confirmContinueWithoutAgent(provider.displayName)) {
+      return recordAnswer(session, 'aiTool', value);
+    }
+    // Re-ask with this attempted pick still highlighted, in case the user just
+    // needs to install/sign in and retry rather than pick something else.
+    session = seedDetected(session, { aiTool: value });
+  }
 }
 
 export async function run(): Promise<void> {
@@ -72,6 +122,10 @@ export async function run(): Promise<void> {
   } else {
     session = existing ?? createSession();
   }
+
+  // aiTool is always the first question, checked for real readiness (PATH +
+  // a headless hello smoke test) before anything else is asked.
+  session = await selectAiTool(session);
 
   // Whether the user chose to work with an already-existing project (Gate 1).
   // Bootstrap-prompt generation only makes sense when scaffolding a new project,
@@ -106,14 +160,8 @@ export async function run(): Promise<void> {
         );
       }
 
-      // Existing project. aiTool is always the first question — ask it now so the
-      // Stage-2 LLM pass can use the chosen agent; recordAnswer ⇒ runFlow skips it.
-      const aiToolQ = findQuestion(flow, session.answers, 'aiTool');
-      if (aiToolQ) {
-        // Seed the detected tool so the prompt pre-selects it; the user's pick wins.
-        const seeded = detectedAiTool ? seedDetected(session, { aiTool: detectedAiTool }) : session;
-        session = recordAnswer(session, 'aiTool', await runQuestion(aiToolQ, seeded.answers));
-      }
+      // aiTool is already answered by `selectAiTool` above; runFlow's per-question
+      // skip (session.answered) means it won't be asked again here.
 
       // Gate 1 — work with the existing project, or start fresh?
       if ((await confirmStartMode()) === 'existing') {

@@ -33,6 +33,12 @@ export const config = {
     availabilityProbeMs: 5_000,
     /** Timeout for the `<binary> --help` flag-support probe (ms). */
     helpProbeMs: 10_000,
+    /**
+     * Timeout for the post-selection "is this agent actually ready" smoke test
+     * (ms). Env: PAYO_AGENT_HELLO_TIMEOUT_MS. Long enough for a cold CLI start,
+     * short enough not to stall onboarding on a hung/unauthenticated CLI.
+     */
+    helloTestMs: (): number => intEnv('PAYO_AGENT_HELLO_TIMEOUT_MS', 20_000, 1),
     /** Max bytes of help output read by the flag-support probe. */
     helpMaxBytes: 1_000_000,
     /** Max bytes retained (tail) per output stream of a run. */

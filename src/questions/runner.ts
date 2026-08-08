@@ -369,6 +369,21 @@ export async function confirmLegacyCleanup(files: string[]): Promise<boolean> {
   return value;
 }
 
+/**
+ * Asked when the chosen agent CLI failed the post-selection readiness check
+ * (missing from PATH, or installed but didn't respond). Continuing falls back to
+ * static templates for anything that CLI would have generated; declining re-opens
+ * the aiTool question so the user can install/sign in or pick another tool.
+ */
+export async function confirmContinueWithoutAgent(displayName: string): Promise<boolean> {
+  const value = await confirm({
+    message: `Continue with ${displayName} anyway? Payo will fall back to static templates for anything it can't generate.`,
+    initialValue: false,
+  });
+  guardCancel(value);
+  return value;
+}
+
 /** Offer the post-generation bootstrap prompt once generation is done. */
 export async function confirmBootstrapPrompt(): Promise<boolean> {
   const value = await confirm({
