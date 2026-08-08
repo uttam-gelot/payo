@@ -37,7 +37,8 @@ const core: Record<string, Question> = {
     id: 'aiTool',
     type: 'select',
     summary: 'Generator CLI',
-    message: 'Which AI CLI should Payo use to write your skills?',
+    message:
+      'Which AI CLI is already installed and signed in on this machine? Payo runs it locally to write your skills — no separate API key needed.',
     optionsFrom: opt.aiToolOptions,
     // Closed set: only providers with a CLI runner, no free-text Other.
     allowOther: false,
