@@ -4,7 +4,7 @@
  * callers fall back to static template generation. `runAgent` is async so the
  * orchestrator can run independent skills concurrently in a bounded pool.
  */
-import { spawn, spawnSync } from 'child_process';
+import { spawn, spawnSync, type ChildProcess } from 'child_process';
 import { config } from '../config';
 import type { AgentCaps, AgentRunner } from './types';
 
@@ -123,18 +123,32 @@ export interface AgentTranscript {
 /**
  * Run one prompt to completion in the project cwd. The agent is expected to
  * write files itself. Timeout sends SIGTERM (guards the cursor-agent hang bug).
- * Resolves (never rejects) so a failed run is just `{ ok: false }`.
+ * Resolves (never rejects) so a failed run is just `{ ok: false }` — including
+ * when `spawn()` itself throws synchronously (e.g. an npm-installed CLI's
+ * .cmd/.ps1 shim on Windows, which can hit this instead of the normal async
+ * 'error' event).
  */
 export function runAgent(runner: AgentRunner, prompt: string): Promise<AgentResult> {
   return new Promise((resolve) => {
     const useStdin = runner.promptViaStdin ?? false;
-    const args = runner.buildArgs(useStdin ? '' : prompt, capsFor(runner));
-    const child = spawn(runner.binary, args, {
-      cwd: process.cwd(),
-      // stdin only when we feed the prompt; both output streams are captured —
-      // an agent that refuses the task narrates it on stdout and still exits 0.
-      stdio: [useStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'],
-    });
+    let args: string[] = [];
+    let child: ChildProcess;
+    try {
+      args = runner.buildArgs(useStdin ? '' : prompt, capsFor(runner));
+      child = spawn(runner.binary, args, {
+        cwd: process.cwd(),
+        // stdin only when we feed the prompt; both output streams are captured —
+        // an agent that refuses the task narrates it on stdout and still exits 0.
+        stdio: [useStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'],
+      });
+    } catch (err) {
+      resolve({
+        ok: false,
+        stderr: err instanceof Error ? err.message : String(err),
+        transcript: { argv: [runner.binary, ...args], stdout: '', stderr: '' },
+      });
+      return;
+    }
 
     let stderr = '';
     let stdout = '';
