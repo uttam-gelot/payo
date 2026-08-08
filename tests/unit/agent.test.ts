@@ -111,6 +111,21 @@ describe('runAgent', () => {
     expect(res.ok).toBe(false);
     expect(res.stderr).toBe('timed out');
   }, 10000);
+
+  it('spawn() throwing synchronously still resolves (never rejects), with a transcript', async () => {
+    // A NUL byte in the binary name reliably makes node's spawn() throw
+    // synchronously — the same failure shape as an npm .cmd/.ps1 shim on
+    // Windows, without needing an actual Windows host to reproduce it.
+    const throwingRunner: AgentRunner = {
+      binary: 'bad\0name',
+      buildArgs: () => ['x'],
+    };
+    const res = await runAgent(throwingRunner, 'prompt');
+    expect(res.ok).toBe(false);
+    expect(typeof res.stderr).toBe('string');
+    expect(res.transcript).toBeDefined();
+    expect(res.transcript?.argv).toEqual(['bad\0name', 'x']);
+  });
 });
 
 describe('checkAgentReady', () => {

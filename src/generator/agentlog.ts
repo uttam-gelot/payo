@@ -16,10 +16,20 @@ function logName(skillId: string, attempt: number): string {
   return `${skillId.replace(/[^a-zA-Z0-9._-]/g, '-')}-attempt${attempt}.log`;
 }
 
+/** Outcome of an attempted log write: at most one of `path` / `error` is set. */
+export interface AgentLogResult {
+  /** Project-relative log path, set only when the write succeeded. */
+  path?: string;
+  /** Human-readable failure, set only when the write itself failed. */
+  error?: string;
+}
+
 /**
  * Write one failed run's transcript. Returns the project-relative log path for
- * the failure report, or undefined when there was nothing to record or the write
- * failed — logging must never turn a recoverable generation failure into a crash.
+ * the failure report, an error describing why the write failed, or `{}` when
+ * there was nothing to record — logging must never turn a recoverable
+ * generation failure into a crash, but a write failure must stay visible to
+ * the caller rather than vanish silently.
  */
 export function writeAgentLog(
   skillId: string,
@@ -27,8 +37,8 @@ export function writeAgentLog(
   reason: string,
   prompt: string,
   transcript?: AgentTranscript,
-): string | undefined {
-  if (!transcript) return undefined;
+): AgentLogResult {
+  if (!transcript) return {};
   const abs = path.join(config.payo.dir(), LOGS_SUBDIR, logName(skillId, attempt));
   const body = [
     `# payo agent log — ${skillId} (attempt ${attempt})`,
@@ -49,8 +59,8 @@ export function writeAgentLog(
   ].join('\n');
   try {
     writeFileAtomic(abs, body);
-    return path.relative(process.cwd(), abs);
-  } catch {
-    return undefined;
+    return { path: path.relative(process.cwd(), abs) };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }
