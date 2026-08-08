@@ -315,7 +315,8 @@ function runParallel(
         // The inline tail is truncated by design; the full transcript lands in
         // .payo/logs so the actual cause is recoverable after the run.
         const log = writeAgentLog(skill.id, attempt, reason, prompt, result.transcript);
-        if (log) reason += ` [log: ${log}]`;
+        if (log.path) reason += ` [log: ${log.path}]`;
+        else if (log.error) reason += ` [log write failed: ${log.error}]`;
         cleanupFailedAttempt(rel, before);
         if (FATAL_AGENT_ERROR.test(reason)) {
           fatal = reason;

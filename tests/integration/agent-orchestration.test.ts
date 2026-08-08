@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'bun:test';
-import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { setAgentOverride, resetAgentOverride } from '../helpers/agentMock';
 import { generate } from '../../src/generator/index';
@@ -428,6 +428,45 @@ describe('generate() — AI agent orchestration (mocked agent)', () => {
       expect(log).toContain('error: read-only workspace');
       expect(log).toContain('argv: codex exec');
       expect(log).toContain('--- prompt ---');
+    });
+  });
+
+  it('surfaces a log write failure instead of dropping it silently', async () => {
+    await inTempProject(async (dir) => {
+      const payoDir = join(dir, '.payo');
+      mkdirSync(payoDir);
+      chmodSync(payoDir, 0o500); // read + execute, no write — blocks creating logs/
+      try {
+        const reasons: string[] = [];
+        setAgentOverride({
+          isAvailable: true,
+          runAgent: (r, p) => {
+            if (!p.includes('project-overview')) return simulate('success')(r, p);
+            return {
+              ok: false,
+              stderr: 'exited with code 1',
+              stdout: 'sandbox denied the write',
+              transcript: {
+                argv: ['codex', 'exec'],
+                stdout: 'banner\nsandbox denied the write',
+                stderr: 'error: read-only workspace',
+              },
+            };
+          },
+        });
+
+        await generate(answers(), {
+          onSkillResult: (_t, ok, reason) => {
+            if (!ok && reason) reasons.push(reason);
+          },
+        });
+
+        const failed = reasons.find((r) => r.includes('[log write failed: '));
+        expect(failed).toBeDefined();
+        expect(failed).toContain('sandbox denied the write');
+      } finally {
+        chmodSync(payoDir, 0o700); // restore so the temp dir can be removed
+      }
     });
   });
 
