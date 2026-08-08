@@ -48,7 +48,8 @@ interactive CLI that **interviews you about your project** — language, framewo
 database, auth, testing, conventions — and then **generates the guidance files
 your assistant actually reads.**
 
-It supports **Claude, Cursor, GitHub Copilot, Codex, Windsurf, and Antigravity**.
+It supports **Claude, Cursor, GitHub Copilot, Codex, Windsurf, Zed, and
+Antigravity**.
 Where the assistant ships a headless CLI, Payo drives that tool's own AI to
 write rich, project-specific docs; where it doesn't, Payo falls back to solid
 templates — so you always end up with usable output.
@@ -67,7 +68,7 @@ and let it rot.
 
 Payo writes them for you in minutes — tailored to your actual stack, in one
 universal layout that **every skills-compatible tool reads** (Claude Code, Codex,
-Cursor, Copilot, Gemini, Antigravity, Windsurf, …) — so your assistant follows
+Cursor, Copilot, Gemini, Antigravity, Windsurf, Zed, …) — so your assistant follows
 _your_ conventions from the first prompt instead of guessing.
 
 ### Vibe coding, without the mess
@@ -297,11 +298,17 @@ One universal layout, whichever agent CLI you pick — no per-tool formats:
 
 Who reads what, with no extra work:
 
-- **Codex, Cursor, Copilot, Gemini CLI, Antigravity, Devin** → `.agents/skills/` and
-  `AGENTS.md` natively.
+- **Codex, Cursor, Copilot, Gemini CLI, Antigravity, Zed, Devin** → `.agents/skills/`
+  and `AGENTS.md` natively.
 - **Claude Code** → the `CLAUDE.md` shim plus the `.claude/skills/` symlinks
   (officially supported; it dedupes if it also reads the target directly).
 - **Windsurf** → `AGENTS.md` plus the `.windsurf/skills/` shim.
+
+> **Zed users:** Zed reads only the **first** instruction file it finds, in the order
+> `.rules`, `.cursorrules`, `.windsurfrules`, `.clinerules`,
+> `.github/copilot-instructions.md`, `AGENT.md`, `AGENTS.md`. If your repo holds any
+> of the files above `AGENTS.md`, Zed ignores everything Payo generated — so Payo
+> warns you at the end of a run and leaves the file for you to remove or merge.
 
 `AGENTS.md` opens its skills index with a directive telling the agent to consult and
 follow the applicable skills before writing code — so the guidance is used, not just
@@ -340,8 +347,8 @@ when you enable a guardrail, Payo also writes the hook that makes it fire regard
   Change-audit instead **denies the command once** with an instruction back to the
   agent — a confirm prompt would just be approved and the audit skipped — and the
   retry for that same change goes through. It stores nothing outside `.git/` and runs
-  no model. Tools without a pre-tool hook (Codex, Antigravity, Windsurf) are covered
-  by the git hook above.
+  no model. Tools without a pre-tool hook (Codex, Antigravity, Windsurf, Zed) are
+  covered by the git hook above.
 
 Both are **idempotent** — re-running Payo never duplicates a hook — and are written
 only for the guardrails you actually enabled. Whatever a hook runs, the generated

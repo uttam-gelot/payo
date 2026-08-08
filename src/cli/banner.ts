@@ -97,7 +97,7 @@ const DESCRIPTION = [
   '',
   'payo generates Agent Skills tailored to your stack — one universal layout',
   '(AGENTS.md + .agents/skills) that works across Claude Code, Codex, Cursor,',
-  'Copilot, Gemini, Antigravity & Windsurf. Write once, use in every agent.',
+  'Copilot, Gemini, Antigravity, Windsurf & Zed. Write once, use in every agent.',
   '',
   'It detects your stack across 8 languages, then asks a few questions and',
   'writes skills your AI agents follow from the very first prompt.',

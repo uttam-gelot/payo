@@ -21,6 +21,7 @@ import {
   runQuestion,
 } from '../questions/runner';
 import { findLegacyArtifacts, removeLegacyArtifacts } from '../generator/legacy';
+import { zedShadowWarnings } from '../generator/zed';
 import { detectStack } from '../detect/index';
 import { scanExistingAiConfigs, detectAiTool } from '../detect/aiconfig';
 import { llmDetect, willLlmDetectRun, type LlmDetection } from '../detect/llm';
@@ -373,6 +374,20 @@ export async function run(): Promise<void> {
     if (removed.length > 0) {
       note(removed.map((f) => `• ${f}`).join('\n'), 'Removed legacy config');
     }
+  }
+
+  // Zed reads only the FIRST instruction file it finds, and AGENTS.md is 7th of
+  // nine — so a higher-priority file shadows everything Payo just generated.
+  // Deliberately after the cleanup above: three of the six shadowing files are
+  // legacy artifacts, and warning about a file Payo has just deleted is noise.
+  const supportTools = session.answers.supportTools;
+  const zedWarnings = zedShadowWarnings(
+    Array.isArray(supportTools)
+      ? supportTools.filter((t): t is string => typeof t === 'string')
+      : undefined,
+  );
+  if (zedWarnings.length > 0) {
+    note(zedWarnings.map((w) => `• ${w}`).join('\n'), 'Zed');
   }
 
   // Generation finished — remove the working dir (.payo/) and its session.

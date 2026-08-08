@@ -51,6 +51,10 @@ describe('detectAiTool', () => {
     expect(inProject(['.cursorrules'], (d) => detectAiTool(d))).toBe('cursor');
   });
 
+  it('maps .rules → zed', () => {
+    expect(inProject(['.rules'], (d) => detectAiTool(d))).toBe('zed');
+  });
+
   it('maps a bare AGENTS.md → codex (shared path, registration order)', () => {
     expect(inProject(['AGENTS.md'], (d) => detectAiTool(d))).toBe('codex');
   });

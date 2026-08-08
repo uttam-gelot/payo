@@ -29,7 +29,7 @@ describe('predictTargets — universal layout', () => {
   it('predicts the full universal targets when no support scoping is set', () => {
     // Layout no longer depends on the provider; only content does. With no
     // supportTools answer, all shims are predicted (back-compat default).
-    for (const tool of ['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'windsurf']) {
+    for (const tool of ['claude', 'codex', 'antigravity', 'cursor', 'copilot', 'windsurf', 'zed']) {
       expect(predictTargets(fullStackAnswers(tool))).toEqual(universalTargets(tool));
     }
   });
