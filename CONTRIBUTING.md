@@ -115,10 +115,21 @@ accordingly and gate `appliesTo` on language/db predicates.
 
 ## Adding a new AI tool / provider
 
-Each supported assistant has a provider in
-[`src/providers/`](src/providers/) defining the file format and output location
-it writes (e.g. `CLAUDE.md`, `.cursorrules`). Add a new provider there and wire
-it into [`src/providers/registry.ts`](src/providers/registry.ts).
+Each supported assistant has a provider in [`src/providers/`](src/providers/).
+Output is universal — an `AGENTS.md` entrypoint plus `.agents/skills/` — so a
+provider no longer owns a file format. It declares its id and display name, the
+`knownArtifacts` used to detect an existing config, and an optional `agent` for
+tools that ship a headless CLI (omit it for static-only tools like Windsurf and
+Zed, which are then excluded from Q1 automatically).
+
+Add the file, then register it by importing it and adding one
+`registerProvider(...)` call in
+[`src/providers/index.ts`](src/providers/index.ts) — registration order drives
+the picker order. A tool that does not read `.agents/skills/` natively also
+needs an entry in `SHIM_TOOLS`
+([`src/generator/shims.ts`](src/generator/shims.ts)); most tools do read it and
+need nothing. A tool with a script-executing pre-tool hook needs an entry in
+`ASK_TOOLS` ([`src/generator/hooks.ts`](src/generator/hooks.ts)).
 
 ## Before opening a PR
 
