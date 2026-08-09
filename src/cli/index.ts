@@ -104,6 +104,25 @@ async function selectAiTool(session: Session): Promise<Session> {
   }
 }
 
+/**
+ * Ask aiTool (with its readiness check) and report whether the session was
+ * fresh *before* that happened. `selectAiTool` answers aiTool via
+ * `recordAnswer`, which returns a new session rather than mutating in place —
+ * a caller that instead reads freshness off the *returned* session would see
+ * 'aiTool' already in `answered` and wrongly conclude the session was never
+ * fresh. That was the #60 regression: existing-project detection was gated on
+ * exactly that reassigned value and so never ran again. Exported so the
+ * ordering can be unit-tested directly, without driving the real prompts.
+ */
+export async function selectAiToolTracked(
+  session: Session,
+  deps: { selectAiTool?: (s: Session) => Promise<Session> } = {},
+): Promise<{ session: Session; isFreshSession: boolean }> {
+  const isFreshSession = session.answered.length === 0;
+  const select = deps.selectAiTool ?? selectAiTool;
+  return { session: await select(session), isFreshSession };
+}
+
 export async function run(): Promise<void> {
   printBanner();
 
@@ -123,14 +142,11 @@ export async function run(): Promise<void> {
     session = existing ?? createSession();
   }
 
-  // Snapshot before selectAiTool answers aiTool — recordAnswer would otherwise
-  // push 'aiTool' into `answered`, making a truly fresh session look resumed
-  // and skipping existing-project detection below entirely.
-  const isFreshSession = session.answered.length === 0;
-
   // aiTool is always the first question, checked for real readiness (PATH +
   // a headless hello smoke test) before anything else is asked.
-  session = await selectAiTool(session);
+  const selected = await selectAiToolTracked(session);
+  session = selected.session;
+  const isFreshSession = selected.isFreshSession;
 
   // Whether the user chose to work with an already-existing project (Gate 1).
   // Bootstrap-prompt generation only makes sense when scaffolding a new project,
