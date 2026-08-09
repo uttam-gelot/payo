@@ -123,6 +123,211 @@ export async function selectAiToolTracked(
   return { session: await select(session), isFreshSession };
 }
 
+/** Injectable seams for {@link runExistingProjectGate} — everything impure the gate calls. */
+export interface ExistingProjectGateDeps {
+  detectStack?: typeof detectStack;
+  scanExistingAiConfigs?: typeof scanExistingAiConfigs;
+  detectAiTool?: typeof detectAiTool;
+  confirmStartMode?: () => Promise<'fresh' | 'existing'>;
+  confirmDetectionDepth?: () => Promise<'everything' | 'partial'>;
+  willLlmDetectRun?: typeof willLlmDetectRun;
+  llmDetect?: typeof llmDetect;
+}
+
+/**
+ * The existing-project detection gate (Gate 1 + Gate 2): on a fresh session
+ * whose cwd looks like an existing project, ask whether to detect it, and if
+ * so run Stage-1/Stage-2 detection and fold the results into the session. A
+ * no-op — returning `session` untouched — on a resumed session or a truly
+ * empty directory, which is exactly the branch #60 broke (a stale freshness
+ * read made this whole gate skip on every run). Extracted out of `run()` and
+ * injectable so the "does the existing-project branch actually run" contract
+ * can be unit-tested without mocking any module or driving real prompts.
+ */
+export async function runExistingProjectGate(
+  session: Session,
+  isFreshSession: boolean,
+  cwd: string,
+  deps: ExistingProjectGateDeps = {},
+): Promise<{ session: Session; startedFromExisting: boolean; autoRecommendGates: boolean }> {
+  let startedFromExisting = false;
+  let autoRecommendGates = false;
+  if (!isFreshSession) return { session, startedFromExisting, autoRecommendGates };
+
+  const detectStackFn = deps.detectStack ?? detectStack;
+  const scanExistingAiConfigsFn = deps.scanExistingAiConfigs ?? scanExistingAiConfigs;
+  const detectAiToolFn = deps.detectAiTool ?? detectAiTool;
+  const confirmStartModeFn = deps.confirmStartMode ?? confirmStartMode;
+  const confirmDetectionDepthFn = deps.confirmDetectionDepth ?? confirmDetectionDepth;
+  const willLlmDetectRunFn = deps.willLlmDetectRun ?? willLlmDetectRun;
+  const llmDetectFn = deps.llmDetect ?? llmDetect;
+
+  const detected = detectStackFn(cwd);
+  // The existing git-hook runner and what it already covers. Recorded before
+  // the start-mode gate on purpose: a repo's hooks must be respected whether
+  // the user is continuing the project or starting fresh inside it. Drives the
+  // hookPolicy question and, through the hook plan, what the generated
+  // guidance may claim is already automated.
+  if (detected.hooks) session = recordAnswer(session, 'existingHooks', detected.hooks);
+  if (Object.keys(detected.answers).length === 0) {
+    return { session, startedFromExisting, autoRecommendGates };
+  }
+
+  // The repo may already hold AI config — possibly for a different tool than
+  // the user is about to pick. Surface it and pre-select the tool in use.
+  const existingAiConfigs = scanExistingAiConfigsFn(cwd);
+  const detectedAiTool = detectAiToolFn(cwd);
+  if (existingAiConfigs.length > 0) {
+    note(
+      existingAiConfigs.map((f) => `• ${f}`).join('\n'),
+      detectedAiTool
+        ? `Existing AI config detected (looks like ${detectedAiTool})`
+        : 'Existing AI config detected',
+    );
+  }
+
+  // aiTool is already answered by `selectAiTool` above; runFlow's per-question
+  // skip (session.answered) means it won't be asked again here.
+
+  // Gate 1 — work with the existing project, or start fresh?
+  if ((await confirmStartModeFn()) !== 'existing') {
+    // Gate 1 "fresh" → seed nothing; normal flow (aiTool already answered).
+    return { session, startedFromExisting, autoRecommendGates };
+  }
+  startedFromExisting = true;
+  // Gate 2 — detect everything (auto-fill + review) or just the stack?
+  const depth = await confirmDetectionDepthFn();
+  autoRecommendGates = depth === 'everything';
+
+  // Be explicit about what "detect everything" does, so the user knows what
+  // to expect: code is the source of truth, undetected topics are skipped,
+  // and a few safe assistant policies are applied (and editable at review).
+  if (autoRecommendGates) {
+    note(
+      [
+        'Payo will use your code, folder structure, and git history as the source of truth.',
+        'Anything it cannot find is skipped — no skill is created for it and it is not mentioned.',
+        '',
+        'These safe assistant policies are applied (edit any at the review screen):',
+        '• No AI attribution in commits/PRs',
+        '• Task-scoped, small atomic commits',
+        '• Ask before pushing to a remote',
+        '• Run formatter/linter/tests before pushing',
+        '• Work from .env.example (never read the real .env)',
+        '• DRY, modular, separation-of-concerns coding standards',
+      ].join('\n'),
+      'Detect everything',
+    );
+  }
+
+  // Stage 2 — LLM pass over the chosen agent (additive; static-only fallback).
+  const aiTool = typeof session.answers.aiTool === 'string' ? session.answers.aiTool : undefined;
+  let result: LlmDetection = detected;
+  // Only spin when the pass will actually run — otherwise the spinner lies
+  // ("Analysis complete") on the common no-agent / nothing-to-fill path.
+  if (willLlmDetectRunFn(detected, aiTool, depth)) {
+    const s = spinner();
+    s.start(spinnerLabel(`Analyzing your project with ${aiTool}`));
+    try {
+      result = await llmDetectFn(detected, aiTool, depth, cwd);
+    } finally {
+      // Report what the pass actually produced, not a blanket "complete".
+      // Stage 2 tags each id it fills with source 'llm'; on any silent
+      // fallback (no result file, timeout, all off-vocab) that count is 0,
+      // so the message never claims a detection that did not happen.
+      const added = Object.values(result.sources).filter((src) => src === 'llm').length;
+      s.stop(
+        added > 0
+          ? `Analysis complete — ${added} more detail${added === 1 ? '' : 's'} detected`
+          : 'Analysis complete — no extra details found',
+      );
+    }
+  }
+
+  summarizeDetection(result);
+
+  // Apply by tier and depth.
+  // - "everything": the user confirms once at the review screen, so every
+  //   detected fact (both tiers, LLM guesses included) is recordAnswer'd —
+  //   skipped inline, pre-filled and editable at review. runFlow then
+  //   auto-fills the remaining convention/preference gates (see below).
+  // - "partial": deterministic Tier-1 facts are recorded (skipped); Stage-2
+  //   LLM fills are seeded instead (pre-selected but still asked, giving the
+  //   least-trustworthy source an explicit confirmation); Tier-2 conventions
+  //   are left entirely to the interview.
+  const { tier1, tier2 } = splitByTier(result.answers as Record<string, unknown>);
+  const applyRecorded = (entries: Record<string, unknown>): void => {
+    for (const [id, value] of Object.entries(entries)) {
+      session = recordAnswer(session, id, value);
+    }
+  };
+  const applySeeded = (entries: Record<string, unknown>): void => {
+    for (const [id, value] of Object.entries(entries)) {
+      session =
+        result.sources[id] === 'llm'
+          ? seedDetected(session, { [id]: value })
+          : recordAnswer(session, id, value);
+    }
+  };
+  if (depth === 'everything') {
+    applyRecorded(tier1);
+    applyRecorded(tier2);
+  } else {
+    applySeeded(tier1);
+    // Git conventions are inferred deterministically from local history; seed
+    // them so the interview pre-selects the detected value (still asked in
+    // partial mode, where the rest of Tier-2 is left entirely to the user).
+    for (const [id, value] of Object.entries(tier2)) {
+      if (result.sources[id] === 'git') session = seedDetected(session, { [id]: value });
+    }
+  }
+
+  // Carry per-package stacks (monorepo) to the generator as derived data.
+  // Not a Question, so it never surfaces as an editable review line.
+  if (result.packages && result.packages.length > 0) {
+    session = recordAnswer(session, 'monorepoPackages', result.packages);
+  }
+  // Same for the extra languages of a hybrid repo (React app + Rust
+  // backend): the interview covers the primary stack only, but the
+  // generated docs must not pretend the other stacks don't exist.
+  if (result.secondary && result.secondary.length > 0) {
+    session = recordAnswer(session, 'secondaryLanguages', result.secondary);
+  }
+
+  // Stage-2 conflicts: the agent found evidence contradicting a Stage-1
+  // answer. Never silently overridden — in partial mode the answer is
+  // demoted from recorded to seeded (the interview re-asks it with the
+  // suggestion pre-selected); in "everything" mode the Stage-1 value
+  // stays and the note points the user at the review screen.
+  const conflicts = 'conflicts' in result ? (result.conflicts ?? []) : [];
+  if (conflicts.length > 0) {
+    note(
+      conflicts
+        .map(
+          (c) =>
+            `• ${c.id}: detected "${String(result.answers[c.id])}", project evidence suggests "${c.suggested}"${c.evidence ? ` — ${c.evidence}` : ''}`,
+        )
+        .join('\n'),
+      'Detection conflicts — confirm at review',
+    );
+    if (depth !== 'everything') {
+      for (const c of conflicts) {
+        session = forgetAnswer(session, c.id);
+        session = seedDetected(session, { [c.id]: c.suggested });
+      }
+    }
+  }
+
+  // Detectors seed facts independent of project shape (e.g. a styling lib
+  // on a backend project). Drop any recorded answer whose question is
+  // unreachable under the detected answers, so orphaned facts don't leak
+  // into generation or show a phantom line in the review screen. Seeded
+  // Tier-2 hints live in `answers` only (not `answered`) and are untouched.
+  session = reconcile(flow, session);
+
+  return { session, startedFromExisting, autoRecommendGates };
+}
+
 export async function run(): Promise<void> {
   printBanner();
 
@@ -148,179 +353,17 @@ export async function run(): Promise<void> {
   session = selected.session;
   const isFreshSession = selected.isFreshSession;
 
+  // --- Auto-detect existing stack (fresh sessions only; resume keeps answers) ---
+  const gate = await runExistingProjectGate(session, isFreshSession, process.cwd());
+  session = gate.session;
   // Whether the user chose to work with an already-existing project (Gate 1).
   // Bootstrap-prompt generation only makes sense when scaffolding a new project,
   // so it is suppressed on this path.
-  let startedFromExisting = false;
-
+  const startedFromExisting = gate.startedFromExisting;
   // Set when the user picks "detect everything": the questionnaire then auto-fills
   // every convention/preference gate with recommended defaults instead of asking,
   // deferring all confirmation to the review screen.
-  let autoRecommendGates = false;
-
-  // --- Auto-detect existing stack (fresh sessions only; resume keeps answers) ---
-  if (isFreshSession) {
-    const detected = detectStack(process.cwd());
-    // The existing git-hook runner and what it already covers. Recorded before
-    // the start-mode gate on purpose: a repo's hooks must be respected whether
-    // the user is continuing the project or starting fresh inside it. Drives the
-    // hookPolicy question and, through the hook plan, what the generated
-    // guidance may claim is already automated.
-    if (detected.hooks) session = recordAnswer(session, 'existingHooks', detected.hooks);
-    if (Object.keys(detected.answers).length > 0) {
-      // The repo may already hold AI config — possibly for a different tool than
-      // the user is about to pick. Surface it and pre-select the tool in use.
-      const existingAiConfigs = scanExistingAiConfigs(process.cwd());
-      const detectedAiTool = detectAiTool(process.cwd());
-      if (existingAiConfigs.length > 0) {
-        note(
-          existingAiConfigs.map((f) => `• ${f}`).join('\n'),
-          detectedAiTool
-            ? `Existing AI config detected (looks like ${detectedAiTool})`
-            : 'Existing AI config detected',
-        );
-      }
-
-      // aiTool is already answered by `selectAiTool` above; runFlow's per-question
-      // skip (session.answered) means it won't be asked again here.
-
-      // Gate 1 — work with the existing project, or start fresh?
-      if ((await confirmStartMode()) === 'existing') {
-        startedFromExisting = true;
-        // Gate 2 — detect everything (auto-fill + review) or just the stack?
-        const depth = await confirmDetectionDepth();
-        autoRecommendGates = depth === 'everything';
-
-        // Be explicit about what "detect everything" does, so the user knows what
-        // to expect: code is the source of truth, undetected topics are skipped,
-        // and a few safe assistant policies are applied (and editable at review).
-        if (autoRecommendGates) {
-          note(
-            [
-              'Payo will use your code, folder structure, and git history as the source of truth.',
-              'Anything it cannot find is skipped — no skill is created for it and it is not mentioned.',
-              '',
-              'These safe assistant policies are applied (edit any at the review screen):',
-              '• No AI attribution in commits/PRs',
-              '• Task-scoped, small atomic commits',
-              '• Ask before pushing to a remote',
-              '• Run formatter/linter/tests before pushing',
-              '• Work from .env.example (never read the real .env)',
-              '• DRY, modular, separation-of-concerns coding standards',
-            ].join('\n'),
-            'Detect everything',
-          );
-        }
-
-        // Stage 2 — LLM pass over the chosen agent (additive; static-only fallback).
-        const aiTool =
-          typeof session.answers.aiTool === 'string' ? session.answers.aiTool : undefined;
-        let result: LlmDetection = detected;
-        // Only spin when the pass will actually run — otherwise the spinner lies
-        // ("Analysis complete") on the common no-agent / nothing-to-fill path.
-        if (willLlmDetectRun(detected, aiTool, depth)) {
-          const s = spinner();
-          s.start(spinnerLabel(`Analyzing your project with ${aiTool}`));
-          try {
-            result = await llmDetect(detected, aiTool, depth, process.cwd());
-          } finally {
-            // Report what the pass actually produced, not a blanket "complete".
-            // Stage 2 tags each id it fills with source 'llm'; on any silent
-            // fallback (no result file, timeout, all off-vocab) that count is 0,
-            // so the message never claims a detection that did not happen.
-            const added = Object.values(result.sources).filter((src) => src === 'llm').length;
-            s.stop(
-              added > 0
-                ? `Analysis complete — ${added} more detail${added === 1 ? '' : 's'} detected`
-                : 'Analysis complete — no extra details found',
-            );
-          }
-        }
-
-        summarizeDetection(result);
-
-        // Apply by tier and depth.
-        // - "everything": the user confirms once at the review screen, so every
-        //   detected fact (both tiers, LLM guesses included) is recordAnswer'd —
-        //   skipped inline, pre-filled and editable at review. runFlow then
-        //   auto-fills the remaining convention/preference gates (see below).
-        // - "partial": deterministic Tier-1 facts are recorded (skipped); Stage-2
-        //   LLM fills are seeded instead (pre-selected but still asked, giving the
-        //   least-trustworthy source an explicit confirmation); Tier-2 conventions
-        //   are left entirely to the interview.
-        const { tier1, tier2 } = splitByTier(result.answers as Record<string, unknown>);
-        const applyRecorded = (entries: Record<string, unknown>): void => {
-          for (const [id, value] of Object.entries(entries)) {
-            session = recordAnswer(session, id, value);
-          }
-        };
-        const applySeeded = (entries: Record<string, unknown>): void => {
-          for (const [id, value] of Object.entries(entries)) {
-            session =
-              result.sources[id] === 'llm'
-                ? seedDetected(session, { [id]: value })
-                : recordAnswer(session, id, value);
-          }
-        };
-        if (depth === 'everything') {
-          applyRecorded(tier1);
-          applyRecorded(tier2);
-        } else {
-          applySeeded(tier1);
-          // Git conventions are inferred deterministically from local history; seed
-          // them so the interview pre-selects the detected value (still asked in
-          // partial mode, where the rest of Tier-2 is left entirely to the user).
-          for (const [id, value] of Object.entries(tier2)) {
-            if (result.sources[id] === 'git') session = seedDetected(session, { [id]: value });
-          }
-        }
-
-        // Carry per-package stacks (monorepo) to the generator as derived data.
-        // Not a Question, so it never surfaces as an editable review line.
-        if (result.packages && result.packages.length > 0) {
-          session = recordAnswer(session, 'monorepoPackages', result.packages);
-        }
-        // Same for the extra languages of a hybrid repo (React app + Rust
-        // backend): the interview covers the primary stack only, but the
-        // generated docs must not pretend the other stacks don't exist.
-        if (result.secondary && result.secondary.length > 0) {
-          session = recordAnswer(session, 'secondaryLanguages', result.secondary);
-        }
-
-        // Stage-2 conflicts: the agent found evidence contradicting a Stage-1
-        // answer. Never silently overridden — in partial mode the answer is
-        // demoted from recorded to seeded (the interview re-asks it with the
-        // suggestion pre-selected); in "everything" mode the Stage-1 value
-        // stays and the note points the user at the review screen.
-        const conflicts = 'conflicts' in result ? (result.conflicts ?? []) : [];
-        if (conflicts.length > 0) {
-          note(
-            conflicts
-              .map(
-                (c) =>
-                  `• ${c.id}: detected "${String(result.answers[c.id])}", project evidence suggests "${c.suggested}"${c.evidence ? ` — ${c.evidence}` : ''}`,
-              )
-              .join('\n'),
-            'Detection conflicts — confirm at review',
-          );
-          if (depth !== 'everything') {
-            for (const c of conflicts) {
-              session = forgetAnswer(session, c.id);
-              session = seedDetected(session, { [c.id]: c.suggested });
-            }
-          }
-        }
-
-        // Detectors seed facts independent of project shape (e.g. a styling lib
-        // on a backend project). Drop any recorded answer whose question is
-        // unreachable under the detected answers, so orphaned facts don't leak
-        // into generation or show a phantom line in the review screen. Seeded
-        // Tier-2 hints live in `answers` only (not `answered`) and are untouched.
-        session = reconcile(flow, session);
-      }
-      // Gate 1 "fresh" → seed nothing; normal flow (aiTool already answered).
-    }
-  }
+  const autoRecommendGates = gate.autoRecommendGates;
 
   // --- Dynamic questionnaire ---
   session = await runFlow(flow, session, { autoRecommendGates });
