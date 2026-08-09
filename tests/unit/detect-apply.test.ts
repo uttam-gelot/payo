@@ -141,11 +141,13 @@ describe('detection apply policy', () => {
       s = recordAnswer(s, 'monorepoPackages', [{ path: 'services', language: 'rust' }]);
       s = recordAnswer(s, 'secondaryLanguages', ['rust']);
       s = recordAnswer(s, 'detectEverything', true);
+      s = recordAnswer(s, 'startedFromExisting', true);
       s = reconcile(flow, s);
 
       expect(s.answers.secondaryLanguages).toEqual(['rust']);
       expect(s.answers.monorepoPackages).toEqual([{ path: 'services', language: 'rust' }]);
       expect(s.answers.detectEverything).toBe(true);
+      expect(s.answers.startedFromExisting).toBe(true);
 
       // A genuinely stale question answer is still pruned.
       s = recordAnswer(s, 'mysteryField', 'x');

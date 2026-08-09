@@ -123,6 +123,13 @@ export async function selectAiToolTracked(
   return { session: await select(session), isFreshSession };
 }
 
+export function shouldOfferBootstrapPrompt(
+  session: Session,
+  startedFromExisting: boolean,
+): boolean {
+  return !startedFromExisting && session.answers.startedFromExisting !== true;
+}
+
 /** Injectable seams for {@link runExistingProjectGate} — everything impure the gate calls. */
 export interface ExistingProjectGateDeps {
   detectStack?: typeof detectStack;
@@ -188,6 +195,7 @@ export async function runExistingProjectGate(
     return { session, startedFromExisting, autoRecommendGates };
   }
   startedFromExisting = true;
+  session = recordAnswer(session, 'startedFromExisting', true);
   // Gate 2 — detect everything (auto-fill + review) or just the stack?
   const depth = await confirmDetectionDepthFn();
   autoRecommendGates = depth === 'everything';
@@ -501,7 +509,10 @@ export async function run(): Promise<void> {
   // Offer a paste-ready prompt to scaffold a working project from the new skills.
   // The provider's CLI agent writes it when installed; otherwise a deterministic
   // template is used as the floor.
-  if (!startedFromExisting && (await confirmBootstrapPrompt())) {
+  if (
+    shouldOfferBootstrapPrompt(session, startedFromExisting) &&
+    (await confirmBootstrapPrompt())
+  ) {
     // The agent run blocks; show a spinner while it generates (AI path only).
     let spin: ReturnType<typeof spinner> | undefined;
     const bootstrap = await generateBootstrap(session.answers, result.files, (name) => {
