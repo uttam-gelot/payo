@@ -123,6 +123,11 @@ export async function run(): Promise<void> {
     session = existing ?? createSession();
   }
 
+  // Snapshot before selectAiTool answers aiTool — recordAnswer would otherwise
+  // push 'aiTool' into `answered`, making a truly fresh session look resumed
+  // and skipping existing-project detection below entirely.
+  const isFreshSession = session.answered.length === 0;
+
   // aiTool is always the first question, checked for real readiness (PATH +
   // a headless hello smoke test) before anything else is asked.
   session = await selectAiTool(session);
@@ -138,7 +143,7 @@ export async function run(): Promise<void> {
   let autoRecommendGates = false;
 
   // --- Auto-detect existing stack (fresh sessions only; resume keeps answers) ---
-  if (session.answered.length === 0) {
+  if (isFreshSession) {
     const detected = detectStack(process.cwd());
     // The existing git-hook runner and what it already covers. Recorded before
     // the start-mode gate on purpose: a repo's hooks must be respected whether
