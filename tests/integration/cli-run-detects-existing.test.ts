@@ -12,8 +12,14 @@
  * `confirmOverwrite` scripted to 'skip', `run()` returns right after the
  * overwrite guard — before `generate()`, hooks, or the bootstrap prompt are
  * ever touched — so detection, state, and the generator all run for real.
+ *
+ * `mock.module` patches the module registry for the whole test process, not
+ * just this file — CI runs every test file in one process, so an unrestored
+ * mock here silently breaks real-implementation tests elsewhere (e.g.
+ * `tests/unit/agent.test.ts`'s `checkAgentReady` cases, `tests/unit/gates.test.ts`).
+ * `afterAll` puts each module back exactly as captured before any mocking.
  */
-import { mock, describe, it, expect, beforeEach } from 'bun:test';
+import { mock, describe, it, expect, beforeEach, afterAll } from 'bun:test';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import * as realRunner from '../../src/questions/runner';
@@ -88,6 +94,13 @@ beforeEach(() => {
   sawConfirmStartMode = false;
   sawConfirmDetectionDepth = false;
   askedIds = [];
+});
+
+afterAll(() => {
+  void mock.module('@clack/prompts', () => realClack);
+  void mock.module('../../src/generator/agent', () => realAgent);
+  void mock.module('../../src/detect/llm', () => realLlm);
+  void mock.module('../../src/questions/runner', () => realRunner);
 });
 
 describe('run() — existing-project detection survives selectAiTool', () => {
