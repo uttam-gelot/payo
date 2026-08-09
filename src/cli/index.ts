@@ -188,6 +188,7 @@ export async function runExistingProjectGate(
     return { session, startedFromExisting, autoRecommendGates };
   }
   startedFromExisting = true;
+  session = recordAnswer(session, 'startedFromExisting', true);
   // Gate 2 — detect everything (auto-fill + review) or just the stack?
   const depth = await confirmDetectionDepthFn();
   autoRecommendGates = depth === 'everything';

@@ -43,6 +43,7 @@ describe('runExistingProjectGate', () => {
     expect(session.answered).toContain('projectType');
     expect(session.answers.language).toBe('typescript');
     expect(session.answers.projectType).toBe('backend');
+    expect(session.answers.startedFromExisting).toBe(true);
   });
 
   it('existing project detected but user picks "start fresh" -> fresh flow continues', async () => {
@@ -68,6 +69,7 @@ describe('runExistingProjectGate', () => {
     // Nothing detected was seeded — the interview asks these fresh.
     expect(session.answered).not.toContain('language');
     expect(session.answered).not.toContain('projectType');
+    expect(session.answers.startedFromExisting).toBeUndefined();
   });
 
   it('nothing detected (greenfield dir) -> gate never prompts, fresh flow continues', async () => {

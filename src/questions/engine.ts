@@ -231,7 +231,12 @@ export function findQuestion(
  * them to the generator). Reconcile prunes by flow reachability, so without an
  * exemption these would be silently dropped before generation.
  */
-const SYNTHETIC_IDS = new Set(['monorepoPackages', 'secondaryLanguages', 'detectEverything']);
+const SYNTHETIC_IDS = new Set([
+  'monorepoPackages',
+  'secondaryLanguages',
+  'detectEverything',
+  'startedFromExisting',
+]);
 
 /** Ids reachable under the given answers: askable questions + active gate decisions. */
 function reachableIds(flow: FlowSection[], answers: Answers): Set<string> {
