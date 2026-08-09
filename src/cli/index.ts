@@ -127,7 +127,6 @@ export async function selectAiToolTracked(
 export interface ExistingProjectGateDeps {
   detectStack?: typeof detectStack;
   scanExistingAiConfigs?: typeof scanExistingAiConfigs;
-  detectAiTool?: typeof detectAiTool;
   confirmStartMode?: () => Promise<'fresh' | 'existing'>;
   confirmDetectionDepth?: () => Promise<'everything' | 'partial'>;
   willLlmDetectRun?: typeof willLlmDetectRun;
@@ -156,7 +155,6 @@ export async function runExistingProjectGate(
 
   const detectStackFn = deps.detectStack ?? detectStack;
   const scanExistingAiConfigsFn = deps.scanExistingAiConfigs ?? scanExistingAiConfigs;
-  const detectAiToolFn = deps.detectAiTool ?? detectAiTool;
   const confirmStartModeFn = deps.confirmStartMode ?? confirmStartMode;
   const confirmDetectionDepthFn = deps.confirmDetectionDepth ?? confirmDetectionDepth;
   const willLlmDetectRunFn = deps.willLlmDetectRun ?? willLlmDetectRun;
@@ -174,16 +172,11 @@ export async function runExistingProjectGate(
   }
 
   // The repo may already hold AI config — possibly for a different tool than
-  // the user is about to pick. Surface it and pre-select the tool in use.
+  // the user is about to pick. Surface it, but generically: which tool it
+  // looks like is an implementation detail the user does not need named here.
   const existingAiConfigs = scanExistingAiConfigsFn(cwd);
-  const detectedAiTool = detectAiToolFn(cwd);
   if (existingAiConfigs.length > 0) {
-    note(
-      existingAiConfigs.map((f) => `• ${f}`).join('\n'),
-      detectedAiTool
-        ? `Existing AI config detected (looks like ${detectedAiTool})`
-        : 'Existing AI config detected',
-    );
+    note(existingAiConfigs.map((f) => `• ${f}`).join('\n'), 'Existing AI config detected');
   }
 
   // aiTool is already answered by `selectAiTool` above; runFlow's per-question

@@ -30,7 +30,6 @@ describe('runExistingProjectGate', () => {
       {
         detectStack: () => detectedExisting,
         scanExistingAiConfigs: () => [],
-        detectAiTool: () => undefined,
         confirmStartMode: () => Promise.resolve('existing'),
         confirmDetectionDepth: () => Promise.resolve('partial'),
         willLlmDetectRun: () => false,
@@ -55,7 +54,6 @@ describe('runExistingProjectGate', () => {
       {
         detectStack: () => detectedExisting,
         scanExistingAiConfigs: () => [],
-        detectAiTool: () => undefined,
         confirmStartMode: () => {
           startModeCalls++;
           return Promise.resolve('fresh');
