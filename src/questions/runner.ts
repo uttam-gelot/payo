@@ -1,5 +1,6 @@
 import { select, multiselect, text, confirm, isCancel, cancel, note } from '@clack/prompts';
 import type { Answers, Option, Question } from './types';
+import type { SkillSpec } from '../generator/skills';
 
 // ---------------------------------------------------------------------------
 // Cancel guard — call after every prompt return value
@@ -392,4 +393,38 @@ export async function confirmBootstrapPrompt(): Promise<boolean> {
   });
   guardCancel(value);
   return value;
+}
+
+/**
+ * The slice of @clack's `multiselect` {@link confirmSkillSelection} uses.
+ * Injectable for the same reason as {@link SelectPrompt} — deterministic tests
+ * without mocking the @clack module.
+ */
+type MultiselectPrompt = (opts: {
+  message: string;
+  options: { value: string; label: string; hint?: string }[];
+  required?: boolean;
+  initialValues?: string[];
+}) => Promise<string[] | symbol>;
+
+/**
+ * Right before generation, show the skills payo computed from the answers and
+ * let the user drop any they don't want — opt OUT, not in, so everything
+ * starts checked. Skipped entirely when there's nothing to decide (0 or 1
+ * applicable skill), same as the hookPolicy/hookRunner "only ask when there's
+ * a real choice" pattern.
+ */
+export async function confirmSkillSelection(
+  specs: SkillSpec[],
+  ask: MultiselectPrompt = multiselect,
+): Promise<string[]> {
+  if (specs.length < 2) return specs.map((s) => s.id);
+  const picked = await ask({
+    message: 'Which skills should Payo generate?',
+    options: specs.map((s) => ({ value: s.id, label: s.title, hint: s.description })),
+    required: false,
+    initialValues: specs.map((s) => s.id),
+  });
+  guardCancel(picked);
+  return picked;
 }
