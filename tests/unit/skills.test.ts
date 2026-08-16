@@ -234,4 +234,27 @@ describe('selectSkills', () => {
       'never read or open the real .env file',
     );
   });
+
+  describe('skillSelection filter', () => {
+    it('returns the full applicable set when skillSelection is unset (regression guard)', () => {
+      expect(ids(contexts.tsBackend)).toEqual(
+        ids({ ...contexts.tsBackend, skillSelection: undefined }),
+      );
+    });
+
+    it('narrows to exactly the chosen ids, in declared order', () => {
+      const all = ids(contexts.tsBackend);
+      const got = ids({ ...contexts.tsBackend, skillSelection: ['coding-standards', 'tooling'] });
+      expect(got).toEqual(all.filter((id) => ['coding-standards', 'tooling'].includes(id)));
+    });
+
+    it('silently ignores a selected id no longer in the applicable set', () => {
+      const got = ids({ ...contexts.tsBackend, skillSelection: ['coding-standards', 'auth'] });
+      expect(got).toEqual(['coding-standards']);
+    });
+
+    it('an empty selection yields no skills at all', () => {
+      expect(ids({ ...contexts.tsBackend, skillSelection: [] })).toEqual([]);
+    });
+  });
 });

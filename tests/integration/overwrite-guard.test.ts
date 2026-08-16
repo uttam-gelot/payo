@@ -63,6 +63,19 @@ describe('predictTargets — universal layout', () => {
     expect(codexOnly).toContain('AGENTS.md'); // entrypoint + .agents/skills still written
     expect(codexOnly).toContain(skillPath(selectSkills(fullStackAnswers('codex'))[0].id));
   });
+
+  it("omits a deselected skill's file and shim paths after skillSelection narrows the set", () => {
+    const answers = fullStackAnswers('claude');
+    const [kept, dropped] = selectSkills(answers).map((s) => s.id);
+    const targets = predictTargets({ ...answers, skillSelection: [kept] });
+    expect(targets).toContain(skillPath(kept));
+    expect(targets).not.toContain(skillPath(dropped));
+    expect(targets).not.toContain(`.claude/skills/${dropped}`);
+    expect(targets).not.toContain(`.windsurf/skills/${dropped}`);
+    // The base entrypoint + shim are unaffected by skill selection.
+    expect(targets).toContain('AGENTS.md');
+    expect(targets).toContain('CLAUDE.md');
+  });
 });
 
 describe('existingTargets — cross-tool config', () => {
