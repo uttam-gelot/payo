@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **You now see and can trim the exact skill list before Payo writes anything.**
+  Previously the set of `.agents/skills/` files Payo would generate was decided
+  entirely by your interview answers, with no chance to review or drop one —
+  the only lever was answering an earlier question differently, which meant
+  losing that answer everywhere, not just for one skill. Right before
+  generation, Payo now shows the computed list (every skill preselected) and
+  lets you uncheck any you don't want a file for. Skipped automatically when
+  there's only zero or one skill to decide between.
 - **You now choose which git hook runner Payo sets up.** A repo with no hooks
   always got a `lefthook.yml`, whether or not lefthook was a tool your team
   wanted to install. Payo now asks, offering **Lefthook**, **Husky**,

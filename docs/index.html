@@ -346,9 +346,11 @@
           stack, then writes one universal layout — an <strong>AGENTS.md</strong> entrypoint plus
           <strong>Agent Skills</strong> in <strong>.agents/skills/</strong> — that every
           skills-compatible tool reads. Claude Code and Windsurf get thin shims; nothing is
-          duplicated. The <strong>AGENTS.md</strong> entrypoint tells the assistant to follow
-          those skills — and you can opt into a <strong>change-audit</strong> skill that checks
-          your pending change against them before you commit or push.
+          duplicated. Before anything is written, Payo shows you the exact skill list it
+          computed — every one preselected — so you can uncheck what you don't want. The
+          <strong>AGENTS.md</strong> entrypoint tells the assistant to follow those skills —
+          and you can opt into a <strong>change-audit</strong> skill that checks your
+          pending change against them before you commit or push.
         </p>
       </div>
       <div class="tools">
@@ -503,7 +505,7 @@
         </div>
         <div class="tool">
           <div class="name"><span class="num">2</span>Only the skills you need exist</div>
-          <div class="body">No database means there is no <code>data-layer</code> skill — not a stub, not an "N/A" section, no directory. Same for auth, state, API, logging, testing. A pack gives you all of them and expects you to delete two-thirds.</div>
+          <div class="body">No database means there is no <code>data-layer</code> skill — not a stub, not an "N/A" section, no directory. Same for auth, state, API, logging, testing. A pack gives you all of them and expects you to delete two-thirds. Payo also shows you the computed list before writing anything, so you can drop any skill yourself.</div>
         </div>
         <div class="tool">
           <div class="name"><span class="num">3</span>Real commands, not placeholders</div>

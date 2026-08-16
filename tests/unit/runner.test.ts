@@ -10,9 +10,11 @@ import {
   reviewAction,
   selectAnswerToEdit,
   detectionSummaryLines,
+  confirmSkillSelection,
 } from '../../src/questions/runner';
 import { validationOptions } from '../../src/questions/options';
 import type { Option, Question } from '../../src/questions/types';
+import type { SkillSpec } from '../../src/generator/skills';
 
 const select = (over: Partial<Question> = {}): Question => ({
   id: 'q',
@@ -115,6 +117,44 @@ describe('selectAnswerToEdit', () => {
 
   it('maps the Back sentinel to undefined', async () => {
     expect(await selectAnswerToEdit(items, () => Promise.resolve('__back__'))).toBeUndefined();
+  });
+});
+
+const spec = (id: string): SkillSpec => ({
+  id,
+  title: id,
+  description: `${id} description`,
+  appliesTo: () => true,
+  buildPrompt: () => '',
+});
+
+describe('confirmSkillSelection', () => {
+  it('skips the prompt and returns all ids when fewer than 2 specs apply', async () => {
+    let called = false;
+    const ask = () => {
+      called = true;
+      return Promise.resolve([]);
+    };
+    expect(await confirmSkillSelection([], ask)).toEqual([]);
+    expect(await confirmSkillSelection([spec('testing')], ask)).toEqual(['testing']);
+    expect(called).toBe(false);
+  });
+
+  it('preselects every skill and returns the picked ids verbatim', async () => {
+    const specs = [spec('testing'), spec('auth')];
+    let seenInitialValues: string[] | undefined;
+    const picked = await confirmSkillSelection(specs, (o) => {
+      seenInitialValues = o.initialValues;
+      return Promise.resolve(['testing']);
+    });
+    expect(seenInitialValues).toEqual(['testing', 'auth']);
+    expect(picked).toEqual(['testing']);
+  });
+
+  it('allows an empty selection (required: false)', async () => {
+    const specs = [spec('testing'), spec('auth')];
+    const picked = await confirmSkillSelection(specs, () => Promise.resolve([]));
+    expect(picked).toEqual([]);
   });
 });
 

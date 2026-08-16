@@ -506,9 +506,20 @@ function auditStaticBody(
   ].join('\n');
 }
 
-/** The skills that apply to the current answers, in declared order. */
+/**
+ * The skills that apply to the current answers, in declared order. When
+ * `a.skillSelection` holds an array of ids (recorded by the post-review
+ * multiselect), the applicable set is further narrowed to those ids — any id
+ * no longer in the applicable set (e.g. a stale selection after an edit) is
+ * silently ignored. Undefined (programmatic callers, tests, sessions from
+ * before this field existed) leaves the applicable set unfiltered.
+ */
 export function selectSkills(a: Answers): SkillSpec[] {
-  return skills
+  const applicable = skills
     .filter((s) => s.appliesTo(a))
     .map((s) => (s.describe ? { ...s, description: s.describe(a) } : s));
+  const chosen = a.skillSelection;
+  if (!Array.isArray(chosen)) return applicable;
+  const kept = new Set(chosen);
+  return applicable.filter((s) => kept.has(s.id));
 }

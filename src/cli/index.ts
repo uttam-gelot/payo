@@ -18,10 +18,12 @@ import {
   confirmLegacyCleanup,
   confirmStartMode,
   confirmDetectionDepth,
+  confirmSkillSelection,
   summarizeDetection,
   runQuestion,
 } from '../questions/runner';
 import { findLegacyArtifacts, removeLegacyArtifacts } from '../generator/legacy';
+import { selectSkills } from '../generator/skills';
 import { zedShadowWarnings } from '../generator/zed';
 import { detectStack } from '../detect/index';
 import { scanExistingAiConfigs, detectAiTool } from '../detect/aiconfig';
@@ -377,6 +379,23 @@ export async function run(): Promise<void> {
   // prescribing defaults. Recorded after the last reconcile (in reviewAndEdit) so
   // it survives to generation; not a Question, so it never showed in the review.
   if (autoRecommendGates) session = recordAnswer(session, 'detectEverything', true);
+
+  // --- Skill selection ---
+  // Shown before the overwrite guard on purpose: the guard predicts targets
+  // from `selectSkills(answers)`, so a skill deselected here must already be
+  // out of that set or the guard would warn about a file this run will now
+  // never write. Guarded by `answered` so a resumed run doesn't re-ask.
+  if (!session.answered.includes('skillSelection')) {
+    const specs = selectSkills(session.answers);
+    const chosen = await confirmSkillSelection(specs);
+    session = recordAnswer(session, 'skillSelection', chosen);
+    if (chosen.length === 0) {
+      note(
+        'No skills selected — payo will still write AGENTS.md (and the CLAUDE.md shim, if chosen) with no skill files.',
+        'Skill selection',
+      );
+    }
+  }
 
   // --- Generate provider artifact(s) ---
   // Resume: skip skills a prior interrupted run already finished. The working
