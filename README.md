@@ -108,6 +108,8 @@ conventions, logging, testing. A pack gives you all of them and expects you to
 delete the two-thirds that don't apply; Payo never creates them. The interview
 works the same way: a bank of **200+ stack-tailored questions** across **100+
 tech modules**, from which you're asked only the handful your stack pulls in.
+Payo also shows you the computed list before writing anything, so you can
+uncheck any skill you don't want a file for.
 
 **3. Real commands and real paths, not placeholders.** Because Payo knows your
 package manager, framework, and ORM, the guidance says `pnpm exec eslint .` —
@@ -212,14 +214,18 @@ guidance files straight into your repo.
    summary of every answer. Choose **Edit an answer** to change any response — or
    re-open a section you skipped — right from the review; dependent questions are
    re-asked automatically. Pick **Generate** when it looks right.
-5. **Payo generates the guidance.** It writes one universal layout that every
+5. **Pick which skills to generate.** Payo shows the exact list of skills your
+   answers produced — every one preselected — so you can uncheck anything you
+   don't want a file for before a single one is written. Skipped when there's
+   only zero or one skill to decide between.
+6. **Payo generates the guidance.** It writes one universal layout that every
    skills-compatible tool reads (see the table below). With an agent CLI
    installed, skills are generated in parallel by the AI; otherwise solid
    templates are used.
-6. **(Optional) Get a bootstrap prompt.** Payo offers to write a paste-ready
+7. **(Optional) Get a bootstrap prompt.** Payo offers to write a paste-ready
    `bootstrap-prompt.md` you hand to any LLM to scaffold a runnable project that
    honors the guidance it just generated.
-7. **Interrupted? Just rerun.** Progress lives under `.payo/`; Payo resumes and
+8. **Interrupted? Just rerun.** Progress lives under `.payo/`; Payo resumes and
    only generates what's missing.
 
 ## Already have a project? Payo detects your stack
