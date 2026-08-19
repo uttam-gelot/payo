@@ -346,7 +346,7 @@ const skills: SkillSpec[] = [
       has(a, 'gitWorkflow') ||
       has(a, 'branchNaming') ||
       has(a, 'commitConvention') ||
-      typeof a.aiAttribution === 'boolean' ||
+      (Array.isArray(a.aiConventions) && a.aiConventions.includes('no-ai-attribution')) ||
       a.commitScope === true ||
       a.commitScratchGuard === true ||
       a.confirmPush === true ||
@@ -364,10 +364,9 @@ const skills: SkillSpec[] = [
       if (branch) base += ` Follow ${branchNamingDesc(branch)} for branch names.`;
       const commit = val(a, 'commitConvention');
       if (commit) base += ` Use ${commitConventionDesc(commit)} for commit messages.`;
-      if (typeof a.aiAttribution === 'boolean')
-        base += a.aiAttribution
-          ? ' In commits and PRs, attribute AI-assisted work (e.g. a Co-Authored-By trailer).'
-          : ' Do not mention AI assistants or add AI co-authorship trailers in commit messages or PR descriptions.';
+      if (Array.isArray(a.aiConventions) && a.aiConventions.includes('no-ai-attribution'))
+        base +=
+          ' Do not mention AI assistants or add AI co-authorship trailers in commit messages or PR descriptions.';
       if (a.commitScope === true)
         base += ' Scope each commit to the task at hand, excluding unrelated changes.';
       if (a.commitScratchGuard === true)

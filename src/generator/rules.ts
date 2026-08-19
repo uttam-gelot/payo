@@ -132,6 +132,16 @@ const DOC_GUIDANCE: Record<string, string> = {
   changelog: '- Keep a CHANGELOG (Keep a Changelog format), updated with each release.',
 };
 
+/** Guidance line per selected AI writing convention (see aiConventionOptions). */
+const AI_CONVENTION_GUIDANCE: Record<string, string> = {
+  'no-ai-attribution':
+    '- Do not mention AI assistants or add AI co-authorship trailers in commits or PRs.',
+  'no-em-dash':
+    '- Do not use em dashes (—) in written text; use a comma, period, or "and"/"but" instead.',
+  ste100:
+    '- Write in ASD-STE100 Simplified Technical English: short sentences, one instruction per sentence, approved/simple vocabulary, active voice, present tense.',
+};
+
 /** One review line per workspace package: `path — Language / Framework (type), db`. */
 function packageLine(p: PackageSummary): string {
   const stack: string[] = [];
@@ -309,6 +319,12 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
     sections.push({ title: 'Documentation', body: body.join('\n') });
   }
 
+  const aiConv = answers.aiConventions;
+  if (Array.isArray(aiConv) && aiConv.length) {
+    const body = (aiConv as string[]).map((c) => AI_CONVENTION_GUIDANCE[c] ?? `- ${c}.`);
+    sections.push({ title: 'AI Writing Conventions', body: body.join('\n') });
+  }
+
   // Error Handling & Logging is universal guidance, but under detect-everything
   // with no logger detected we skip it rather than prescribe one that isn't there.
   const logger = str(answers, 'logger');
@@ -362,7 +378,6 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
     !!git ||
     !!branch ||
     !!commit ||
-    typeof answers.aiAttribution === 'boolean' ||
     answers.commitScope === true ||
     answers.commitScratchGuard === true ||
     answers.confirmPush === true ||
@@ -383,13 +398,6 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
       lines.push(
         `- Write commit messages using ${COMMIT_CONVENTION_DESC[commit] ?? `the "${commit}" convention`}.`,
       );
-    if (typeof answers.aiAttribution === 'boolean') {
-      lines.push(
-        answers.aiAttribution
-          ? '- Attribute AI-assisted work in commits and PRs (e.g. a Co-Authored-By trailer).'
-          : '- Do not mention AI assistants or add AI co-authorship trailers in commits or PRs.',
-      );
-    }
     if (answers.commitScope === true)
       lines.push('- Scope each commit to the current task; do not include unrelated changes.');
     if (answers.commitScratchGuard === true)
