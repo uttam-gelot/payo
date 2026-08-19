@@ -164,7 +164,7 @@ describe('runFlow — skip (skip every group)', () => {
     // multiselect skipped to an empty list, confirm to false
     expect(a.testTypes).toEqual([]);
     expect(a.codingStandards).toEqual([]);
-    expect(a.aiAttribution).toBe(false);
+    expect(a.aiConventions).toEqual([]);
     expect(a.commitScope).toBe(false);
     expect(a.commitScratchGuard).toBe(false);
     expect(a.confirmPush).toBe(false);

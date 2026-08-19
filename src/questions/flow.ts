@@ -189,12 +189,13 @@ const core: Record<string, Question> = {
     message: 'Commit-message convention?',
     options: opt.commitConventionOptions,
   },
-  aiAttribution: {
-    id: 'aiAttribution',
-    type: 'confirm',
-    summary: 'AI attribution in commits/PRs',
-    message: 'Mention the AI assistant (e.g. a Co-Authored-By trailer) in commits and PRs?',
-    recommended: false,
+  aiConventions: {
+    id: 'aiConventions',
+    type: 'multiselect',
+    summary: 'AI writing conventions',
+    message: 'Conventions for AI-generated text?',
+    options: opt.aiConventionOptions,
+    required: false,
     policyDefault: true,
   },
   commitScope: {
@@ -439,7 +440,7 @@ export const flow: FlowSection[] = [
       core.gitWorkflow,
       core.branchNaming,
       core.commitConvention,
-      core.aiAttribution,
+      core.aiConventions,
       core.commitScope,
       core.commitScratchGuard,
       core.confirmPush,

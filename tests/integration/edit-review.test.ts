@@ -122,13 +122,13 @@ describe('editableItems — ordering & content', () => {
     const session = freshSession({
       ...BASE,
       codingStandards: ['DRY', 'SOLID'], // multiselect
-      aiAttribution: true, // confirm
+      confirmPush: true, // confirm
     });
     const ids = editableItems(flow, session)
       .filter((i) => i.kind === 'question')
       .map((i) => i.id);
     expect(ids).toContain('codingStandards');
-    expect(ids).toContain('aiAttribution');
+    expect(ids).toContain('confirmPush');
   });
 
   it('excludes unset (skipped) content answers but lists the section gate row', () => {

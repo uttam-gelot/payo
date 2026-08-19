@@ -50,7 +50,7 @@ describe('recommended path applies correct values', () => {
     expect(a.codingStandards).toEqual(['DRY', 'modular', 'soc']);
     expect(a.documentation).toEqual(['readme', 'comments']);
     expect(a.gitWorkflow).toBe('standard');
-    expect(a.aiAttribution).toBe(false);
+    expect(a.aiConventions).toEqual(['no-ai-attribution']);
     expect(a.commitScope).toBe(true);
     expect(a.commitScratchGuard).toBe(true);
     expect(a.confirmPush).toBe(true);

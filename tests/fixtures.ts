@@ -107,7 +107,7 @@ export function fullStackAnswers(aiTool?: string): Answers {
     testTypes: ['unit', 'integration'],
     testRunner: 'vitest',
     gitWorkflow: 'standard',
-    aiAttribution: false,
+    aiConventions: ['no-ai-attribution'],
     commitScope: true,
     commitScratchGuard: true,
     confirmPush: true,

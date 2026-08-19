@@ -230,6 +230,12 @@ export const documentationOptions: Option<string>[] = [
   { value: 'changelog', label: 'CHANGELOG (Keep a Changelog)' },
 ];
 
+export const aiConventionOptions: Option<string>[] = [
+  { value: 'no-ai-attribution', label: 'No AI attribution in commits/PRs', hint: 'recommended' },
+  { value: 'no-em-dash', label: 'No em dash (—) in AI-written text' },
+  { value: 'ste100', label: 'ASD-STE100 Simplified Technical English' },
+];
+
 export const formatterOptions = (a: Answers): Option<string>[] => {
   switch (a.language) {
     case 'typescript':
