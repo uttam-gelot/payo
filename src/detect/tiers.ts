@@ -46,7 +46,7 @@ export const TIER2: ReadonlySet<string> = new Set([
   'gitWorkflow',
   'branchNaming',
   'commitConvention',
-  'aiAttribution',
+  'aiConventions',
   'commitScope',
   'commitScratchGuard',
   'confirmPush',

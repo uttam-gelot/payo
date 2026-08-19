@@ -152,5 +152,5 @@ export interface ProjectAnswers {
   formatter?: Formatter;
   linter?: Linter;
   gitWorkflow?: GitWorkflow;
-  aiAttribution?: boolean;
+  aiConventions?: string[];
 }
