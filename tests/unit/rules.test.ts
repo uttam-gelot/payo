@@ -69,18 +69,19 @@ describe('buildBaseRules', () => {
     expect(md).not.toContain('__recommended');
   });
 
-  it('reflects the AI-attribution choice in the Git Workflow section', () => {
-    const off = renderMarkdown(
+  it('renders selected AI writing conventions in their own section', () => {
+    const md = renderMarkdown(
       'G',
-      buildBaseRules({ ...contexts.tsBackend, gitWorkflow: 'standard', aiAttribution: false }),
+      buildBaseRules({
+        ...contexts.tsBackend,
+        gitWorkflow: 'standard',
+        aiConventions: ['no-ai-attribution', 'no-em-dash', 'ste100'],
+      }),
     );
-    expect(off).toContain('Do not mention AI assistants');
-
-    const on = renderMarkdown(
-      'G',
-      buildBaseRules({ ...contexts.tsBackend, gitWorkflow: 'standard', aiAttribution: true }),
-    );
-    expect(on).toContain('Co-Authored-By');
+    expect(md).toContain('## AI Writing Conventions');
+    expect(md).toContain('Do not mention AI assistants');
+    expect(md).toContain('Do not use em dashes');
+    expect(md).toContain('ASD-STE100');
   });
 
   it('emits commit-hygiene lines in the Git Workflow section when enabled', () => {
@@ -270,7 +271,6 @@ describe('buildBaseRules', () => {
         branchNaming: 'kebab',
         commitConvention: 'conventional',
         confirmPush: true,
-        aiAttribution: false,
       }),
     );
     expect(md).toContain('## Git Workflow');

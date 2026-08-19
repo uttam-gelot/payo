@@ -85,7 +85,7 @@ describe('autoRecommendGates', () => {
       expect(s.answers.confirmPush).toBe(true);
       expect(s.answers.atomicCommits).toBe(true);
       expect(s.answers.commitScope).toBe(true);
-      expect(s.answers.aiAttribution).toBe(false);
+      expect(s.answers.aiConventions).toEqual(['no-ai-attribution']);
       expect(s.answers.codingStandards).toEqual(['DRY', 'modular', 'soc']);
     }));
 
