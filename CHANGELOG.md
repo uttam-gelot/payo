@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **New "AI writing conventions" question.** Previously the only choice about
+  AI-generated text was whether commits/PRs got an attribution trailer, asked
+  as a lone yes/no buried in the git-workflow questions. It's now a multiselect
+  covering that same choice plus two new options — no em dash (—) in written
+  text, and ASD-STE100 Simplified Technical English — and lives with the other
+  Conventions questions rather than under Git Workflow, since it applies to all
+  generated prose, not just commits.
 - **You now see and can trim the exact skill list before Payo writes anything.**
   Previously the set of `.agents/skills/` files Payo would generate was decided
   entirely by your interview answers, with no chance to review or drop one —
