@@ -54,6 +54,8 @@ Where the assistant ships a headless CLI, Payo drives that tool's own AI to
 write rich, project-specific docs; where it doesn't, Payo falls back to solid
 templates — so you always end up with usable output.
 
+And for those wondering what Payo means, in Gujarati it means foundation — what a building or project is built on.
+
 ## Why Payo?
 
 Every AI coding session starts cold. Your assistant doesn't know you use Drizzle
