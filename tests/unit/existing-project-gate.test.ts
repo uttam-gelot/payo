@@ -93,6 +93,33 @@ describe('runExistingProjectGate', () => {
     expect(session).toBe(before);
   });
 
+  it('empty dir inside a git work tree (git-only signal) -> gate never prompts, fresh flow continues', async () => {
+    // A freshly `git init`'d empty directory still reports branch/commit
+    // conventions (git-ness comes from the enclosing work tree, not any
+    // project file), so a git-only answer set must not read as "existing project".
+    let startModeCalls = 0;
+    const before = sessionWithAiTool();
+    const { session, startedFromExisting } = await runExistingProjectGate(
+      before,
+      true,
+      '/fake/cwd',
+      {
+        detectStack: () => ({
+          answers: { branchNaming: 'kebab', commitConvention: 'conventional' },
+          sources: { branchNaming: 'git', commitConvention: 'git' },
+        }),
+        confirmStartMode: () => {
+          startModeCalls++;
+          return Promise.resolve('existing');
+        },
+      },
+    );
+
+    expect(startModeCalls).toBe(0);
+    expect(startedFromExisting).toBe(false);
+    expect(session).toBe(before);
+  });
+
   it('resumed session (not fresh) -> gate is skipped entirely, even in an existing project', async () => {
     let detectStackCalls = 0;
     let startModeCalls = 0;
