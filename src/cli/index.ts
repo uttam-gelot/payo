@@ -176,7 +176,14 @@ export async function runExistingProjectGate(
   // hookPolicy question and, through the hook plan, what the generated
   // guidance may claim is already automated.
   if (detected.hooks) session = recordAnswer(session, 'existingHooks', detected.hooks);
-  if (Object.keys(detected.answers).length === 0) {
+  // Git conventions alone (branchNaming/commitConvention) aren't "existing
+  // project" evidence — an empty dir freshly `git init`'d still reports them,
+  // since git-ness comes from the enclosing work tree, not any project file.
+  // Only a manifest/config/lockfile/LLM-sourced answer should trip this gate.
+  const hasNonGitAnswer = Object.keys(detected.answers).some(
+    (id) => detected.sources[id] !== 'git',
+  );
+  if (!hasNonGitAnswer) {
     return { session, startedFromExisting, autoRecommendGates };
   }
 
