@@ -1,6 +1,6 @@
 # using bump-my-version — https://github.com/callowayproject/bump-my-version
 [tool.bumpversion]
-current_version = "2.4.6"
+current_version = "2.4.7"
 parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
 serialize = ["{major}.{minor}.{patch}"]
 search = "{current_version}"
