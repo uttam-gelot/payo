@@ -35,6 +35,13 @@ export interface SkillSpec {
   /** Task instruction for the agent (project context is added by the caller). */
   buildPrompt(a: Answers): string;
   /**
+   * Extra rule-section titles this skill's `buildPrompt` leans on beyond its
+   * own same-titled section and the always-included grounding set (see
+   * `sectionsFor` in index.ts). Leave unset for the 1:1 default — most
+   * skills only ever reference their own topic.
+   */
+  relevantSections?: string[];
+  /**
    * Optional deterministic body for the no-CLI floor. When set, `runStatic`
    * writes this instead of the generic "see AGENTS.md" pointer — for skills
    * whose content is a fixed procedure, not stack-derived guidance.
@@ -142,6 +149,9 @@ const skills: SkillSpec[] = [
     description:
       'Idiomatic patterns, project structure, and common pitfalls for the chosen framework.',
     appliesTo: (a) => has(a, 'framework'),
+    // No static section shares this title; the framework follow-ups it needs
+    // live in 'Tech Details' — see buildPrompt.
+    relevantSections: ['Tech Details'],
     buildPrompt: (a): string => {
       const fw = val(a, 'framework');
       return (
@@ -157,6 +167,9 @@ const skills: SkillSpec[] = [
     description:
       'Modeling schemas, writing queries/migrations, and naming, using the chosen database/ORM safely.',
     appliesTo: (a) => has(a, 'database'),
+    // Its own section is titled 'Data', not 'Data Layer', plus it needs the
+    // migration/schema follow-ups carried in 'Tech Details' — see buildPrompt.
+    relevantSections: ['Data', 'Tech Details'],
     buildPrompt: (a): string => {
       const orm = val(a, 'orm');
       const via = orm
@@ -209,6 +222,8 @@ const skills: SkillSpec[] = [
     description:
       'Modeling identity/sessions, protecting routes, verifying credentials, and handling secrets.',
     appliesTo: (a) => has(a, 'authApproach'),
+    // Its own section is titled 'Authentication', not the full skill title.
+    relevantSections: ['Authentication'],
     buildPrompt: (a): string => {
       const approach = val(a, 'authApproach');
       const strategy = val(a, 'authStrategy');
@@ -404,6 +419,8 @@ const skills: SkillSpec[] = [
     description:
       'Use right before pushing to a remote to check the pending change against this ' +
       "project's skills and report any that conflict.",
+    // Purely procedural (see buildPrompt) — no stack section needed beyond grounding.
+    relevantSections: [],
     describe: (a): string =>
       `Use right before ${auditGerund(auditTiming(a))} to check the pending change against ` +
       "this project's skills and report any that conflict.",
