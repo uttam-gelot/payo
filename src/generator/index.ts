@@ -22,6 +22,7 @@ import type {
 } from './types';
 import type { SkillSpec } from './skills';
 import { buildBaseRules, fenceProjectData } from './rules';
+import { resolveGuidance } from './guidance';
 import { selectSkills } from './skills';
 import { isAvailable, runAgent } from './agent';
 import { writeAgentLog } from './agentlog';
@@ -74,6 +75,44 @@ function projectContext(sections: RuleSection[]): string {
   return `Project context:\n${fenceProjectData(body)}`;
 }
 
+/** Rule sections every skill's prompt should carry regardless of topic — basic "what is this project" framing. */
+const GROUNDING_TITLES = new Set([
+  'Project Overview',
+  'Tech Stack',
+  'Monorepo Structure',
+  'Folder Structure',
+]);
+
+/**
+ * Scope a skill's project context to what its own `buildPrompt` actually
+ * references: the grounding set, its own same-titled section, any section
+ * named in `relevantSections` (for the few skills that lean on another
+ * topic, e.g. `framework-conventions` needing `Tech Details`), and every
+ * provider guidance section (module-authored, untitled by owning skill, so
+ * kept unconditionally rather than risking a silent drop). Any failure, or
+ * an empty result, falls back to the full unfiltered list — today's
+ * behavior — so a bug here can only cost the token saving, never a section
+ * a skill's prompt depends on.
+ */
+function sectionsFor(
+  skill: SkillSpec,
+  sections: RuleSection[],
+  guidanceTitles: ReadonlySet<string>,
+): RuleSection[] {
+  try {
+    const wanted = new Set([
+      ...GROUNDING_TITLES,
+      skill.title,
+      ...(skill.relevantSections ?? []),
+      ...guidanceTitles,
+    ]);
+    const filtered = sections.filter((s) => wanted.has(s.title));
+    return filtered.length > 0 ? filtered : sections;
+  } catch {
+    return sections;
+  }
+}
+
 /** The project-local write instruction naming this run's target file. */
 const writeLineFor = (rel: string): string =>
   `- Write the result to the project-local file ./${rel} (relative to the current working directory — this project). Do NOT write to any global, home-directory, or user-level config location.`;
@@ -101,11 +140,12 @@ function composePrompt(
   skill: SkillSpec,
   answers: Answers,
   sections: RuleSection[],
+  guidanceTitles: ReadonlySet<string>,
   outPath: string,
 ): string {
   return [
     'You are configuring AI coding-agent guidance for the software project described below.',
-    projectContext(sections),
+    projectContext(sectionsFor(skill, sections, guidanceTitles)),
     `Task: ${skill.buildPrompt(answers)}`,
     'Begin the file with EXACTLY this YAML frontmatter (verbatim, including the --- ' +
       `delimiters), then a blank line, then the content:\n\n${universalFrontmatter(skill)}`,
@@ -348,12 +388,21 @@ async function runUniversal(
   resume?: ResumeStore,
 ): Promise<GenerationResult | null> {
   hooks.onStart?.('ai', provider.displayName, specs.length);
+  // Guidance-section titles are module-authored (not owned by any one skill),
+  // so they're always kept in full rather than scoped — see `sectionsFor`.
+  // Computed once per run, not per skill.
+  let guidanceTitles: ReadonlySet<string>;
+  try {
+    guidanceTitles = new Set(resolveGuidance(answers).map((s) => s.title));
+  } catch {
+    guidanceTitles = new Set();
+  }
   const runs = await runParallel(
     runner,
     specs,
     hooks,
     (skill) => skillPath(skill.id),
-    (skill, outPath) => composePrompt(skill, answers, sections, outPath),
+    (skill, outPath) => composePrompt(skill, answers, sections, guidanceTitles, outPath),
     resume,
   );
 

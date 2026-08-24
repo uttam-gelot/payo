@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Per-skill generation prompts now carry only the project context that
+  skill needs**, instead of the full rule-section list every time. Each of
+  the (typically 8-13) parallel agent spawns was resending every section —
+  auth, testing, git workflow, and the rest — even when its own task only
+  read one of them. Every prompt still gets a small grounding set (Project
+  Overview, Tech Stack, Monorepo/Folder Structure) plus its own topic
+  section and anything else it explicitly depends on; provider-specific
+  guidance sections (Tailwind, Auth.js, …) are kept for every skill
+  regardless, since they're not owned by a single topic. Falls back to the
+  full unfiltered context on any error, so a bug here can only cost the
+  saving, never drop context a skill's prompt relies on. No change to
+  generated output.
+
 ### Added
 
 - **New "AI writing conventions" question.** Previously the only choice about
