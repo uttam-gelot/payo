@@ -35,6 +35,8 @@ export interface AgentRunner {
   buildArgs(prompt: string, caps?: AgentCaps): string[];
   /** Argv for the help probe backing `caps` (default `['--help']`). */
   helpArgs?: string[];
+  /** Argv for the installed-version probe (default `['--version']`). */
+  versionArgs?: string[];
   /** Pass the prompt on stdin instead of as an argv (default false). */
   promptViaStdin?: boolean;
   /** Hard wall-clock cap; defaults to config.agent.timeoutMs(). Guards CLI hang bugs. */

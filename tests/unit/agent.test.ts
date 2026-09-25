@@ -5,6 +5,7 @@ import {
   capsFor,
   checkAgentReady,
   clearCapsCache,
+  installedVersion,
   isAvailable,
   probeCommand,
   runAgent,
@@ -73,6 +74,36 @@ describe('capsFor', () => {
     clearCapsCache();
     const missing: AgentRunner = { binary: 'definitely-missing-bin-xyz', buildArgs: () => [] };
     expect(capsFor(missing).supports('--sandbox')).toBe(false);
+  });
+});
+
+describe('installedVersion', () => {
+  /** A runner whose "version" is a fixed echo, standing in for a CLI's --version. */
+  const versionRunner = (out: string): AgentRunner => ({
+    binary: 'sh',
+    versionArgs: ['-c', `echo '${out}'`],
+    buildArgs: () => [],
+  });
+
+  it('reads a version followed by the product name', () => {
+    clearCapsCache();
+    expect(installedVersion(versionRunner('2.1.282 (Claude Code)'))).toBe('2.1.282');
+  });
+
+  it('reads a version prefixed by the binary name', () => {
+    clearCapsCache();
+    expect(installedVersion(versionRunner('codex-cli 0.149.0'))).toBe('0.149.0');
+  });
+
+  it('is undefined when the output carries no version', () => {
+    clearCapsCache();
+    expect(installedVersion(versionRunner('unknown option'))).toBeUndefined();
+  });
+
+  it('is undefined when the probe fails', () => {
+    clearCapsCache();
+    const missing: AgentRunner = { binary: 'definitely-missing-bin-xyz', buildArgs: () => [] };
+    expect(installedVersion(missing)).toBeUndefined();
   });
 });
 
