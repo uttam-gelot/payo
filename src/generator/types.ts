@@ -35,6 +35,8 @@ export interface AgentRunner {
   buildArgs(prompt: string, caps?: AgentCaps): string[];
   /** Argv for the help probe backing `caps` (default `['--help']`). */
   helpArgs?: string[];
+  /** Argv for the installed-version probe (default `['--version']`). */
+  versionArgs?: string[];
   /** Pass the prompt on stdin instead of as an argv (default false). */
   promptViaStdin?: boolean;
   /** Hard wall-clock cap; defaults to config.agent.timeoutMs(). Guards CLI hang bugs. */
@@ -46,6 +48,14 @@ export interface AgentCaps {
   /** True when `flag` (e.g. '--add-dir') appears in the CLI's help text. */
   supports(flag: string): boolean;
 }
+
+/**
+ * A piece of the universal layout a tool may read on its own, making the shim
+ * Payo would otherwise write for it redundant: the `AGENTS.md` entrypoint (vs.
+ * the `CLAUDE.md` import shim) and the `.agents/skills/` tree (vs. a per-tool
+ * skills-dir shim).
+ */
+export type NativeFeature = 'agentsMd' | 'skills';
 
 /**
  * Strategy interface: each AI tool implements this once. The registry maps
@@ -67,6 +77,12 @@ export interface AiProvider {
   knownArtifacts: readonly string[];
   /** Optional headless-CLI capability; absent ⇒ static-only. */
   agent?: AgentRunner;
+  /**
+   * First installed-CLI version that reads each feature natively, so its shim
+   * can be skipped. A feature left out is always shimmed. Probed through
+   * `agent`, so a provider without one is always shimmed too.
+   */
+  nativeSince?: Partial<Record<NativeFeature, string>>;
 }
 
 /** Progress callbacks so the CLI can report long-running agent work. */

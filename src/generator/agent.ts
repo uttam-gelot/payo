@@ -24,23 +24,22 @@ export function isAvailable(runner: AgentRunner): boolean {
   }
 }
 
-/** Help text per `binary + helpArgs`, so each CLI is probed at most once. */
-const helpCache = new Map<string, string>();
+/** Probe output per `binary + args`, so each CLI query runs at most once. */
+const probeCache = new Map<string, string>();
 
-/** Reset the memoized help probes (tests; a CLI upgrade mid-process is not a case). */
+/** Reset the memoized CLI probes (tests; a CLI upgrade mid-process is not a case). */
 export function clearCapsCache(): void {
-  helpCache.clear();
+  probeCache.clear();
 }
 
 /**
- * Read a CLI's help output. Some CLIs print help on stderr or exit non-zero for
- * `--help`, so both streams are merged and the exit code ignored — an empty
- * result just means "unknown", handled by the caller.
+ * Read a CLI's output for an informational query (`--help`, `--version`). Some
+ * CLIs print it on stderr or exit non-zero, so both streams are merged and the
+ * exit code ignored — an empty result just means "unknown", handled by the caller.
  */
-function helpText(runner: AgentRunner): string {
-  const args = runner.helpArgs ?? ['--help'];
+function probeOutput(runner: AgentRunner, args: string[]): string {
   const key = `${runner.binary} ${args.join(' ')}`;
-  const cached = helpCache.get(key);
+  const cached = probeCache.get(key);
   if (cached !== undefined) return cached;
   let text = '';
   try {
@@ -53,8 +52,20 @@ function helpText(runner: AgentRunner): string {
   } catch {
     text = '';
   }
-  helpCache.set(key, text);
+  probeCache.set(key, text);
   return text;
+}
+
+const helpText = (runner: AgentRunner): string =>
+  probeOutput(runner, runner.helpArgs ?? ['--help']);
+
+/**
+ * The installed CLI's version: the first `x.y[.z]` in its version output, which
+ * tolerates the product names and prefixes CLIs wrap it in (`2.1.282 (Claude
+ * Code)`, `codex-cli 0.149.0`). Undefined when the probe yields no version.
+ */
+export function installedVersion(runner: AgentRunner): string | undefined {
+  return /\d+\.\d+(?:\.\d+)?/.exec(probeOutput(runner, runner.versionArgs ?? ['--version']))?.[0];
 }
 
 /**

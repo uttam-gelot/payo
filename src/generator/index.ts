@@ -43,6 +43,7 @@ import {
   writeStaticSkill,
 } from './universal';
 import { createSkillShims, shimRootsForTools } from './shims';
+import { readsNatively } from './native';
 import { emitHooks } from './hooks';
 import { HOOK_PLAN_KEY, hookPlanFrom, planHooks } from './hookplan';
 
@@ -194,7 +195,6 @@ function runStatic(
   hooks: GenerateHooks,
 ): GenerationResult {
   const specs = selectSkills(answers);
-  const tools = shimToolsFrom(answers);
   hooks.onStart?.('static', provider.displayName, specs.length + 1);
   const index = specs.map((s) => ({
     title: s.title,
@@ -202,11 +202,11 @@ function runStatic(
     path: skillPath(s.id),
   }));
   const files = [writeAgentsEntrypoint(sections, index)];
-  if (wantsClaude(tools)) files.push(writeClaudeShim());
+  if (wantsClaudeShim(answers)) files.push(writeClaudeShim());
   for (const s of specs) files.push(writeStaticSkill(s, staticSkillBody(s, answers)));
   for (const shim of createSkillShims(
     specs.map((s) => s.id),
-    tools,
+    skillShimTools(answers),
   )) {
     files.push(shim.path);
   }
@@ -420,7 +420,6 @@ async function runUniversal(
   }
   if (generated.length === 0) return null;
 
-  const tools = shimToolsFrom(answers);
   const files: string[] = [];
   files.push(
     writeAgentsEntrypoint(
@@ -432,11 +431,11 @@ async function runUniversal(
       })),
     ),
   );
-  if (wantsClaude(tools)) files.push(writeClaudeShim());
+  if (wantsClaudeShim(answers)) files.push(writeClaudeShim());
   for (const r of generated) files.push(r.path);
   for (const shim of createSkillShims(
     generated.map((r) => r.skill.id),
-    tools,
+    skillShimTools(answers),
   )) {
     files.push(shim.path);
   }
@@ -469,26 +468,45 @@ function shimToolsFrom(answers: Answers): string[] | undefined {
   return Array.isArray(v) ? v.filter((t): t is string => typeof t === 'string') : undefined;
 }
 
-/** Whether to write the CLAUDE.md import shim: only when Claude Code is supported. */
-function wantsClaude(tools?: string[]): boolean {
-  return !tools || tools.includes('claude');
+/**
+ * Whether to write the CLAUDE.md import shim: only when Claude Code is supported
+ * and its installed version does not read AGENTS.md natively. An existing
+ * CLAUDE.md still gets the shim — Claude Code reads AGENTS.md only when no
+ * CLAUDE.md exists, so that file must keep routing to the entrypoint.
+ */
+function wantsClaudeShim(answers: Answers): boolean {
+  const tools = shimToolsFrom(answers);
+  if (tools && !tools.includes('claude')) return false;
+  return (
+    !readsNatively(answers, 'claude', 'agentsMd') || fs.existsSync(resolveContained(CLAUDE_SHIM))
+  );
+}
+
+/**
+ * The supported tools that still need a skills-dir shim: `shimToolsFrom` minus
+ * any whose installed version reads `.agents/skills/` natively. Undefined stays
+ * undefined (all shims) for callers that never answered `supportTools`.
+ */
+function skillShimTools(answers: Answers): string[] | undefined {
+  return shimToolsFrom(answers)?.filter((t) => !readsNatively(answers, t, 'skills'));
 }
 
 /**
  * The project-relative paths a `generate()` run with these answers will write.
  * The universal layout is identical whether the agent or the static floor runs
  * (only the content differs), so this is provider-independent: the entrypoint,
- * the CLAUDE.md shim (when Claude is supported), and — when any skill applies —
+ * the CLAUDE.md shim (when Claude is supported and needs it), and — when any skill applies —
  * each skill file plus the discovery shims for the supported tools. Lets the CLI
  * warn about existing files before generation starts.
  */
 export function predictTargets(answers: Answers): string[] {
-  const tools = shimToolsFrom(answers);
-  const base = [AGENTS_ENTRYPOINT, ...(wantsClaude(tools) ? [CLAUDE_SHIM] : [])];
+  const base = [AGENTS_ENTRYPOINT, ...(wantsClaudeShim(answers) ? [CLAUDE_SHIM] : [])];
   const specs = selectSkills(answers);
   if (specs.length === 0) return base;
   const skillFiles = specs.map((s) => skillPath(s.id));
-  const shimPaths = shimRootsForTools(tools).flatMap((root) => specs.map((s) => `${root}/${s.id}`));
+  const shimPaths = shimRootsForTools(skillShimTools(answers)).flatMap((root) =>
+    specs.map((s) => `${root}/${s.id}`),
+  );
   return [...new Set([...base, ...skillFiles, ...shimPaths])];
 }
 

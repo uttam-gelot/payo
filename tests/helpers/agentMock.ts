@@ -34,6 +34,7 @@ void mock.module('../../src/generator/agent', () => ({
   // the rest of the module from anything that imports it.
   capsFor: realAgent.capsFor,
   clearCapsCache: realAgent.clearCapsCache,
+  installedVersion: realAgent.installedVersion,
   probeCommand: realAgent.probeCommand,
   isAvailable: (runner: AgentRunner): boolean => override?.isAvailable ?? realIsAvailable(runner),
   runAgent: (runner: AgentRunner, prompt: string): AgentResult | Promise<AgentResult> =>
