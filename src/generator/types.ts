@@ -50,6 +50,14 @@ export interface AgentCaps {
 }
 
 /**
+ * A piece of the universal layout a tool may read on its own, making the shim
+ * Payo would otherwise write for it redundant: the `AGENTS.md` entrypoint (vs.
+ * the `CLAUDE.md` import shim) and the `.agents/skills/` tree (vs. a per-tool
+ * skills-dir shim).
+ */
+export type NativeFeature = 'agentsMd' | 'skills';
+
+/**
  * Strategy interface: each AI tool implements this once. The registry maps
  * an AiTool id to its implementation, so dispatch never uses a switch. Output is
  * universal (generator/universal.ts); a provider only declares its identity, the
@@ -69,6 +77,12 @@ export interface AiProvider {
   knownArtifacts: readonly string[];
   /** Optional headless-CLI capability; absent ⇒ static-only. */
   agent?: AgentRunner;
+  /**
+   * First installed-CLI version that reads each feature natively, so its shim
+   * can be skipped. A feature left out is always shimmed. Probed through
+   * `agent`, so a provider without one is always shimmed too.
+   */
+  nativeSince?: Partial<Record<NativeFeature, string>>;
 }
 
 /** Progress callbacks so the CLI can report long-running agent work. */
