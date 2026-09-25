@@ -6,6 +6,7 @@ import { generate } from '../../src/generator/index';
 import { listProviders } from '../../src/providers/index';
 import { selectSkills } from '../../src/generator/skills';
 import { skillPath } from '../../src/generator/universal';
+import { NATIVE_KEY } from '../../src/generator/native';
 import { inTempProject } from '../helpers/tmpProject';
 import { fullStackAnswers } from '../fixtures';
 
@@ -61,6 +62,32 @@ describe('generate() — static output on disk', () => {
       expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(false);
       expect(existsSync(join(dir, '.claude/skills'))).toBe(false);
       expect(existsSync(join(dir, '.windsurf/skills'))).toBe(false);
+    });
+  });
+
+  it('skips the CLAUDE.md shim when Claude reads AGENTS.md natively', async () => {
+    await inTempProject(async (dir) => {
+      const res = await generate({
+        ...fullStackAnswers('claude'),
+        supportTools: ['claude'],
+        [NATIVE_KEY]: { claude: ['agentsMd'] },
+      });
+      expect(res.files).not.toContain('CLAUDE.md');
+      expect(existsSync(join(dir, 'CLAUDE.md'))).toBe(false);
+      expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
+      expect(existsSync(join(dir, '.claude/skills'))).toBe(true);
+    });
+  });
+
+  it('still routes an existing CLAUDE.md to AGENTS.md when Claude is native', async () => {
+    await inTempProject(async (dir) => {
+      writeFileSync(join(dir, 'CLAUDE.md'), '# mine', 'utf-8');
+      await generate({
+        ...fullStackAnswers('claude'),
+        supportTools: ['claude'],
+        [NATIVE_KEY]: { claude: ['agentsMd'] },
+      });
+      expect(readFileSync(join(dir, 'CLAUDE.md'), 'utf-8')).toContain('@AGENTS.md');
     });
   });
 

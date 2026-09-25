@@ -12,6 +12,7 @@ import {
 import { selectSkills } from '../../src/generator/skills';
 import { skillPath } from '../../src/generator/universal';
 import { shimRootsForTools } from '../../src/generator/shims';
+import { NATIVE_KEY } from '../../src/generator/native';
 import { inTempProject } from '../helpers/tmpProject';
 import { fullStackAnswers } from '../fixtures';
 
@@ -62,6 +63,36 @@ describe('predictTargets — universal layout', () => {
     expect(codexOnly.some((t) => t.startsWith('.windsurf/skills/'))).toBe(false);
     expect(codexOnly).toContain('AGENTS.md'); // entrypoint + .agents/skills still written
     expect(codexOnly).toContain(skillPath(selectSkills(fullStackAnswers('codex'))[0].id));
+  });
+
+  describe('with native support detected', () => {
+    const supportBoth = { ...fullStackAnswers('claude'), supportTools: ['claude', 'windsurf'] };
+
+    it('drops the CLAUDE.md shim when Claude reads AGENTS.md natively', async () => {
+      await inTempProject(() => {
+        const targets = predictTargets({ ...supportBoth, [NATIVE_KEY]: { claude: ['agentsMd'] } });
+        expect(targets).not.toContain('CLAUDE.md');
+        // Skills are still shimmed: reading AGENTS.md is not reading .agents/skills.
+        expect(targets.some((t) => t.startsWith('.claude/skills/'))).toBe(true);
+      });
+    });
+
+    it('keeps the CLAUDE.md shim when a CLAUDE.md already exists', async () => {
+      await inTempProject((dir) => {
+        writeFileSync(join(dir, 'CLAUDE.md'), '# mine', 'utf-8');
+        const targets = predictTargets({ ...supportBoth, [NATIVE_KEY]: { claude: ['agentsMd'] } });
+        expect(targets).toContain('CLAUDE.md');
+      });
+    });
+
+    it("drops only the native tool's skills shim", async () => {
+      await inTempProject(() => {
+        const targets = predictTargets({ ...supportBoth, [NATIVE_KEY]: { claude: ['skills'] } });
+        expect(targets).toContain('CLAUDE.md');
+        expect(targets.some((t) => t.startsWith('.claude/skills/'))).toBe(false);
+        expect(targets.some((t) => t.startsWith('.windsurf/skills/'))).toBe(true);
+      });
+    });
   });
 
   it("omits a deselected skill's file and shim paths after skillSelection narrows the set", () => {
