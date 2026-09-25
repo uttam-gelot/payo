@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **No `CLAUDE.md` shim when your Claude Code reads `AGENTS.md` itself.**
+  Claude Code 2.1.277 started reading `AGENTS.md` in projects without a
+  `CLAUDE.md`, and 2.1.281 made that work on every backend (Bedrock, Vertex,
+  Foundry, LLM gateways, telemetry-off sessions). Payo now checks the
+  installed version of each tool you choose to support and skips any shim
+  that version makes redundant. On Claude Code 2.1.281 or later, Payo no
+  longer writes the one-line `@AGENTS.md` import. Older or undetected
+  installs still get it, and an existing `CLAUDE.md` is still given the
+  import, since Claude Code reads `AGENTS.md` only when no `CLAUDE.md`
+  exists. The `.claude/skills/` symlinks stay: Claude Code still discovers
+  skills only there. The check runs on your machine, so a teammate on an
+  older Claude Code must add that one-line `CLAUDE.md` themselves.
 - **Per-skill generation prompts now carry only the project context that
   skill needs**, instead of the full rule-section list every time. Each of
   the (typically 8-13) parallel agent spawns was resending every section —

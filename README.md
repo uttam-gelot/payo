@@ -300,7 +300,7 @@ One universal layout, whichever agent CLI you pick — no per-tool formats:
 | ------------------------------- | ------------------------------------------------------------------ |
 | `AGENTS.md`                     | The entrypoint most tools read natively — your project's base rules |
 | `.agents/skills/<id>/SKILL.md`  | One [Agent Skill](https://agentskills.io) per topic, spec frontmatter |
-| `CLAUDE.md`                     | A one-line `@AGENTS.md` import shim so Claude Code picks it up       |
+| `CLAUDE.md`                     | A one-line `@AGENTS.md` import shim for Claude Code < 2.1.281        |
 | `.claude/skills/**`             | Symlinks into `.agents/skills/` (dir copy on Windows) for Claude Code |
 | `.windsurf/skills/**`           | The same shim for Windsurf                                           |
 
@@ -308,8 +308,11 @@ Who reads what, with no extra work:
 
 - **Codex, Cursor, Copilot, Gemini CLI, Antigravity, Zed, Devin** → `.agents/skills/`
   and `AGENTS.md` natively.
-- **Claude Code** → the `CLAUDE.md` shim plus the `.claude/skills/` symlinks
-  (officially supported; it dedupes if it also reads the target directly).
+- **Claude Code** → the `.claude/skills/` symlinks (officially supported; it
+  dedupes if it also reads the target directly), plus `AGENTS.md` natively from
+  2.1.281. On older versions Payo also writes the `CLAUDE.md` shim. Payo checks
+  the installed version, and always writes the shim if a `CLAUDE.md` already
+  exists, since Claude Code then reads that file instead.
 - **Windsurf** → `AGENTS.md` plus the `.windsurf/skills/` shim.
 
 > **Zed users:** Zed reads only the **first** instruction file it finds, in the order
