@@ -42,6 +42,7 @@ import { checkAgentReady } from '../generator/agent';
 import { getProvider } from '../providers/index';
 import { hookSetupHints } from '../generator/hooks';
 import { planHooks } from '../generator/hookplan';
+import { NATIVE_KEY, detectNative } from '../generator/native';
 import type { ResumeStore } from '../generator/types';
 import { printBanner } from './banner';
 
@@ -410,12 +411,23 @@ export async function run(): Promise<void> {
   // exits before cleanup) carries progress over.
   const resumeCount = session.generated.length;
 
+  // Probe the supported tools' installed versions once, so the overwrite guard
+  // and the write below agree on which shims are redundant (e.g. no CLAUDE.md
+  // once Claude Code reads AGENTS.md natively).
+  const tools = session.answers.supportTools;
+  const answers = {
+    ...session.answers,
+    [NATIVE_KEY]: detectNative(
+      Array.isArray(tools) ? tools.filter((t): t is string => typeof t === 'string') : [],
+    ),
+  };
+
   // --- Overwrite guard ---
   // Checked before any generation work starts, so no agent call is wasted on a
   // run the user then abandons. Skipped on resume: those files exist because
   // payo's own interrupted run wrote them.
   if (resumeCount === 0) {
-    const existing = existingTargets(session.answers);
+    const existing = existingTargets(answers);
     if (existing.length > 0) {
       const choice = await confirmOverwrite(existing);
       if (choice === 'skip') {
@@ -427,7 +439,7 @@ export async function run(): Promise<void> {
         // Back up only the files THIS run will overwrite. Other tools' configs
         // (in `existing` but not our own targets) are left in place — moving them
         // would silently disable a tool this run does not replace.
-        const own = predictedExisting(session.answers);
+        const own = predictedExisting(answers);
         const others = existing.filter((f) => !own.includes(f));
         const backups = backupFiles(own);
         if (backups.length > 0) {
@@ -447,7 +459,7 @@ export async function run(): Promise<void> {
     },
   };
   const result = await generate(
-    session.answers,
+    answers,
     {
       onStart: (mode, providerName, total) => {
         if (mode !== 'ai') {
