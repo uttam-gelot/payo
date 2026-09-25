@@ -7,6 +7,7 @@ import {
   type NativeDeps,
 } from '../../src/generator/native';
 import type { AiProvider } from '../../src/generator/types';
+import { getProvider } from '../../src/providers/index';
 
 const runner = { binary: 'tool-cli', buildArgs: () => [] };
 
@@ -94,5 +95,19 @@ describe('readsNatively', () => {
     expect(readsNatively({ [NATIVE_KEY]: { claude: 'agentsMd' } }, 'claude', 'agentsMd')).toBe(
       false,
     );
+  });
+});
+
+describe('Claude Code threshold', () => {
+  const claude = getProvider('claude')!;
+  const deps = (version: string): NativeDeps => depsFor({ claude }, version);
+
+  it('reads AGENTS.md natively from 2.1.281, the first version on every backend', () => {
+    expect(detectNative(['claude'], deps('2.1.280'))).toEqual({});
+    expect(detectNative(['claude'], deps('2.1.281'))).toEqual({ claude: ['agentsMd'] });
+  });
+
+  it('keeps the skills shim: Claude Code discovers skills only under .claude/skills', () => {
+    expect(detectNative(['claude'], deps('99.0.0')).claude).not.toContain('skills');
   });
 });
