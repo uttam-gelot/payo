@@ -397,6 +397,51 @@ const core: Record<string, Question> = {
     allowOther: false,
     when: (a) => a.auditSkill === true,
   },
+  reviewSkill: {
+    id: 'reviewSkill',
+    type: 'confirm',
+    summary: 'Code-review skill',
+    message: 'Add a code-review skill your assistant uses when you ask it to review a diff or PR?',
+    recommended: true,
+  },
+  reviewTargets: {
+    id: 'reviewTargets',
+    type: 'multiselect',
+    summary: 'Review targets',
+    message: 'What will you ask it to review?',
+    options: opt.reviewTargetOptions,
+    allowOther: false,
+    when: (a) => a.reviewSkill === true,
+  },
+  reviewFocus: {
+    id: 'reviewFocus',
+    type: 'multiselect',
+    summary: 'Review focus',
+    message: 'Which focus areas should a review recommend? (you can change them on each review)',
+    optionsFrom: opt.reviewFocusOptions,
+    allowOther: false,
+    when: (a) => a.reviewSkill === true,
+  },
+  reviewTone: {
+    id: 'reviewTone',
+    type: 'select',
+    summary: 'Finding style',
+    message: 'How should review findings be written?',
+    options: opt.reviewToneOptions,
+    allowOther: false,
+    when: (a) => a.reviewSkill === true,
+  },
+  reviewChecklist: {
+    id: 'reviewChecklist',
+    type: 'text',
+    summary: 'Team review checklist',
+    message:
+      'Any team rules every review must check? Separate them with ";" (leave empty for none)',
+    placeholder: 'e.g. new endpoints need an integration test; no TODO without a ticket',
+    // Empty by default: the one answer Payo cannot derive, so a team with rules customizes.
+    recommended: '',
+    when: (a) => a.reviewSkill === true,
+  },
 };
 
 /** Wrap stack-defining single questions — asked individually, no recommended gate. */
@@ -486,4 +531,15 @@ export const flow: FlowSection[] = [
   // Opt-in change-audit skill — asked explicitly on every project; the timing
   // follow-up only surfaces once opted in.
   single(core.auditSkill, core.auditTiming),
+  // Opt-in pr-review skill, then one gate over the team's review defaults. The
+  // gate is asked even in detect-everything mode: these are preferences the code
+  // cannot show, and the user has just opted in.
+  single(core.reviewSkill),
+  {
+    recommendable: true,
+    askWhenAutoRecommending: true,
+    gate: (a) =>
+      a.reviewSkill === true ? { id: 'review.__recommended', title: 'Code Review' } : null,
+    questions: () => [core.reviewTargets, core.reviewFocus, core.reviewTone, core.reviewChecklist],
+  },
 ];

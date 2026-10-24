@@ -49,6 +49,7 @@ const BASE: Answers = {
   orm: 'prisma',
   logger: 'pino',
   auditSkill: false,
+  reviewSkill: false,
   hookRunner: 'lefthook',
 };
 
@@ -180,5 +181,44 @@ describe('runFlow — skip (skip every group)', () => {
 
     // nothing was actually asked — every group was skipped at the gate
     expect(asked.filter((id) => !id.endsWith('__recommended'))).toEqual([]);
+  });
+});
+
+describe('runFlow — code review', () => {
+  const REVIEW_IDS = ['reviewTargets', 'reviewFocus', 'reviewTone', 'reviewChecklist'];
+  const OPTED_IN: Answers = { ...BASE, reviewSkill: true };
+
+  it('asks no review question when the skill is declined', async () => {
+    gateDecision = false;
+    const a = (await runFlow(flow, freshSession(BASE))).answers;
+    for (const id of REVIEW_IDS) expect(asked).not.toContain(id);
+    expect(a['review.__recommended']).toBeUndefined();
+  });
+
+  it('fills the team defaults from the gate and asks none of them', async () => {
+    gateDecision = 'recommended';
+    const a = (await runFlow(flow, freshSession(OPTED_IN))).answers;
+    for (const id of REVIEW_IDS) expect(asked).not.toContain(id);
+    expect(a.reviewTargets).toEqual(['local', 'branch', 'pr']);
+    // Tests is recommended because the Testing gate settled test types first.
+    expect(a.reviewFocus).toEqual(['bugs', 'security', 'quality', 'tests']);
+    expect(a.reviewTone).toBe('terse');
+    expect(a.reviewChecklist).toBe('');
+  });
+
+  it('asks each review question when the gate is customized', async () => {
+    gateDecision = false;
+    await runFlow(flow, freshSession(OPTED_IN));
+    for (const id of REVIEW_IDS) expect(asked).toContain(id);
+  });
+
+  it('still asks the opt-in and the gate in detect-everything mode', async () => {
+    gateDecision = 'customize';
+    const seed: Answers = { ...BASE };
+    delete seed.reviewSkill; // unanswered, so the opt-in itself must be asked
+    const a = (await runFlow(flow, freshSession(seed), { autoRecommendGates: true })).answers;
+    expect(asked).toContain('reviewSkill');
+    expect(a['review.__recommended']).toBe('customize');
+    for (const id of REVIEW_IDS) expect(asked).toContain(id);
   });
 });

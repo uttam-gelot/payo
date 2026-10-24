@@ -93,6 +93,10 @@ describe('recommendedLabel', () => {
       ),
     ).toBe('—');
   });
+
+  it('returns an em dash for an empty text default', () => {
+    expect(recommendedLabel({ id: 't', type: 'text', message: '', recommended: '' }, {})).toBe('—');
+  });
 });
 
 describe('answerLabel', () => {

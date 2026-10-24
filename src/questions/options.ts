@@ -6,6 +6,13 @@ import type { Answers, Option } from './types';
 import { listProviders } from '../providers/index';
 import { modulesFor } from '../stack/registry';
 import { isMongo } from '../stack/predicates';
+import {
+  REVIEW_FOCUS,
+  REVIEW_TARGETS,
+  REVIEW_TONES,
+  defaultReviewFocus,
+  type ReviewChoice,
+} from '../generator/review';
 
 // Q1 picks which agent CLI authors the content — the output layout is universal
 // and works with every skills-compatible tool. Offer only providers that expose
@@ -641,6 +648,30 @@ export const auditTimingOptions: Option<string>[] = [
   { value: 'push', label: 'Before pushing to a remote', hint: 'recommended' },
   { value: 'commit', label: 'Before every commit' },
 ];
+
+// --- Code review ------------------------------------------------------------
+
+const reviewOption = (c: ReviewChoice, recommended: boolean): Option<string> => ({
+  value: c.id,
+  label: `${c.label} — ${c.detail}`,
+  ...(recommended ? { hint: 'recommended' } : {}),
+});
+
+/** What the pr-review skill reviews. All three are recommended. */
+export const reviewTargetOptions: Option<string>[] = REVIEW_TARGETS.map((c) =>
+  reviewOption(c, true),
+);
+
+/** Focus areas the skill recommends at run time. Tests only when the project has tests. */
+export const reviewFocusOptions = (a: Answers): Option<string>[] => {
+  const recommended = new Set(defaultReviewFocus(a));
+  return REVIEW_FOCUS.map((c) => reviewOption(c, recommended.has(c.id)));
+};
+
+/** How the skill writes findings. Terse is recommended. */
+export const reviewToneOptions: Option<string>[] = REVIEW_TONES.map((c) =>
+  reviewOption(c, c.id === 'terse'),
+);
 
 // --- Authentication ---------------------------------------------------------
 

@@ -23,6 +23,19 @@ describe('tiers — classification', () => {
     expect(isTier1('gitleaks')).toBe(false);
   });
 
+  it('keeps every code-review id out of both tiers, so detection never fills one', () => {
+    for (const id of [
+      'reviewSkill',
+      'reviewTargets',
+      'reviewFocus',
+      'reviewTone',
+      'reviewChecklist',
+    ]) {
+      expect(isTier1(id)).toBe(false);
+      expect(isTier2(id)).toBe(false);
+    }
+  });
+
   it('treats tsconfig.* as Tier-1 by prefix', () => {
     expect(isTier1('tsconfig.strict')).toBe(true);
     expect(isTier1('tsconfig.target')).toBe(true);

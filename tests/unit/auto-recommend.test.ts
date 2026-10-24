@@ -28,6 +28,7 @@ function seedSingles(): Session {
     database: 'none',
     logger: 'none',
     auditSkill: false,
+    reviewSkill: false,
     // Auto mode settles gates, not single questions: the gitleaks policy default
     // makes a hook check wanted, which would otherwise prompt for the runner.
     hookRunner: 'lefthook',

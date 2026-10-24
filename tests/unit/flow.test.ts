@@ -65,6 +65,17 @@ describe('flow gating by project type', () => {
     expect(reachable({ ...base, auditSkill: false }).has('auditTiming')).toBe(false);
   });
 
+  it('asks the code-review opt-in on every project but hides its settings until opted in', () => {
+    const base = { projectType: 'backend', language: 'go' };
+    const settings = ['reviewTargets', 'reviewFocus', 'reviewTone', 'reviewChecklist'];
+    expect(reachable(base).has('reviewSkill')).toBe(true);
+    for (const id of settings) {
+      expect(reachable(base).has(id)).toBe(false);
+      expect(reachable({ ...base, reviewSkill: false }).has(id)).toBe(false);
+      expect(reachable({ ...base, reviewSkill: true }).has(id)).toBe(true);
+    }
+  });
+
   it('asks about existing hooks only when there is something they do not cover', () => {
     const base = { projectType: 'backend', language: 'go', gitleaks: true };
     const husky = (coverage: Record<string, string[]>): Answers => ({
