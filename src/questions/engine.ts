@@ -340,7 +340,8 @@ export interface RunFlowOptions {
    * — recommended value per question where one exists, else the skip sentinel.
    * Used by "detect everything", where the user confirms once at the review screen
    * instead of gate-by-gate. Already-answered ids (detected facts) are untouched,
-   * so detection always wins over a recommended default.
+   * so detection always wins over a recommended default. Sections that set
+   * `askWhenAutoRecommending` still prompt.
    */
   autoRecommendGates?: boolean;
 }
@@ -366,8 +367,9 @@ export async function runFlow(
         // for questions marked `policyDefault` (safe assistant-behavior policies);
         // every other undetected question is skipped, never fabricated. The gate
         // decision reflects whether any default was kept, so the review edit list
-        // still re-opens the section.
-        if (opts.autoRecommendGates) {
+        // still re-opens the section. A section marked `askWhenAutoRecommending`
+        // opts out and is gated the normal way.
+        if (opts.autoRecommendGates && !section.askWhenAutoRecommending) {
           const recommended = new Map(plan?.map((p) => [p.question.id, p.value]));
           let keptPolicy = false;
           for (const { question, value } of skipPlan) {
