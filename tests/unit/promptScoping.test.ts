@@ -98,4 +98,17 @@ describe('per-skill prompt scoping', () => {
     // Guidance sections still pass through — they're always kept, per the design.
     expect(changeAudit).toContain('## Authentication — Auth.js');
   });
+
+  it('pr-review prompt is scoped to grounding and carries the fixed procedure', async () => {
+    const { prompts, runAgent } = capturePrompts();
+    setAgentOverride({ isAvailable: true, runAgent });
+    await inTempProject(async () => {
+      await generate({ ...fullStackAnswers('claude'), reviewSkill: true });
+    });
+    const review = prompts.get('pr-review');
+    expect(review).toBeDefined();
+    expect(review).not.toMatch(heading('Data'));
+    expect(review).not.toMatch(heading('Testing'));
+    expect(review).toContain('===== BEGIN SKILL BODY =====');
+  });
 });

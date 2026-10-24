@@ -331,6 +331,23 @@ agent uses it at that point to check your pending change against the relevant pr
 skills and flag anything that conflicts. It reads the diff and reports — it never runs
 your tests, linter or formatter, because your git hook already does.
 
+Payo can also add a **pr-review** skill (`.agents/skills/pr-review/SKILL.md`) if you
+opt in. Your assistant uses it when you ask for a review of your local changes, the
+current branch, or a PR / MR by number. Before it reads any code, it asks what to focus
+on (bugs, security, code quality, tests), which level of findings you want, and whether
+to check the change against your project skills. In Claude Code that is one
+`AskUserQuestion` prompt. It checks each finding against the surrounding code before
+reporting it, labels it the [Conventional Comments](https://conventionalcomments.org/)
+way (`issue (blocking):`, `suggestion:`, `nitpick:`, and so on), and puts the worst
+first. Then you pick what happens next: stop, let it fix the issues in your own change,
+post one review on the PR / MR, or get inline comments to paste yourself.
+
+It fetches a PR with plain git into a temporary ref, and never checks it out or runs its
+code. It needs `gh` or `glab` only to read a PR description or to post, and it never
+approves a PR or requests changes. Claude Code's `/code-review` and Codex's `/review`
+are built-in commands, so typing them runs those instead. Ask in words ("review PR 42")
+or type `/pr-review`.
+
 ### Guardrails enforced by hooks, not just prose
 
 Skills are guidance the assistant _should_ follow — but an agent can skip prose. So
@@ -406,6 +423,9 @@ your stack needs. Dimensions covered:
   every push)
 - **Change audit** _(optional)_ — opt into a skill that checks your pending
   change against the project skills before commit or push
+- **Code review** _(optional)_: opt into a skill for on-demand reviews, then set
+  the team defaults: what you review, which focus areas to recommend, how findings
+  read, and a team checklist every review checks
 
 ## AI vs. template generation
 

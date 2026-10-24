@@ -36,6 +36,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Optional `pr-review` skill for code and PR reviews.** Asking an assistant to
+  "review this PR" used to get a generic review. It didn't know the project's
+  conventions, it re-ran checks the git hooks already run, and it reported
+  findings it never verified. Payo can now generate a `pr-review` skill next to
+  `change-audit`. One question turns it on, and one gate sets the team defaults:
+  what you review, which focus areas to recommend, how findings read, and an
+  optional team checklist. Each review starts by asking what to focus on, which
+  level of findings to include, and whether to check the project skills. It
+  reviews local changes, a branch, or a GitHub / GitLab PR or MR fetched with git
+  only. It never checks out or runs PR code, and it never assumes `main` is the
+  base. It verifies each finding, labels it, and orders the list by criticality.
+  After the report you can stop, fix the issues in your own change, post one
+  review on the PR / MR after a confirm, or get inline comments to paste. It
+  never approves or requests changes.
 - **New "AI writing conventions" question.** Previously the only choice about
   AI-generated text was whether commits/PRs got an attribution trailer, asked
   as a lone yes/no buried in the git-workflow questions. It's now a multiselect

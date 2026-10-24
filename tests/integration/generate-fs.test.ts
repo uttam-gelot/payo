@@ -44,6 +44,18 @@ describe('generate() — static output on disk', () => {
     });
   }
 
+  it('writes the full pr-review procedure and indexes it in AGENTS.md', async () => {
+    await inTempProject(async (dir) => {
+      await generate({ ...fullStackAnswers('claude'), reviewSkill: true });
+      const skill = readFileSync(join(dir, skillPath('pr-review')), 'utf-8');
+      expect(skill).toMatch(/^---\nname: "pr-review"\n/);
+      expect(skill.match(/^# Code & PR Review$/gm)).toHaveLength(1);
+      expect(skill).toContain('## 1. Get the change (git only)');
+      expect(skill).toContain('Ask what next');
+      expect(readFileSync(join(dir, 'AGENTS.md'), 'utf-8')).toContain('Code & PR Review');
+    });
+  });
+
   it('scopes the static layout to the supported tools', async () => {
     await inTempProject(async (dir) => {
       // Support only Claude → CLAUDE.md + .claude/skills, no .windsurf/skills.

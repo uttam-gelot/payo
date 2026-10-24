@@ -66,5 +66,11 @@ export interface FlowSection {
   recommendable?: boolean;
   /** Gate identity, resolved from answers (tech title comes from the selected module). */
   gate?: (a: Answers) => { id: string; title: string } | null;
+  /**
+   * Still ask the gate in "detect everything" mode instead of auto-filling it.
+   * For sections that hold team preferences the code cannot show, where a
+   * silent skip would drop something the user just opted into.
+   */
+  askWhenAutoRecommending?: boolean;
   questions(a: Answers): Question[];
 }

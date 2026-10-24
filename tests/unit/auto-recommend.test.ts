@@ -4,6 +4,7 @@ import { inTempProject } from '../helpers/tmpProject';
 import { runFlow } from '../../src/questions/engine';
 import { flow } from '../../src/questions/flow';
 import { createSession, recordAnswer, type Session } from '../../src/state/index';
+import type { FlowSection } from '../../src/questions/types';
 
 /**
  * "Detect everything" auto-fill: runFlow with { autoRecommendGates: true } resolves
@@ -27,6 +28,7 @@ function seedSingles(): Session {
     database: 'none',
     logger: 'none',
     auditSkill: false,
+    reviewSkill: false,
     // Auto mode settles gates, not single questions: the gitleaks policy default
     // makes a hook check wanted, which would otherwise prompt for the runner.
     hookRunner: 'lefthook',
@@ -97,5 +99,34 @@ describe('autoRecommendGates', () => {
       s = recordAnswer(s, 'structure', 'monorepo');
       s = await runFlow(flow, s, { autoRecommendGates: true });
       expect(s.answers.structure).toBe('monorepo');
+    }));
+
+  it('leaves a section that opts out to its normal gate', async () =>
+    inTempProject(async () => {
+      // Neither question is a policyDefault, so auto mode would skip both. The
+      // opt-out keeps the stored gate decision in charge; it is pre-answered
+      // here so the gate never prompts.
+      const section: FlowSection = {
+        recommendable: true,
+        askWhenAutoRecommending: true,
+        gate: () => ({ id: 'opt.__recommended', title: 'Opt' }),
+        questions: () => [
+          {
+            id: 'optTone',
+            type: 'select',
+            message: 'Tone?',
+            options: [{ value: 'terse', label: 'Terse', hint: 'recommended' }],
+          },
+          { id: 'optOn', type: 'confirm', message: 'On?', recommended: true },
+        ],
+      };
+      const s = await runFlow(
+        [section],
+        recordAnswer(createSession(), 'opt.__recommended', 'recommended'),
+        { autoRecommendGates: true },
+      );
+      expect(s.answers.optTone).toBe('terse');
+      expect(s.answers.optOn).toBe(true);
+      expect(s.answers['opt.__recommended']).toBe('recommended');
     }));
 });

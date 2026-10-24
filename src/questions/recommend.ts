@@ -64,7 +64,8 @@ function labelForValue(
   value: string | string[] | boolean | undefined,
   a: Answers,
 ): string {
-  if (value === undefined) return '—';
+  // An empty text default (e.g. no team checklist) reads as "nothing", not a blank.
+  if (value === undefined || value === '') return '—';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
 
   const options = resolveOptions(q, a);
