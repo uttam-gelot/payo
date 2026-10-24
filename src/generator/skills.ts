@@ -12,6 +12,7 @@ import {
   manualVerifyTools,
   verifyToolsPhrase,
 } from './hookplan';
+import { reviewDescription, reviewPrompt, reviewStaticBody } from './review';
 
 export interface SkillSpec {
   /** Stable id; also used as the native filename stem and frontmatter `name`. */
@@ -449,6 +450,18 @@ const skills: SkillSpec[] = [
       );
     },
     staticBody: (a): string => auditStaticBody(auditTiming(a), hookPlanFrom(a)),
+  },
+  {
+    id: 'pr-review',
+    title: 'Code & PR Review',
+    // Never mentions commit or push, so it does not compete with change-audit.
+    description: reviewDescription({}),
+    describe: reviewDescription,
+    // Names the skills to read instead of restating them, like change-audit.
+    relevantSections: [],
+    appliesTo: (a) => a.reviewSkill === true,
+    buildPrompt: reviewPrompt,
+    staticBody: reviewStaticBody,
   },
 ];
 
