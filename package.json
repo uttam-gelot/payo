@@ -1,6 +1,6 @@
 {
 	"name": "@uge/payo",
-	"version": "2.5.0",
+	"version": "2.5.1",
 	"description": "One interview writes AGENTS.md and agent skills for your project, plus git and agent hooks that enforce them. Works with Claude Code, Cursor, Codex and Copilot.",
 	"repository": {
 		"type": "git",
