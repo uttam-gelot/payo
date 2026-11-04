@@ -1,12 +1,12 @@
 {
 	"name": "@uge/payo",
 	"version": "2.5.0",
-	"description": "CLI tool to generate AI rules and skills for your project",
+	"description": "One interview writes AGENTS.md and agent skills for your project, plus git and agent hooks that enforce them. Works with Claude Code, Cursor, Codex and Copilot.",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/uttam-gelot/payo.git"
 	},
-	"homepage": "https://github.com/uttam-gelot/payo#readme",
+	"homepage": "https://payo.uttamgelot.com/",
 	"bugs": {
 		"url": "https://github.com/uttam-gelot/payo/issues"
 	},
@@ -40,7 +40,15 @@
 		"cli",
 		"ai",
 		"rules",
-		"skills"
+		"skills",
+		"agents-md",
+		"agent-skills",
+		"claude-code",
+		"cursor",
+		"copilot",
+		"codex",
+		"git-hooks",
+		"code-review"
 	],
 	"license": "MIT",
 	"type": "module",
