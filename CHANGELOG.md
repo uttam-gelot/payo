@@ -7,32 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- **No `CLAUDE.md` shim when your Claude Code reads `AGENTS.md` itself.**
-  Claude Code 2.1.277 started reading `AGENTS.md` in projects without a
-  `CLAUDE.md`, and 2.1.281 made that work on every backend (Bedrock, Vertex,
-  Foundry, LLM gateways, telemetry-off sessions). Payo now checks the
-  installed version of each tool you choose to support and skips any shim
-  that version makes redundant. On Claude Code 2.1.281 or later, Payo no
-  longer writes the one-line `@AGENTS.md` import. Older or undetected
-  installs still get it, and an existing `CLAUDE.md` is still given the
-  import, since Claude Code reads `AGENTS.md` only when no `CLAUDE.md`
-  exists. The `.claude/skills/` symlinks stay: Claude Code still discovers
-  skills only there. The check runs on your machine, so a teammate on an
-  older Claude Code must add that one-line `CLAUDE.md` themselves.
-- **Per-skill generation prompts now carry only the project context that
-  skill needs**, instead of the full rule-section list every time. Each of
-  the (typically 8-13) parallel agent spawns was resending every section —
-  auth, testing, git workflow, and the rest — even when its own task only
-  read one of them. Every prompt still gets a small grounding set (Project
-  Overview, Tech Stack, Monorepo/Folder Structure) plus its own topic
-  section and anything else it explicitly depends on; provider-specific
-  guidance sections (Tailwind, Auth.js, …) are kept for every skill
-  regardless, since they're not owned by a single topic. Falls back to the
-  full unfiltered context on any error, so a bug here can only cost the
-  saving, never drop context a skill's prompt relies on. No change to
-  generated output.
+## [2.5.0] - 2026-10-24
 
 ### Added
 
@@ -50,6 +25,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   After the report you can stop, fix the issues in your own change, post one
   review on the PR / MR after a confirm, or get inline comments to paste. It
   never approves or requests changes.
+
+## [2.4.9] - 2026-09-25
+
+### Changed
+
+- **No `CLAUDE.md` shim when your Claude Code reads `AGENTS.md` itself.**
+  Claude Code 2.1.277 started reading `AGENTS.md` in projects without a
+  `CLAUDE.md`, and 2.1.281 made that work on every backend (Bedrock, Vertex,
+  Foundry, LLM gateways, telemetry-off sessions). Payo now checks the
+  installed version of each tool you choose to support and skips any shim
+  that version makes redundant. On Claude Code 2.1.281 or later, Payo no
+  longer writes the one-line `@AGENTS.md` import. Older or undetected
+  installs still get it, and an existing `CLAUDE.md` is still given the
+  import, since Claude Code reads `AGENTS.md` only when no `CLAUDE.md`
+  exists. The `.claude/skills/` symlinks stay: Claude Code still discovers
+  skills only there. The check runs on your machine, so a teammate on an
+  older Claude Code must add that one-line `CLAUDE.md` themselves.
+
+## [2.4.8] - 2026-08-24
+
+### Changed
+
+- **Per-skill generation prompts now carry only the project context that
+  skill needs**, instead of the full rule-section list every time. Each of
+  the (typically 8-13) parallel agent spawns was resending every section —
+  auth, testing, git workflow, and the rest — even when its own task only
+  read one of them. Every prompt still gets a small grounding set (Project
+  Overview, Tech Stack, Monorepo/Folder Structure) plus its own topic
+  section and anything else it explicitly depends on; provider-specific
+  guidance sections (Tailwind, Auth.js, …) are kept for every skill
+  regardless, since they're not owned by a single topic. Falls back to the
+  full unfiltered context on any error, so a bug here can only cost the
+  saving, never drop context a skill's prompt relies on. No change to
+  generated output.
+
+## [2.4.7] - 2026-08-22
+
+### Fixed
+
+- A freshly `git init`'d empty directory no longer counts as an existing
+  project. Git conventions come from the enclosing work tree, not from any
+  project file, so Payo now needs at least one non-git answer before it asks
+  whether to work with the existing project. (#66)
+
+## [2.4.6] - 2026-08-19
+
+### Added
+
 - **New "AI writing conventions" question.** Previously the only choice about
   AI-generated text was whether commits/PRs got an attribution trailer, asked
   as a lone yes/no buried in the git-workflow questions. It's now a multiselect
@@ -57,6 +80,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   text, and ASD-STE100 Simplified Technical English — and lives with the other
   Conventions questions rather than under Git Workflow, since it applies to all
   generated prose, not just commits.
+
+## [2.4.5] - 2026-08-16
+
+### Added
+
 - **You now see and can trim the exact skill list before Payo writes anything.**
   Previously the set of `.agents/skills/` files Payo would generate was decided
   entirely by your interview answers, with no chance to review or drop one —
@@ -65,6 +93,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   generation, Payo now shows the computed list (every skill preselected) and
   lets you uncheck any you don't want a file for. Skipped automatically when
   there's only zero or one skill to decide between.
+
+## [2.4.4] - 2026-08-09
+
+### Fixed
+
+- The "generate a starter prompt to scaffold a working project" question no
+  longer appears on existing-project runs, including resumed ones. (#63)
+
+## [2.4.3] - 2026-08-09
+
+### Fixed
+
+- Existing-project detection ran on no fresh run since 2.4.1. Asking for the
+  agent CLI first marked the session as started, so stack detection and both
+  existing-project questions were skipped. Payo now checks for a fresh run
+  before it asks for the agent CLI. (#62)
+
+## [2.4.2] - 2026-08-08
+
+### Fixed
+
+- On Windows, a failed agent run could abort the whole generation batch before
+  Payo wrote its log. An agent CLI that throws on spawn now counts as a normal
+  failure, and a log file that can't be written shows its error in the failure
+  reason instead of failing silently. (#61)
+
+## [2.4.1] - 2026-08-08
+
+### Added
+
+- **Payo checks that your agent CLI works before it asks more questions.**
+  Before, Payo checked only that the CLI was on your `PATH`, and only at the
+  end. A CLI that was installed but signed out fell back to templates with no
+  clear reason. Right after you pick the agent CLI, Payo now sends it a short
+  test prompt. If that fails, it says why (missing binary or no response) and
+  lets you pick again or continue with templates. (#60)
+
+## [2.4.0] - 2026-08-08
+
+### Added
+
+- **Zed support.** Zed reads `AGENTS.md` and `.agents/skills/` natively, so
+  choosing Zed writes the universal layout and nothing else. Zed reads only the
+  first instruction file it finds, so Payo warns you when a file such as
+  `.rules` or `.cursorrules` would hide `AGENTS.md` from Zed. It never deletes
+  that file. (#59)
+
+### Fixed
+
+- The bootstrap spinner no longer prints its line again on every frame when
+  the label is close to the terminal width. (#58)
+
+## [2.3.3] - 2026-08-01
+
+### Changed
+
+- **The change-audit gate now needs proof that the audit ran.** The gate used
+  to deny the first commit or push, then mark the change itself and let the
+  retry through. An agent that ignored the deny and ran the command again got
+  past without the audit. The gate now only reads a receipt that the
+  change-audit skill writes after a clean audit, keyed to that exact change.
+  A blind retry stays blocked. (#57)
+- **Codex and Antigravity get the change-audit gate too.** Both can deny a
+  command and send the reason back to the agent, so they now carry the same
+  receipt-gated deny as Claude, Cursor and Copilot. Codex needs a one-time
+  `/hooks` trust step, which Payo prints. (#57)
+
+## [2.3.2] - 2026-08-01
+
+### Added
+
 - **You now choose which git hook runner Payo sets up.** A repo with no hooks
   always got a `lefthook.yml`, whether or not lefthook was a tool your team
   wanted to install. Payo now asks, offering **Lefthook**, **Husky**,
@@ -548,7 +647,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pre-existing `CLAUDE.md` can no longer be clobbered outside the overwrite
   prompt. (#28)
 
-[Unreleased]: https://github.com/uttam-gelot/payo/compare/v2.3.1...HEAD
+[Unreleased]: https://github.com/uttam-gelot/payo/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/uttam-gelot/payo/compare/v2.4.9...v2.5.0
+[2.4.9]: https://github.com/uttam-gelot/payo/compare/v2.4.8...v2.4.9
+[2.4.8]: https://github.com/uttam-gelot/payo/compare/v2.4.7...v2.4.8
+[2.4.7]: https://github.com/uttam-gelot/payo/compare/v2.4.6...v2.4.7
+[2.4.6]: https://github.com/uttam-gelot/payo/compare/v2.4.5...v2.4.6
+[2.4.5]: https://github.com/uttam-gelot/payo/compare/v2.4.4...v2.4.5
+[2.4.4]: https://github.com/uttam-gelot/payo/compare/v2.4.3...v2.4.4
+[2.4.3]: https://github.com/uttam-gelot/payo/compare/v2.4.2...v2.4.3
+[2.4.2]: https://github.com/uttam-gelot/payo/compare/v2.4.1...v2.4.2
+[2.4.1]: https://github.com/uttam-gelot/payo/compare/v2.4.0...v2.4.1
+[2.4.0]: https://github.com/uttam-gelot/payo/compare/v2.3.3...v2.4.0
+[2.3.3]: https://github.com/uttam-gelot/payo/compare/v2.3.2...v2.3.3
+[2.3.2]: https://github.com/uttam-gelot/payo/compare/v2.3.1...v2.3.2
 [2.3.1]: https://github.com/uttam-gelot/payo/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/uttam-gelot/payo/compare/v2.2.1...v2.3.0
 [2.2.1]: https://github.com/uttam-gelot/payo/compare/v2.2.0...v2.2.1
