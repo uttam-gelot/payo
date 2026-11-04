@@ -27,7 +27,7 @@
   <meta property="og:image:type" content="image/png" />
   <meta property="og:image:width" content="2400" />
   <meta property="og:image:height" content="1260" />
-  <meta property="og:image:alt" content="Payo — generate CLAUDE.md, AGENTS.md, and universal Agent Skills in minutes." />
+  <meta property="og:image:alt" content="Payo. One interview. Rules your AI can't skip." />
   <meta property="og:locale" content="en_US" />
 
   <meta name="google-site-verification" content="_yiJtrJdbV0s8nQ2owfdkDHGfmy1tE7IVs1xbc-GPOo" />
@@ -37,7 +37,7 @@
   <meta name="twitter:title" content="Payo — CLAUDE.md, AGENTS.md &amp; Agent Skills generator CLI" />
   <meta name="twitter:description" content="Generate project-tailored AI assistant rules in minutes. Works with Claude, Cursor, Copilot, Codex, Windsurf, Zed, Antigravity." />
   <meta name="twitter:image" content="https://payo.uttamgelot.com/og.png" />
-  <meta name="twitter:image:alt" content="Payo — generate AI assistant rules in minutes." />
+  <meta name="twitter:image:alt" content="Payo. One interview. Rules your AI can't skip." />
 
   <!-- Structured data: SoftwareApplication -->
   <script type="application/ld+json">
@@ -196,12 +196,16 @@
     .btn-ghost svg { width: 17px; height: 17px; }
     .cmd-note { margin-top: 16px; font-size: 14px; color: var(--muted); }
     .cmd-note code { background: var(--teal-soft); color: var(--teal-deep); }
+    .cmd-note a { color: var(--teal); text-decoration: underline; text-underline-offset: 3px; }
 
     /* demo */
     .demo-wrap { max-width: 960px; margin: 60px auto 0; padding: 10px;
       border-radius: calc(var(--radius) + 6px); background: linear-gradient(135deg, var(--sand-soft), var(--teal-soft));
       box-shadow: var(--shadow-md); }
     .demo { width: 100%; display: block; border-radius: var(--radius); border: 1px solid rgba(255,255,255,.7); }
+    .shot { margin: 32px 0 0; }
+    .shot img { width: 100%; height: auto; display: block; border-radius: var(--radius); border: 1px solid var(--line); box-shadow: var(--shadow-md); }
+    .shot figcaption { margin-top: 10px; font-size: 14px; color: var(--muted); }
 
     /* sections */
     section { padding: 80px 0; }
@@ -322,7 +326,7 @@
         universal <strong>Agent Skills</strong> — tailored to your actual stack, read natively
         by Cursor, Copilot, Codex, and friends.
       </p>
-      <p class="cmd-note">And for those wondering what Payo means, in Gujarati it means foundation — what a building or project is built on.</p>
+      <p class="cmd-note">And for those wondering what Payo means, in Gujarati it means foundation — what a building or project is built on. <a href="https://uttamgelot.com/notes/why-i-built-payo/">Why I built it</a>.</p>
 
       <div class="hero-cta">
         <div class="cmd">
@@ -369,6 +373,10 @@
         <div class="tool"><div class="name"><span class="dot"></span>Windsurf</div><div class="files">AGENTS.md<br />.windsurf/skills/</div></div>
         <div class="tool"><div class="name"><span class="dot"></span>Zed</div><div class="files">AGENTS.md<br />.agents/skills/</div></div>
       </div>
+      <figure class="shot">
+        <img src="https://raw.githubusercontent.com/uttam-gelot/payo/main/assets/pr-review-flow.gif" alt="pr-review asks about focus areas, review level and project skills before it reads any code" loading="lazy" />
+        <figcaption>pr-review asks what to focus on before it reads any code.</figcaption>
+      </figure>
     </section>
 
     <section id="stacks">
@@ -535,6 +543,10 @@
           <div class="body">Re-running never duplicates a hook or clobbers your config; an interrupted run resumes from <code>.payo/</code>. No backend, no account, no telemetry — with no agent CLI installed, nothing leaves your machine.</div>
         </div>
       </div>
+      <figure class="shot">
+        <img src="https://raw.githubusercontent.com/uttam-gelot/payo/main/assets/change-audit-block.png" alt="change-audit blocks a push because the column lastVerifiedAt breaks the snake_case rule" loading="lazy" />
+        <figcaption>The change-audit gate blocks a push that breaks the project's snake_case rule.</figcaption>
+      </figure>
     </section>
 
     <section id="existing">
@@ -649,6 +661,7 @@
       <div class="foot-links">
         <a href="https://github.com/uttam-gelot/payo">GitHub</a>
         <a href="https://www.npmjs.com/package/@uge/payo">npm</a>
+        <a href="https://uttamgelot.com/notes/why-i-built-payo/">Why I built it</a>
         <a href="https://github.com/uttam-gelot/payo/blob/main/LICENSE">MIT License</a>
       </div>
     </div>
