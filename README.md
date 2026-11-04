@@ -2,7 +2,7 @@
 
 <img src="https://raw.githubusercontent.com/uttam-gelot/payo/main/assets/logo.png" alt="Payo" width="200" />
 
-**Generate project-tailored AI assistant rules & skills in minutes.**
+**One interview. Rules your AI can't skip.**
 
 Payo interviews you about your stack, then writes the guidance files your AI
 coding assistant reads — so Claude, Cursor, Copilot, and friends follow _your_
@@ -32,6 +32,7 @@ project's conventions instead of guessing.
 - [Already have a project? Payo detects your stack](#already-have-a-project-payo-detects-your-stack)
 - [What gets generated](#what-gets-generated)
 - [What it asks about](#what-it-asks-about)
+- [Code and PR reviews](#code-and-pr-reviews)
 - [AI vs. template generation](#ai-vs-template-generation)
 - [Bootstrap prompt](#bootstrap-prompt)
 - [Resume anytime](#resume-anytime)
@@ -55,6 +56,9 @@ write rich, project-specific docs; where it doesn't, Payo falls back to solid
 templates — so you always end up with usable output.
 
 And for those wondering what Payo means, in Gujarati it means foundation — what a building or project is built on.
+
+Why I built it, and what I learned along the way:
+[Getting an AI assistant to follow your repo's rules, not just read them](https://uttamgelot.com/notes/why-i-built-payo/).
 
 ## Why Payo?
 
@@ -135,6 +139,8 @@ hard-blocks the commit or push, and a native pre-tool gate for Claude, Cursor,
 Copilot, Codex, and Antigravity. It plans both
 layers together, so each check runs in exactly one place — the agent is told not
 to re-run what a hook already runs.
+
+![change-audit blocks a push because the column lastVerifiedAt breaks the snake_case rule](https://raw.githubusercontent.com/uttam-gelot/payo/main/assets/change-audit-block.png)
 
 **6. One canonical copy, every tool.** One `SKILL.md` per topic under
 `.agents/skills/`, with Claude Code and Windsurf pointed at it by symlink. No
@@ -220,6 +226,9 @@ guidance files straight into your repo.
    answers produced — every one preselected — so you can uncheck anything you
    don't want a file for before a single one is written. Skipped when there's
    only zero or one skill to decide between.
+
+   <img src="https://raw.githubusercontent.com/uttam-gelot/payo/main/assets/skill-list.png" alt="Payo shows the stack summary, then the list of skills it will generate, each preselected" width="720" />
+
 6. **Payo generates the guidance.** It writes one universal layout that every
    skills-compatible tool reads (see the table below). With an agent CLI
    installed, skills are generated in parallel by the AI; otherwise solid
@@ -331,22 +340,8 @@ agent uses it at that point to check your pending change against the relevant pr
 skills and flag anything that conflicts. It reads the diff and reports — it never runs
 your tests, linter or formatter, because your git hook already does.
 
-Payo can also add a **pr-review** skill (`.agents/skills/pr-review/SKILL.md`) if you
-opt in. Your assistant uses it when you ask for a review of your local changes, the
-current branch, or a PR / MR by number. Before it reads any code, it asks what to focus
-on (bugs, security, code quality, tests), which level of findings you want, and whether
-to check the change against your project skills. In Claude Code that is one
-`AskUserQuestion` prompt. It checks each finding against the surrounding code before
-reporting it, labels it the [Conventional Comments](https://conventionalcomments.org/)
-way (`issue (blocking):`, `suggestion:`, `nitpick:`, and so on), and puts the worst
-first. Then you pick what happens next: stop, let it fix the issues in your own change,
-post one review on the PR / MR, or get inline comments to paste yourself.
-
-It fetches a PR with plain git into a temporary ref, and never checks it out or runs its
-code. It needs `gh` or `glab` only to read a PR description or to post, and it never
-approves a PR or requests changes. Claude Code's `/code-review` and Codex's `/review`
-are built-in commands, so typing them runs those instead. Ask in words ("review PR 42")
-or type `/pr-review`.
+Payo can also add a **pr-review** skill for code and PR reviews. See
+[Code and PR reviews](#code-and-pr-reviews).
 
 ### Guardrails enforced by hooks, not just prose
 
@@ -427,6 +422,40 @@ your stack needs. Dimensions covered:
   the team defaults: what you review, which focus areas to recommend, how findings
   read, and a team checklist every review checks
 
+## Code and PR reviews
+
+Ask a plain assistant to "review this PR" and you get a generic review. It doesn't
+know your conventions, it re-runs checks your git hooks already run, and it reports
+findings it never verified. Payo can add a **pr-review** skill
+(`.agents/skills/pr-review/SKILL.md`) that fixes that. One question turns it on, and
+one gate sets your team's defaults: what you review, which focus areas to recommend,
+how findings read, and an optional team checklist.
+
+![pr-review asks about focus areas, review level and project skills before it reads any code](https://raw.githubusercontent.com/uttam-gelot/payo/main/assets/pr-review-flow.gif)
+
+**What it reviews.** Your local changes, the current branch, or a GitHub / GitLab PR
+or MR by number. It never assumes `main` is the base.
+
+**It asks before it reads any code.** What to focus on (bugs, security, code quality,
+tests), which level of findings you want, and whether to check the change against
+your project skills. In Claude Code that is one `AskUserQuestion` prompt.
+
+**Verified, labeled, ordered.** It checks each finding against the surrounding code
+before reporting it, labels it the [Conventional Comments](https://conventionalcomments.org/)
+way (`issue (blocking):`, `suggestion:`, `nitpick:`, and so on), and puts the worst
+first.
+
+**You pick what happens next.** Stop, let it fix the issues in your own change, post
+one review on the PR / MR after a confirm, or get inline comments to paste yourself.
+
+**Safe with untrusted code.** It fetches a PR with plain git into a temporary ref, and
+never checks it out or runs its code. It needs `gh` or `glab` only to read a PR
+description or to post, and it never approves a PR or requests changes.
+
+**How to start it.** Ask in words ("review PR 42") or type `/pr-review`. Claude Code's
+`/code-review` and Codex's `/review` are built-in commands, so typing them runs those
+instead.
+
 ## AI vs. template generation
 
 Payo always leaves you with output. When the chosen assistant's headless CLI
@@ -468,20 +497,16 @@ generating what's missing. Finished runs clean the directory up automatically.
 
 Payo works today, but it's still early. Here's where it's headed:
 
-- **Deeper monorepo support.** Payo now enumerates workspace members — including
-  nested workspaces the root never declared — detects each package's stack,
-  classifies hybrid repos (frontend + backend languages) as one full-stack
-  project, and writes per-package notes into one root config (see
-  [Already have a project?](#already-have-a-project-payo-detects-your-stack)).
-  Next is going further: per-package skills and guidance for repos where each
-  workspace wants its own conventions, and workspace enumeration for the
-  remaining ecosystems (Python, PHP, .NET, Ruby).
-- **Broader stack coverage.** More languages, frameworks, ORMs, databases, and
-  AI tools, plus deeper, more opinionated defaults for the ones already
-  supported — so the guidance fits more of the ecosystem out of the box.
-- **A smoother flow.** Faster, clearer prompts; better defaults and grouping;
-  tighter summaries and confirmations; and a generation step that's quicker and
-  more transparent about what it's doing.
+- **Add one skill without the full interview.** Today Payo asks every question,
+  even if you only want pr-review. Next, you name the skill and answer only its
+  questions.
+- **More languages, libraries and frameworks**, with recommendations from people
+  who work in those stacks every day.
+- **An audit flow.** Payo compares your skills with the current codebase and
+  shows where they no longer match.
+- **A better flow for existing projects**, including per-package skills for
+  monorepos where each workspace wants its own conventions, and workspace
+  enumeration for the remaining ecosystems (Python, PHP, .NET, Ruby).
 
 Have a stack you want supported or an idea to make the flow better?
 [Open an issue](https://github.com/uttam-gelot/payo/issues) or see
