@@ -9,10 +9,19 @@ import type { RuleSection } from './types';
 import type { PackageSummary } from '../detect/types';
 import type { TechModule } from '../stack/types';
 import { resolveGuidance } from './guidance';
-import { dbFamily, hasTesting as testingSelected } from '../stack/predicates';
+import { dbFamily, hasTesting as testingSelected, usesExternalIdentity } from '../stack/predicates';
+import {
+  authStrategyLine,
+  codingStandardLine,
+  gitWorkflowLine,
+  stripEmDashes,
+  structureLine,
+  tidyText,
+} from './describe';
 import { getModule, modulesFor } from '../stack/registry';
 import {
   automatedSummary,
+  blockedActions,
   hookPlanFrom,
   isAutomated,
   manualVerifyTools,
@@ -194,7 +203,7 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
   const fromCode = answers.detectEverything === true;
 
   const def = str(answers, 'projectDefinition');
-  if (def) sections.push({ title: 'Project Overview', body: def });
+  if (def) sections.push({ title: 'Project Overview', body: tidyText(def) });
 
   const stack: string[] = [];
   const push = (label: string, key: string): void => {
@@ -242,11 +251,15 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
   if (auth) {
     const lines = [`- Auth approach: ${auth}`];
     const strategy = str(answers, 'authStrategy');
-    if (strategy) lines.push(`- Session strategy: ${strategy}`);
+    if (strategy) lines.push(authStrategyLine(strategy));
     if (answers.rbac === true)
       lines.push('- Enforce role-based access control (RBAC) on the server.');
+    // With an external identity provider the app never sees a password, so a
+    // hashing rule would be wrong advice.
     lines.push(
-      '- Hash passwords (argon2/bcrypt); keep secrets in env vars; never log credentials, tokens, or session ids.',
+      usesExternalIdentity(answers)
+        ? '- Keep secrets in env vars; never log credentials, tokens, or session ids.'
+        : '- Hash passwords (argon2/bcrypt); keep secrets in env vars; never log credentials, tokens, or session ids.',
     );
     sections.push({ title: 'Authentication', body: lines.join('\n') });
   }
@@ -294,13 +307,13 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
     const pkgSection = workspacePackagesSection(answers);
     if (pkgSection) sections.push(pkgSection);
   } else if (structure) {
-    sections.push({ title: 'Folder Structure', body: `Use a ${structure} layout.` });
+    sections.push({ title: 'Folder Structure', body: structureLine(structure) });
   }
 
   const standards = answers.codingStandards;
   if (Array.isArray(standards) && standards.length) {
     const body = [
-      ...standards.map((s) => `- ${s}`),
+      ...standards.map((s) => `- ${codingStandardLine(String(s))}`),
       '- Keep configuration and secrets in environment variables.',
       '- Commit a .env.example documenting every required variable; never commit a real .env.',
       '- Validate required environment variables at startup.',
@@ -387,7 +400,7 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
     answers.atomicCommits === true;
   if (gitContent) {
     const lines = [
-      git ? `Follow the ${git} workflow.` : 'Follow this project’s git conventions.',
+      git ? gitWorkflowLine(git) : 'Follow this project’s git conventions.',
       '- Maintain a comprehensive .gitignore (build output, dependencies, environment/secret files, OS/editor artifacts).',
     ];
     if (branch)
@@ -413,9 +426,11 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
     const plan = hookPlanFrom(answers);
     const automated = automatedSummary(plan);
     if (automated) {
-      lines.push(`- Git hooks: ${automated}, and blocks the commit or push when a check fails.`);
       lines.push(
-        '- Do not run those checks yourself first — the hook runs them. If it blocks, fix the failure and retry.',
+        `- Git hooks: ${automated}, and blocks ${blockedActions(plan) ?? 'the commit or push'} when a check fails.`,
+      );
+      lines.push(
+        '- Do not run those checks yourself first; the hook runs them. If it blocks, fix the failure and retry.',
       );
     }
     if (answers.gitleaks === true && !isAutomated(plan, 'secret-scan'))
@@ -435,7 +450,7 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
     if (anyManual && answers.verifyTiming === 'push')
       lines.push(`- Run ${verifyPhrase} before pushing; only push when they pass.`);
     if (answers.atomicCommits === true)
-      lines.push('- Keep commits small and atomic — one logical change per commit.');
+      lines.push('- Keep commits small and atomic: one logical change per commit.');
     sections.push({ title: 'Git Workflow', body: lines.join('\n') });
   }
 
@@ -448,6 +463,17 @@ export function buildBaseRules(answers: Answers): RuleSection[] {
   const details = techDetails(answers);
   if (details.length) sections.push({ title: 'Tech Details', body: details.join('\n') });
 
+  // The no-em-dash convention applies to Payo's own template text too, or
+  // AGENTS.md breaks the rule it states. The AI Writing Conventions section is
+  // left alone: it quotes the em dash to define the rule.
+  const aiConventions = answers.aiConventions;
+  if (Array.isArray(aiConventions) && aiConventions.includes('no-em-dash')) {
+    return sections.map((s) =>
+      s.title === 'AI Writing Conventions'
+        ? s
+        : { title: stripEmDashes(s.title, true), body: stripEmDashes(s.body) },
+    );
+  }
   return sections;
 }
 

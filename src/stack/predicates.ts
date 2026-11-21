@@ -78,3 +78,26 @@ export const hasTesting = (a: Answers): boolean => {
     chosen('e2eTool')
   );
 };
+
+/**
+ * Auth approaches where an external identity provider owns login and password
+ * storage, so the app never receives or hashes a user password. A "hash
+ * passwords" rule there is wrong advice. Custom (Other) values are not listed:
+ * Payo cannot tell, so they keep the generic rule.
+ */
+const EXTERNAL_IDENTITY = new Set([
+  'auth0',
+  'cognito',
+  'clerk',
+  'supabase-auth',
+  'authlib',
+  'goth',
+  'omniauth',
+  'oauth2',
+  'spring-security-oauth2',
+]);
+
+/** True when login and passwords are handled by an external identity provider. */
+export const usesExternalIdentity = (a: Answers): boolean =>
+  (typeof a.authApproach === 'string' && EXTERNAL_IDENTITY.has(a.authApproach)) ||
+  a.authStrategy === 'provider';

@@ -72,7 +72,7 @@ export function writeAgentsEntrypoint(
 ): string {
   const rules = renderMarkdown('Project Guide', sections).trimEnd();
   const index = generated
-    .map((s) => `- **${s.title}** — \`${s.path}\`: ${s.description}`)
+    .map((s) => `- **${s.title}** (\`${s.path}\`): ${s.description}`)
     .join('\n');
   // The index alone only tells a reader the skills exist; this directive tells
   // the agent to actually consult and obey the applicable ones before working.
