@@ -32,6 +32,7 @@ import {
   type PlannedCheck,
 } from './hookplan';
 import type { HookRunner } from '../detect/hooks';
+import { pmAddDev, pmExec } from '../stack/commands';
 
 /** Marker that tags every Payo-written hook block, for idempotent re-runs. */
 const MARK = 'payo:';
@@ -64,14 +65,6 @@ const SETUP_BANNER: Partial<Record<HookRunner, string>> = {
     '# Then wire it into this repo:\n' +
     '#   lefthook install\n' +
     '# Docs: https://github.com/evilmartians/lefthook\n',
-  husky:
-    '# Created by Payo — git hooks that enforce the generated guardrail skills.\n' +
-    '#\n' +
-    '# Requires husky. Install it once with:\n' +
-    '#   npm install -D husky\n' +
-    '# Then wire it into this repo:\n' +
-    '#   npx husky\n' +
-    '# Docs: https://typicode.github.io/husky\n',
   'pre-commit':
     '# Created by Payo — git hooks that enforce the generated guardrail skills.\n' +
     '#\n' +
@@ -88,6 +81,24 @@ const SETUP_BANNER: Partial<Record<HookRunner, string>> = {
     '# Plain git hooks, no dependency. Point git at this directory once:\n' +
     '#   git config core.hooksPath .githooks\n',
 };
+
+/**
+ * The banner for a fresh config. husky is an npm package, so its install and
+ * wire-up lines use the project's own package manager (`bun add -d husky`,
+ * `bunx husky`): a Bun repo must not be told to run npm.
+ */
+function setupBanner(runner: HookRunner, a: Answers): string {
+  if (runner !== 'husky') return SETUP_BANNER[runner] ?? '';
+  return (
+    '# Created by Payo — git hooks that enforce the generated guardrail skills.\n' +
+    '#\n' +
+    '# Requires husky. Install it once with:\n' +
+    `#   ${pmAddDev(a, 'husky')}\n` +
+    '# Then wire it into this repo:\n' +
+    `#   ${pmExec(a, 'husky')}\n` +
+    '# Docs: https://typicode.github.io/husky\n'
+  );
+}
 
 /** Render a fresh `lefthook.yml` for the given checks. */
 function renderLefthook(checks: Check[]): string {
@@ -162,13 +173,12 @@ export function mergeLefthook(text: string, checks: Check[]): string {
  * append to a script the developer wrote — their existing lines keep their
  * existing semantics.
  */
-function appendShellHook(absPath: string, checks: Check[], runner?: HookRunner): boolean {
+function appendShellHook(absPath: string, checks: Check[], banner?: string): boolean {
   const existing = fs.existsSync(absPath) ? fs.readFileSync(absPath, 'utf8') : '';
   const pending = checks.filter((c) => !existing.includes(`${MARK}${c.name}`));
   if (pending.length === 0) return false;
   const lines = pending.map((c) => `${c.run} || exit 1  # ${MARK}${c.name}`).join('\n');
-  const banner = (runner && SETUP_BANNER[runner]) ?? '';
-  const header = existing ? '' : `#!/usr/bin/env sh\n${banner}`;
+  const header = existing ? '' : `#!/usr/bin/env sh\n${banner ?? ''}`;
   const body = `${header}${existing}${existing && !existing.endsWith('\n') ? '\n' : ''}${lines}\n`;
   writeFileAtomic(absPath, body);
   try {
@@ -214,7 +224,7 @@ function appendPreCommit(absPath: string, checks: Check[], fresh: boolean): bool
  * `planHooks`, which is what respects both the user's "leave my hooks alone"
  * choice and their "no runner at all" choice. Returns the paths touched.
  */
-function emitMechanical(plan: HookPlan): string[] {
+function emitMechanical(plan: HookPlan, a: Answers): string[] {
   const checks = plan.write;
   if (checks.length === 0) return [];
 
@@ -243,7 +253,9 @@ function emitMechanical(plan: HookPlan): string[] {
         // A native hooksPath may point outside cwd; keep writes contained to the
         // project unless it is explicitly absolute.
         const abs = path.isAbsolute(base) ? path.join(base, stage) : resolveContained(rel);
-        if (appendShellHook(abs, staged, plan.greenfield ? plan.runner : undefined)) {
+        if (
+          appendShellHook(abs, staged, plan.greenfield ? setupBanner(plan.runner, a) : undefined)
+        ) {
           touched.push(rel);
         }
       }
@@ -607,7 +619,7 @@ export function emitHooks(
   cwd: string = process.cwd(),
   plan: HookPlan = planHooks(a, cwd),
 ): string[] {
-  return [...new Set([...emitMechanical(plan), ...emitNativeAsk(a, tools)])];
+  return [...new Set([...emitMechanical(plan, a), ...emitNativeAsk(a, tools)])];
 }
 
 /** True when `bin` resolves on PATH. */
@@ -634,18 +646,18 @@ const CHECK_LABEL: Record<PlannedCheck['capability'], string> = {
  * it is not already on PATH. A runner that was merged into is already active and
  * gets nothing here.
  */
-const ACTIVATION_HINTS: Partial<Record<HookRunner, (plan: HookPlan) => string[]>> = {
+const ACTIVATION_HINTS: Partial<Record<HookRunner, (plan: HookPlan, a: Answers) => string[]>> = {
   lefthook: () => [
     ...(onPath('lefthook')
       ? []
       : ['Install lefthook:  brew install lefthook   (or: npm i -D lefthook)']),
     'Enable the git hooks:  lefthook install',
   ],
-  husky: () => [
-    'Install husky:  npm i -D husky',
+  husky: (_plan, a) => [
+    `Install husky:  ${pmAddDev(a, 'husky')}`,
     // Deliberately `husky`, not `husky init` — init scaffolds its own
     // pre-commit script, which would sit on top of the one just written.
-    'Enable the git hooks:  npx husky',
+    `Enable the git hooks:  ${pmExec(a, 'husky')}`,
   ],
   'pre-commit': (plan) => [
     ...(onPath('pre-commit')
@@ -673,7 +685,7 @@ export function hookSetupHints(files: string[], a: Answers, plan?: HookPlan): st
   const hints: string[] = [];
   if (plan) {
     if (plan.greenfield && plan.write.length > 0) {
-      hints.push(...(ACTIVATION_HINTS[plan.runner]?.(plan) ?? []));
+      hints.push(...(ACTIVATION_HINTS[plan.runner]?.(plan, a) ?? []));
     }
   } else if (files.includes('lefthook.yml')) {
     // No plan (older callers): the written file is the only evidence available.

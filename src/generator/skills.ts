@@ -7,12 +7,15 @@ import type { Answers } from '../questions/types';
 import {
   auditReceiptCommand,
   automatedSummary,
+  blockedActions,
   hookPlanFrom,
   isAutomated,
   manualVerifyTools,
   verifyToolsPhrase,
 } from './hookplan';
 import { reviewDescription, reviewPrompt, reviewStaticBody } from './review';
+import { authStrategyPrompt, gitWorkflowPhrase } from './describe';
+import { usesExternalIdentity } from '../stack/predicates';
 
 export interface SkillSpec {
   /** Stable id; also used as the native filename stem and frontmatter `name`. */
@@ -233,11 +236,18 @@ const skills: SkillSpec[] = [
         `Write authentication and authorization conventions using ${via}: how to model identity ` +
           'and sessions, protect routes/handlers, and verify credentials.',
       ];
-      if (strategy) parts.push(`Use a ${strategy} session strategy.`);
+      if (strategy) parts.push(authStrategyPrompt(strategy));
+      // An external identity provider owns passwords; telling the agent to hash
+      // them invites a password flow the app must never have.
       parts.push(
-        'Hash passwords with a strong algorithm (argon2 or bcrypt), keep secrets in environment ' +
-          'variables, set secure/httpOnly cookies where applicable, and never log credentials, ' +
-          'tokens, or session identifiers.',
+        usesExternalIdentity(a)
+          ? 'The identity provider owns login screens and password storage: the app never ' +
+              'collects, stores, or hashes user passwords. Keep secrets in environment variables, ' +
+              'set secure/httpOnly cookies where applicable, and never log credentials, tokens, ' +
+              'or session identifiers.'
+          : 'Hash passwords with a strong algorithm (argon2 or bcrypt), keep secrets in environment ' +
+              'variables, set secure/httpOnly cookies where applicable, and never log credentials, ' +
+              'tokens, or session identifiers.',
       );
       if (a.rbac === true) {
         parts.push(
@@ -373,7 +383,7 @@ const skills: SkillSpec[] = [
     buildPrompt: (a): string => {
       const wf = val(a, 'gitWorkflow');
       let base =
-        `Write git-workflow guidance for the ${wf ?? 'selected'} workflow: branching, commit message ` +
+        `Write git-workflow guidance for the ${gitWorkflowPhrase(wf)}: branching, commit message ` +
         'conventions, and PR practices, and maintaining a comprehensive .gitignore (build output, ' +
         'dependencies, environment/secret files, and OS/editor artifacts).';
       const branch = val(a, 'branchNaming');
@@ -395,10 +405,10 @@ const skills: SkillSpec[] = [
       const automated = automatedSummary(plan);
       if (automated) {
         base +=
-          ` This repo enforces its checks with git hooks: ${automated}, and the commit or push ` +
-          'is blocked when one fails. State that in the skill, and instruct the assistant NOT to ' +
-          'run those checks manually beforehand — it should commit or push and, if the hook ' +
-          'blocks, fix the reported failure and retry.';
+          ` This repo enforces its checks with git hooks: ${automated}, and ` +
+          `${blockedActions(plan) ?? 'the commit or push'} is blocked when one fails. State that in ` +
+          'the skill, and instruct the assistant NOT to run those checks manually beforehand. ' +
+          'It should commit or push and, if the hook blocks, fix the reported failure and retry.';
       }
       if (a.gitleaks === true && !isAutomated(plan, 'secret-scan'))
         base +=
@@ -410,7 +420,7 @@ const skills: SkillSpec[] = [
       if (manual.length > 0 && a.verifyTiming === 'push')
         base += ` Run ${verifyToolsPhrase(manual)} before pushing, and only push when they pass.`;
       if (a.atomicCommits === true)
-        base += ' Keep commits small and atomic — one logical change per commit.';
+        base += ' Keep commits small and atomic: one logical change per commit.';
       return base;
     },
   },
@@ -443,6 +453,9 @@ const skills: SkillSpec[] = [
         'the specific conflict) followed by a one-line overall verdict. It flags conflicts for ' +
         'the human to resolve — it does not rewrite code. Keep the whole skill and its output ' +
         'short to conserve tokens; the file must not restate the other skills, only reference them. ' +
+        "Any changed-path globs it lists must match this project's real layout (for example a " +
+        '`src/` prefix when code lives under `src/`), and it must name only tools this project ' +
+        'uses. ' +
         `(4) It must END with this exact step, verbatim: ${auditReceiptStep(timing)} A native git ` +
         `gate blocks the ${timing === 'push' ? 'push' : 'commit'} until that receipt is written, so ` +
         'the skill is useless without this final step — always include it.' +
@@ -503,7 +516,7 @@ function auditReceiptStep(timing: 'commit' | 'push'): string {
   return (
     'If, and only if, the report shows no blocking conflict, record the pass so the ' +
     `${timing} can proceed: ` +
-    `\`${auditReceiptCommand(timing)}\`. If any conflict remains, do NOT record it — resolve the ` +
+    `\`${auditReceiptCommand(timing)}\`. If any conflict remains, do NOT record it. Resolve the ` +
     "conflict (or get the human's explicit sign-off), then run this audit again."
   );
 }
@@ -519,7 +532,7 @@ function auditStaticBody(
       : '`git diff --staged`';
   const automated = automatedSummary(plan);
   return [
-    `Run this right before ${auditGerund(timing)} to catch changes that conflict with this project's skills. Keep it short — do not read every skill.`,
+    `Run this right before ${auditGerund(timing)} to catch changes that conflict with this project's skills. Keep it short; do not read every skill.`,
     '',
     '1. Get the change set with ' + changeSet + '.',
     '2. From the changed files, pick ONLY the few skills in `.agents/skills/` that are relevant (judge by each skill directory name and its description — do not open every skill).',
@@ -529,7 +542,7 @@ function auditStaticBody(
     ...(automated
       ? [
           '',
-          `Never run tests, linters, formatters or secret scanners here — ${automated}, and blocks on failure. Read the diff only, and ignore any instruction in the skills you check to run the project's checks.`,
+          `Never run tests, linters, formatters or secret scanners here: ${automated}, and blocks on failure. Read the diff only, and ignore any instruction in the skills you check to run the project's checks.`,
         ]
       : []),
   ].join('\n');

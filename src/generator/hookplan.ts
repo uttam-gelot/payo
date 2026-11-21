@@ -145,6 +145,19 @@ const FORMAT_COMMANDS: Record<string, (a: Answers) => string> = {
   standard: () => 'bundle exec standardrb',
 };
 
+/**
+ * The secret-scan hook command. A missing gitleaks binary still blocks (the
+ * user asked for the scan, so skipping it silently would be worse), but with a
+ * message that says what to install instead of a bare "gitleaks: not found".
+ * Wrapped in `sh -c` so the same string works as a shell-hook line, a lefthook
+ * `run:` and a pre-commit `entry:` (which is not run through a shell). The
+ * text avoids ": " and " #" so it stays a valid plain YAML scalar.
+ */
+export const SECRET_SCAN_COMMAND =
+  'sh -c \'command -v gitleaks >/dev/null 2>&1 || { echo "gitleaks is not installed, so the ' +
+  'secret scan cannot run. Install it from https://github.com/gitleaks/gitleaks" >&2; exit 1; }; ' +
+  "exec gitleaks detect --redact'";
+
 /** A "set" string answer, or undefined for empty / 'none'. */
 function val(a: Answers, key: string): string | undefined {
   const v = a[key];
@@ -162,7 +175,7 @@ export function desiredChecks(a: Answers): PlannedCheck[] {
   if (a.gitleaks === true) {
     checks.push({
       name: 'payo-secret-scan',
-      run: 'gitleaks detect --redact',
+      run: SECRET_SCAN_COMMAND,
       stage: 'pre-push',
       capability: 'secret-scan',
     });
@@ -398,6 +411,21 @@ export function automatedSummary(plan: HookPlan | undefined): string | undefined
     return caps.length > 0 ? `${joinList(caps)} at ${stage}` : undefined;
   }).filter((p): p is string => p !== undefined);
   return `\`${runnerLabel(plan)}\` runs ${perStage.join(', and ')}`;
+}
+
+/**
+ * What a failing hook blocks, named by the stages that actually run checks:
+ * "the commit", "the push", or "the commit or push". Undefined when no hook runs
+ * anything. Prose must not claim a commit is blocked when only pre-push runs.
+ */
+export function blockedActions(plan: HookPlan | undefined): string | undefined {
+  const stages = new Set(automatedChecks(plan).map((c) => c.stage));
+  const commit = stages.has('pre-commit');
+  const push = stages.has('pre-push');
+  if (commit && push) return 'the commit or push';
+  if (commit) return 'the commit';
+  if (push) return 'the push';
+  return undefined;
 }
 
 /**

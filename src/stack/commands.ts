@@ -50,6 +50,23 @@ export function pmExec(a: Answers, cmd: string): string {
 }
 
 /**
+ * Add a dev dependency with the chosen manager, e.g. `bun add -d husky`.
+ * npm (and the unset case) uses `npm install -D`.
+ */
+export function pmAddDev(a: Answers, pkg: string): string {
+  switch (pm(a)) {
+    case 'pnpm':
+      return `pnpm add -D ${pkg}`;
+    case 'yarn':
+      return `yarn add -D ${pkg}`;
+    case 'bun':
+      return `bun add -d ${pkg}`;
+    default:
+      return `npm install -D ${pkg}`;
+  }
+}
+
+/**
  * Run a package.json script with the chosen manager, e.g. `pnpm dev`,
  * `npm run build`. pnpm/yarn invoke scripts bare; npm (and unset) and bun use
  * their `run` form.
