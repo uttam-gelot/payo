@@ -6,7 +6,7 @@ import { inTempProject } from '../helpers/tmpProject';
 import { initGitRepo, commitEmpty } from '../helpers/gitRepo';
 import { emitHooks, mergeLefthook, hookSetupHints } from '../../src/generator/hooks';
 import { detectHookRunner } from '../../src/detect/hooks';
-import { planHooks, auditReceiptCommand } from '../../src/generator/hookplan';
+import { planHooks, auditReceiptCommand, SECRET_SCAN_COMMAND } from '../../src/generator/hookplan';
 
 type ClaudeCfg = {
   permissions?: { allow: string[] };
@@ -55,7 +55,7 @@ describe('emitHooks — mechanical (the chosen greenfield runner)', () => {
       expect(sh.startsWith('#!/usr/bin/env sh\n')).toBe(true);
       expect(sh).toContain('npx husky'); // the install banner
       // `|| exit 1` per line: sh exits with the status of the last line only.
-      expect(sh).toContain('gitleaks detect --redact || exit 1  # payo:payo-secret-scan');
+      expect(sh).toContain(`${SECRET_SCAN_COMMAND} || exit 1  # payo:payo-secret-scan`);
     }));
 
   it('writes a valid fresh .pre-commit-config.yaml when pre-commit is chosen', () =>
@@ -66,7 +66,7 @@ describe('emitHooks — mechanical (the chosen greenfield runner)', () => {
       // The top-level key is what makes the file loadable at all.
       expect(yml).toContain('\nrepos:\n');
       expect(yml).toContain('- repo: local');
-      expect(yml).toContain('entry: gitleaks detect --redact');
+      expect(yml).toContain(`entry: ${SECRET_SCAN_COMMAND}`);
       expect(yml).toContain('stages: [push]');
     }));
 
@@ -77,7 +77,7 @@ describe('emitHooks — mechanical (the chosen greenfield runner)', () => {
       const sh = readFileSync(join(dir, '.githooks/pre-push'), 'utf8');
       expect(sh).toContain('git config core.hooksPath .githooks'); // the banner
       // `|| exit 1` per line: sh exits with the status of the last line only.
-      expect(sh).toContain('gitleaks detect --redact || exit 1  # payo:payo-secret-scan');
+      expect(sh).toContain(`${SECRET_SCAN_COMMAND} || exit 1  # payo:payo-secret-scan`);
     }));
 
   it('guards every check so an early failure still blocks the push', () =>
